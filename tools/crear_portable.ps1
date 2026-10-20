@@ -27,6 +27,26 @@ Copy-Item $exeLauncher (Join-Path $destino 'ArcadeBros1983Recomp.exe') -Force
 Get-ChildItem -Path $carpetaBuild -Filter '*.dll' -File | ForEach-Object {
     Copy-Item $_.FullName (Join-Path $bin $_.Name) -Force
 }
+# Configuracion arcade: desactivar atajos de save states
+$plantilla = Join-Path $proyecto 'config\config.ini'
+$configDestino = Join-Path $bin 'config.ini'
+
+# Crear configuracion solo si no existe
+if (!(Test-Path $configDestino)) {
+    if (!(Test-Path $plantilla)) {
+        throw 'No se encontro config/config.ini'
+    }
+    Copy-Item $plantilla $configDestino
+}
+
+# Desactivar guardar y cargar estados
+$contenido = Get-Content $configDestino -Raw
+
+$contenido = $contenido -replace '(?m)^(\s*(save_state|load_state)\s*=\s*).*$', '${1}none'
+
+Set-Content -Path $configDestino -Value $contenido -Encoding ascii
+
+Write-Host 'Modo arcade: atajos de save states desactivados.' -ForegroundColor Green
 Write-Host ''
 Write-Host 'Instalacion portable preparada en:' -ForegroundColor Green
 Write-Host $destino

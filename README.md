@@ -216,3 +216,37 @@ El script prepara la distribución dentro de dist/.
 - Almacenamiento totalmente local de configuraciones y partidas: pendiente de verificar.
 
 **Importante:** la ROM es proporcionada por el usuario. No se incluye en el repositorio ni en las distribuciones públicas del proyecto.
+
+## Edición Arcade (en desarrollo)
+
+La siguiente actualización incorpora mejoras propias
+para conservar la experiencia arcade original.
+
+### Características
+
+- Lanzador portable para Windows.
+- Importación de la ROM en la primera ejecución.
+- Almacenamiento local de datos.
+- Compatibilidad con mandos Xbox.
+- Récords permanentes entre sesiones.
+- Atajos de save states desactivados.
+- Partidas nuevas desde cero.
+
+### Sistema de récords
+
+El juego conserva automáticamente la puntuación máxima
+incluso después de cerrar y volver a abrir el programa.
+
+La implementación utiliza la API de modificaciones
+de NESRecomp, sin alterar la ROM original.
+
+Documentación técnica:
+
+[Récords permanentes](docs/RECORDS.md)
+
+### Próximas mejoras
+
+- Verificar la eliminación completa de los save states.
+- Mejorar las opciones gráficas.
+- Investigar renderizado interpolado a 120, 144 y 180 FPS.
+- Ampliar las pruebas de compatibilidad.

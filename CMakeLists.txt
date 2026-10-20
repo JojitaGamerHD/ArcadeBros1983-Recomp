@@ -20,6 +20,7 @@ nesrecomp_add_cycle_game(ArcadeBros1983Recomp
     RECOMPILER "${NESRECOMP_ROOT}/build/recompiler/Release/NESRecomp.exe"
     PLAYERS 2
     REGION NTSC
+    HOST_EXTRAS "${CMAKE_CURRENT_SOURCE_DIR}/src/records.c"
 )
 
 # Lanzador portable de Arcade Bros 1983 Recomp
