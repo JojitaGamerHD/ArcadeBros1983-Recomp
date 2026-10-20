@@ -1,0 +1,18 @@
+﻿# ROM original y archivos privados
+roms/
+*.nes
+
+# Codigo derivado de la ROM
+generated/
+
+# Archivos compilados
+build/
+*.exe
+*.dll
+*.pdb
+*.obj
+
+# Configuracion local y archivos temporales
+.vs/
+keybinds.ini
+*.log

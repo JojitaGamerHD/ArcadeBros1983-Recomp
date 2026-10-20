@@ -1,0 +1,4 @@
+[game]
+name = "Arcade Bros 1983 Recomp"
+output_prefix = "arcade_bros_1983"
+cycle_accurate = true
