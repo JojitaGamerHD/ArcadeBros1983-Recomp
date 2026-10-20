@@ -21,3 +21,11 @@ nesrecomp_add_cycle_game(ArcadeBros1983Recomp
     PLAYERS 2
     REGION NTSC
 )
+
+# Lanzador portable de Arcade Bros 1983 Recomp
+if(WIN32)
+    add_executable(ArcadeBrosLauncher WIN32 src/launcher.cpp)
+    target_compile_features(ArcadeBrosLauncher PRIVATE cxx_std_17)
+    target_link_libraries(ArcadeBrosLauncher PRIVATE comdlg32 bcrypt)
+endif()
+

@@ -180,3 +180,39 @@ NESRecomp es software de terceros sujeto a su licencia **PolyForm Noncommercial 
 ---
 
 **Arcade Bros 1983 Recomp** — Una exploración técnica de la recompilación nativa de juegos clásicos.
+
+## Modo portable
+
+Arcade Bros 1983 Recomp incluye un lanzador portable para Windows.
+
+### Primera ejecución
+
+Al ejecutar el juego por primera vez, el lanzador solicita al usuario su ROM original de Mario Bros. (1983).
+
+El programa verifica que la ROM sea compatible y guarda una copia local dentro de la carpeta Datos.
+
+### Siguientes ejecuciones
+
+Una vez importada la ROM, el juego se inicia directamente sin necesidad de volver a seleccionarla.
+
+La carpeta del juego puede trasladarse a otra ubicación, incluyendo una memoria USB, conservando la ROM importada.
+
+### Crear la versión portable
+
+Desde la carpeta del proyecto, ejecutar:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\tools\crear_portable.ps1
+```
+
+El script prepara la distribución dentro de dist/.
+
+### Estado de las pruebas
+
+- Selector de ROM: funcionando.
+- Importación de ROM: funcionando.
+- Inicio automático posterior: funcionando.
+- Ejecución desde otra carpeta: comprobada.
+- Almacenamiento totalmente local de configuraciones y partidas: pendiente de verificar.
+
+**Importante:** la ROM es proporcionada por el usuario. No se incluye en el repositorio ni en las distribuciones públicas del proyecto.

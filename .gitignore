@@ -16,3 +16,9 @@ build/
 .vs/
 keybinds.ini
 *.log
+
+dist/
+Datos/
+
+dist/
+Datos/
