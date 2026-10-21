@@ -32,7 +32,17 @@ function Aplicar-Parche {
     )
 
     # Comprobar si el parche ya esta aplicado.
+    # Esta comprobacion puede fallar normalmente
+# cuando el parche aun no esta aplicado.
+$preferenciaAnterior = $ErrorActionPreference
+
+try {
+    $ErrorActionPreference = 'SilentlyContinue'
     git -C $carpeta apply --reverse --check $parche 2>$null
+}
+finally {
+    $ErrorActionPreference = $preferenciaAnterior
+}
 
     if ($LASTEXITCODE -eq 0) {
         Write-Host "$nombre ya tiene el parche aplicado." -ForegroundColor Green
