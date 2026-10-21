@@ -22,3 +22,9 @@ Datos/
 
 dist/
 Datos/
+
+# Records personales del modo arcade
+/Records/
+
+# Dependencias locales del motor
+/deps/

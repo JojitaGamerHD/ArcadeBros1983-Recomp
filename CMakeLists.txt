@@ -5,12 +5,14 @@ project(ArcadeBros1983Recomp LANGUAGES C CXX)
 set(CMAKE_C_STANDARD 11)
 set(CMAKE_CXX_STANDARD 17)
 
+# Motor NESRecomp independiente con parche Arcade v0.4.0
 get_filename_component(NESRECOMP_ROOT
-    "${CMAKE_CURRENT_SOURCE_DIR}/../nesrecomp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/deps/nesrecomp-arcade"
     ABSOLUTE
 )
-
-set(NESRECOMP_RECOMP_UI OFF CACHE STRING "" FORCE)
+# Idioma del launcher de Arcade Bros 1983 Recomp
+set(RECOMP_UI_LANGUAGE "es" CACHE STRING "Idioma de recomp-ui" FORCE)
+set(NESRECOMP_RECOMP_UI "" CACHE STRING "" FORCE)
 
 include("${NESRECOMP_ROOT}/runner/cyc/project.cmake")
 

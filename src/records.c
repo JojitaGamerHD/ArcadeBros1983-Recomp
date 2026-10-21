@@ -13,6 +13,7 @@
 #define _CRT_SECURE_NO_WARNINGS
 #include "cyc_host_extras.h"
 #include "cyc_mod.h"
+#include "recomp_runtime_ui.h"
 #include <stdbool.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -161,10 +162,58 @@ static void al_terminar_fotograma(void *ctx) {
     restaurar_si_falta();
 }
 
+/* Creditos personalizados del port. */
+
+static const RecompRuntimeUiItem opciones_creditos[] = {
+    {
+        .key = "arcade.creditos",
+        .section = "Créditos",
+        .label = "Port desarrollado por JojitaGamerHD",
+        .description = "Ver los creditos completos del proyecto.",
+        .type = RECOMP_RUNTIME_UI_ACTION
+    }
+};
+
+static int mostrar_creditos(
+    void *context,
+    const RecompRuntimeUiItem *item
+) {
+    (void)context;
+    (void)item;
+
+#ifdef _WIN32
+    MessageBoxA(
+        NULL,
+        "ARCADE BROS 1983 RECOMP\n\n"
+        "Port desarrollado por JojitaGamerHD\n"
+        "https://github.com/JojitaGamerHD\n\n"
+        "Juego original: Mario Bros. (1983) - Nintendo\n\n"
+        "NESRecomp: Matthew Stanley (mstan)\n"
+        "https://github.com/mstan/nesrecomp\n\n"
+        "recomp-ui: RetroPortingToolKit\n"
+        "https://github.com/RetroPortingToolKit/recomp-ui",
+        "Creditos - Arcade Bros 1983 Recomp",
+        MB_OK | MB_ICONINFORMATION
+    );
+#else
+    fprintf(stderr, "Port desarrollado por JojitaGamerHD\n");
+#endif
+
+    return 1;
+}
+
+static const RecompRuntimeUiCallbacks callbacks_creditos = {
+    .run_action = mostrar_creditos
+};
 static const CycHostExtras extras = {
     .power_on = al_encender,
     .frame_begin = al_empezar_fotograma,
     .frame_end = al_terminar_fotograma,
+
+    .menu_items = opciones_creditos,
+    .menu_item_count =
+        sizeof(opciones_creditos) / sizeof(opciones_creditos[0]),
+    .menu_callbacks = &callbacks_creditos,
 };
 
 const CycHostExtras *cyc_host_extras(void) {

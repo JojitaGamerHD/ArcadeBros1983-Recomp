@@ -1,0 +1,214 @@
+diff --git a/runner/cyc/cyc_host.c b/runner/cyc/cyc_host.c
+index a05b7f9..c95844c 100644
+--- a/runner/cyc/cyc_host.c
++++ b/runner/cyc/cyc_host.c
+@@ -208,6 +208,7 @@ void cyc_sdl_option(const char *name, const char *value);
+ void cyc_sdl_present_out(const char *path, long every);
+ void cyc_sdl_image_path(const char *path);
+ #endif
++
+ #ifdef CYC_ORACLE
+ void cyc_oracle_address_report(void *file);
+ #endif
+@@ -1213,6 +1214,7 @@ session_restart:
+     save_file=offline_save_file;datach_save=offline_datach_save;
+ #endif
+ #if defined(CYC_WITH_SDL)
++arcade_session_restart:
+     /* The window: its settings, and recomp-ui's launcher where the build has it. */
+     if (!headless) {
+         int launch = cyc_sdl_prelaunch(&rom_path, fds_bios, &saved_hle, &saved_bios);
+@@ -1525,6 +1527,14 @@ session_restart:
+ #endif
+         if(result==3)result=net_error[0]?2:0;
+ #endif
++/* Arcade Bros: regresar al launcher tras cerrar la sesion. */
++if (saves_ok && result == 4) {
++    extern bool cyc_sdl_force_launcher;
++
++    cyc_sdl_force_launcher = true;
++    free(image);
++    goto arcade_session_restart;
++}
+         return saves_ok?result:2;
+     }
+ #else
+diff --git a/runner/cyc/cyc_input.c b/runner/cyc/cyc_input.c
+index b41ed98..e9b9f21 100644
+--- a/runner/cyc/cyc_input.c
++++ b/runner/cyc/cyc_input.c
+@@ -19,7 +19,13 @@ static const char *const BUTTON_LABELS[CYC_INPUT_BUTTONS] = { "A", "B", "Select"
+ static const char *const SHORTCUT_KEYS[CYC_SC_COUNT] = { "disk", "menu", "fast_forward", "screenshot", "fullscreen",
+                                                           "save_state", "load_state" };
+ static const char *const SHORTCUT_LABELS[CYC_SC_COUNT] = {
+-    "Disk (show / swap side)", "Menu", "Fast-forward (hold)", "Screenshot", "Fullscreen", "Save state", "Load state",
++    "Disco (mostrar / cambiar cara)",
++    "Menú",
++    "Avance rápido (mantener)",
++    "Captura de pantalla",
++    "Pantalla completa",
++    "Guardar estado",
++    "Cargar estado",
+ };
+ 
+ const char *cyc_button_key(int b) { return b >= 0 && b < CYC_INPUT_BUTTONS ? BUTTON_KEYS[b] : ""; }
+diff --git a/runner/cyc/cyc_sdl.c b/runner/cyc/cyc_sdl.c
+index 150a0e8..380745d 100644
+--- a/runner/cyc/cyc_sdl.c
++++ b/runner/cyc/cyc_sdl.c
+@@ -118,6 +118,7 @@ static bool        s_uncapped; /* measurement pacing only; render and audio stil
+ static bool        s_pause_unfocused;
+ static char        s_image[1024];                   /* the image running (the save state slot's name) */
+ bool cyc_sdl_force_launcher;
++bool cyc_sdl_return_to_launcher;
+ #ifdef NESRECOMP_NET
+ void cyc_sdl_net_name_store(const char *name) {
+     snprintf(s_set.netplay_player_name,sizeof s_set.netplay_player_name,"%s",name&&*name?name:"Player");
+@@ -1267,6 +1268,7 @@ int cyc_sdl_main(const char *title_in, int scale)
+         fprintf(stderr, "--uncapped requires a positive --exit-after frame limit\n");
+         return 2;
+     }
++cyc_sdl_return_to_launcher = false;
+     s_running=true;s_frames_done=(long)cyc_ring_frame;s_tex=NULL;s_pad_count=0;s_vpad_joy=NULL;
+     /* a path names the game by its file's stem */
+     char title[256];
+@@ -1442,8 +1444,7 @@ int cyc_sdl_main(const char *title_in, int scale)
+             apply_settings();
+             save_settings();
+         }
+-        if (edge[CYC_SC_SAVE_STATE] && !menu_open()) save_state_slot();
+-        if (edge[CYC_SC_LOAD_STATE] && !menu_open()) load_state_slot();
++/* Modo arcade: F8 y F9 no permiten guardar ni cargar partidas. */;
+         if (edge[CYC_SC_SCREENSHOT]) {
+             char name[64];
+             int pw, ph;
+@@ -1521,7 +1522,8 @@ int cyc_sdl_main(const char *title_in, int scale)
+             frames++;
+             cyc_host_frame_done(++s_frames_done);
+             loading = s_fds && cyc_host_frame_unpaced();
+-            fast = !online&&(st.shortcut[CYC_SC_FAST_FORWARD] || loading);
++            /* Modo arcade: no acelerar mediante Tab o RT. */
++fast = !online && loading;
+         }
+         int16_t pcm[4096];
+         size_t n;
+@@ -1617,5 +1619,5 @@ int cyc_sdl_main(const char *title_in, int scale)
+ #ifdef NESRECOMP_NET
+     if(nes_netplay_active())return 3;
+ #endif
+-    return 0;
++    return cyc_sdl_return_to_launcher ? 4 : 0;
+ }
+diff --git a/runner/cyc/cyc_ui_launcher.c b/runner/cyc/cyc_ui_launcher.c
+index 8d1ae45..f097eea 100644
+--- a/runner/cyc/cyc_ui_launcher.c
++++ b/runner/cyc/cyc_ui_launcher.c
+@@ -46,11 +46,22 @@ _Static_assert(CYC_SC_COUNT <= RECOMP_LAUNCHER_MAX_ASSIST_BINDINGS, "shortcuts")
+ static int shortcut_list(bool fds, int out[CYC_SC_COUNT])
+ {
+     int n = 0;
+-    for (int i = 0; i < CYC_SC_COUNT; ++i)
+-        if (i != CYC_SC_DISK || fds) out[n++] = i;
++
++    for (int i = 0; i < CYC_SC_COUNT; ++i) {
++
++        /* Modo arcade: ocultar guardado y carga. */
++        if (i == CYC_SC_SAVE_STATE ||
++            i == CYC_SC_LOAD_STATE)
++            continue;
++
++        if (i == CYC_SC_DISK && !fds)
++            continue;
++
++        out[n++] = i;
++    }
++
+     return n;
+ }
+-
+ static void to_launcher(const CycSettings *s, RecompLauncherCSettings *io, const int *shortcuts, int count)
+ {
+     io->window_scale = s->window_scale;
+@@ -203,7 +214,24 @@ int cyc_ui_launcher(CycSettings *settings, const char *settings_path, const CycH
+     if (cyc_native_display_name) snprintf(name, sizeof(name), "%s", cyc_native_display_name);
+     else if (cyc_native_program_name) snprintf(name, sizeof(name), "%s", cyc_native_program_name);
+     else stem_of(*rom_path ? *rom_path : "NES", name, sizeof(name));
+-    gi.name = name;
++    static char titulo_port[320];
++
++snprintf(titulo_port, sizeof(titulo_port),
++         "%s por JojitaGamerHD", name);
++
++gi.name = titulo_port;
++gi.credits_text =
++    "ARCADE BROS 1983 RECOMP\n\n"
++    "Port desarrollado por JojitaGamerHD\n"
++    "GitHub: https://github.com/JojitaGamerHD\n\n"
++    "JUEGO ORIGINAL\n"
++    "Mario Bros. (1983) - Nintendo\n\n"
++    "HERRAMIENTAS UTILIZADAS\n"
++    "NESRecomp - Matthew Stanley (mstan)\n"
++    "https://github.com/mstan/nesrecomp\n\n"
++    "recomp-ui - RetroPortingToolKit\n"
++    "https://github.com/RetroPortingToolKit/recomp-ui\n\n"
++    "Proyecto independiente, no afiliado a Nintendo.";
+ #ifdef NES_HOST_HAS_RECOMP_UI
+     gi.netplay=nes_host_lobby_init(name,*rom_path);
+     gi.netplay_supported=gi.netplay!=NULL;
+diff --git a/runner/cyc/cyc_ui_menu.c b/runner/cyc/cyc_ui_menu.c
+index f52abd0..d6b1494 100644
+--- a/runner/cyc/cyc_ui_menu.c
++++ b/runner/cyc/cyc_ui_menu.c
+@@ -394,6 +394,13 @@ static int run_action(void *ctx, const RecompRuntimeUiItem *it)
+         if (ok) recomp_runtime_ui_close(s_ui);
+         return ok;
+     }
++if (is_key(it, "cyc.return_to_launcher")) {
++    extern bool cyc_sdl_return_to_launcher;
++
++    cyc_sdl_return_to_launcher = true;
++    s_host.quit();
++    return 1;
++}
+     if (is_key(it, "cyc.quit")) {
+         uint64_t now = s_host.now_ms();
+         if (s_quit_armed && now - s_quit_armed < 3000) { s_host.quit(); return 1; }
+@@ -479,8 +486,13 @@ RecompRuntimeUi *cyc_ui_menu_create(const CycUiHost *host)
+     }
+     for (int i = 0; i < CYC_SC_COUNT; ++i) {
+         if (i == CYC_SC_DISK && !host->fds) continue;
++/* Modo arcade: ocultar funciones desactivadas. */
++if (i == CYC_SC_SAVE_STATE ||
++    i == CYC_SC_LOAD_STATE ||
++    i == CYC_SC_FAST_FORWARD)
++    continue;
+         snprintf(s_shortcut_key[i], sizeof(s_shortcut_key[i]), "cyc.shortcut.%d", i);
+-        add(s_shortcut_key[i], "Controls", s_shortcut_label[i], "Change bindings in the launcher's Controls page.",
++        add(s_shortcut_key[i], "Controles", s_shortcut_label[i], "Change bindings in the launcher's Controls page.",
+             RECOMP_RUNTIME_UI_ACTION, 0, 0, 0, NULL, 0, NULL);
+     }
+     if (x && x->menu_items)
+@@ -496,7 +508,12 @@ RecompRuntimeUi *cyc_ui_menu_create(const CycUiHost *host)
+         add("cyc.zapper.crosshair", "Zapper", "Crosshair", "Show the aiming marker.",
+             RECOMP_RUNTIME_UI_BOOL, 0, 1, 1, NULL, 0, NULL);
+     }
+-    add("cyc.quit", "System", "Quit", "Close the game (the disk save is written first).", RECOMP_RUNTIME_UI_ACTION,
++add("cyc.return_to_launcher", "Sistema",
++    "Volver al launcher",
++    "Termina la partida y regresa al menu principal.",
++    RECOMP_RUNTIME_UI_ACTION,
++    0, 0, 0, NULL, 0, NULL);
++    add("cyc.quit", "Sistema", "Salir del juego", "Cierra el juego.", RECOMP_RUNTIME_UI_ACTION,
+         0, 0, 0, NULL, 0, NULL);
+     refresh();
+ 
+@@ -517,8 +534,7 @@ RecompRuntimeUi *cyc_ui_menu_create(const CycUiHost *host)
+                    RECOMP_RUNTIME_UI_STANDARD_INTEGER_SCALE | RECOMP_RUNTIME_UI_STANDARD_LINEAR_FILTER |
+                    RECOMP_RUNTIME_UI_STANDARD_AUDIO | RECOMP_RUNTIME_UI_STANDARD_VOLUME |
+                    RECOMP_RUNTIME_UI_STANDARD_RESUME;
+-    if (host->save_state && host->load_state)
+-        std.features |= RECOMP_RUNTIME_UI_STANDARD_SAVE_STATE | RECOMP_RUNTIME_UI_STANDARD_LOAD_STATE;
++    /* Modo arcade: no mostrar Save State ni Load State en el menu. */
+     if (x && x->view_modes && x->set_view_mode) {
+         std.features |= RECOMP_RUNTIME_UI_STANDARD_VIEW_MODE;
+         std.view_modes = x->view_modes;

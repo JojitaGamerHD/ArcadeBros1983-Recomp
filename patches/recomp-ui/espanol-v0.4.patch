@@ -1,0 +1,169 @@
+diff --git a/src/common/launcher_i18n.cpp b/src/common/launcher_i18n.cpp
+index 91a6c97..8885005 100644
+--- a/src/common/launcher_i18n.cpp
++++ b/src/common/launcher_i18n.cpp
+@@ -205,6 +205,30 @@ static const LauncherI18nEntry kItalian[] = {
+     {"No patch selected", "Nessuna patch selezionata"},
+ };
+ 
++/* Traduccion espanola de Arcade Bros 1983 Recomp. */
++static const LauncherI18nEntry kSpanish[] = {
++    {"Settings", u8"Configuración"},
++    {"Credits", u8"Créditos"},
++    {"Display", u8"Pantalla"},
++    {"Graphics", u8"Gráficos"},
++    {"Controls", u8"Controles"},
++    {"System", u8"Sistema"},
++    {"Window scale", u8"Escala de ventana"},
++    {"Fullscreen", u8"Pantalla completa"},
++    {"Integer scaling", u8"Escalado entero"},
++    {"Linear filtering", u8"Filtrado lineal"},
++    {"Resume game", u8"Continuar partida"},
++    {"RESUME", u8"CONTINUAR"},
++    {"QUIT GAME", u8"SALIR DEL JUEGO"},
++    {"Off", u8"Desactivado"},
++    {"On", u8"Activado"},
++    {"Borderless", u8"Sin bordes"},
++    {"Exclusive", u8"Exclusiva"},
++    {"Default", u8"Predeterminado"},
++    {"Reset", u8"Restablecer"},
++    {"Pause", u8"Pausa"},
++};
++
+ static const char* lookup(const LauncherI18nEntry* entries, int count,
+                           const char* english) {
+     if (!english) return "";
+@@ -231,5 +255,10 @@ const char* launcher_i18n_text(const char* english) {
+         return lookup(kItalian, (int)(sizeof(kItalian) / sizeof(kItalian[0])),
+                       english);
+     }
++    if (std::strcmp(language, "es") == 0 ||
++        std::strcmp(language, "es-CL") == 0) {
++        return lookup(kSpanish, (int)(sizeof(kSpanish) / sizeof(kSpanish[0])),
++            english);
++    }
+     return english ? english : "";
+ }
+diff --git a/src/common/recomp_runtime_settings.c b/src/common/recomp_runtime_settings.c
+index 5358de4..2942ce7 100644
+--- a/src/common/recomp_runtime_settings.c
++++ b/src/common/recomp_runtime_settings.c
+@@ -94,12 +94,12 @@ RecompRuntimeUi *recomp_runtime_ui_create_standard(
+ 
+     size_t count = 0;
+     if (has(f, RECOMP_RUNTIME_UI_STANDARD_FULLSCREEN))
+-        add_item(items, &count, RECOMP_RUNTIME_UI_KEY_FULLSCREEN, "Display",
+-                 "Fullscreen", "Choose windowed or fullscreen output.",
+-                 RECOMP_RUNTIME_UI_CHOICE, 0, 2, 1, kFullscreenChoices, 3, NULL);
++    add_item(items, &count, RECOMP_RUNTIME_UI_KEY_FULLSCREEN, "Pantalla",
++             "Pantalla completa", "Cambiar entre ventana y pantalla completa.",
++             RECOMP_RUNTIME_UI_CHOICE, 0, 2, 1, kFullscreenChoices, 3, NULL);
+     if (has(f, RECOMP_RUNTIME_UI_STANDARD_WINDOW_SCALE))
+-        add_item(items, &count, RECOMP_RUNTIME_UI_KEY_WINDOW_SCALE, "Display",
+-                 "Window scale", "Resize the window in native-size steps.",
++        add_item(items, &count, RECOMP_RUNTIME_UI_KEY_WINDOW_SCALE, "Pantalla",
++                 "Escala de ventana", "Cambiar el tamaño de la ventana.",
+                  RECOMP_RUNTIME_UI_INT, 1,
+                  standard->window_scale_max > 0 ? standard->window_scale_max : 8,
+                  1, NULL, 0, NULL);
+@@ -122,76 +122,76 @@ RecompRuntimeUi *recomp_runtime_ui_create_standard(
+                  RECOMP_RUNTIME_UI_INT, 0, 100, 10, NULL, 0, NULL);
+     }
+     if (has(f, RECOMP_RUNTIME_UI_STANDARD_INTEGER_SCALE))
+-        add_item(items, &count, RECOMP_RUNTIME_UI_KEY_INTEGER_SCALE, "Graphics",
+-                 "Integer scaling", "Snap output to whole native-pixel multiples.",
++        add_item(items, &count, RECOMP_RUNTIME_UI_KEY_INTEGER_SCALE, "Gráficos",
++                 "Escalado entero", "Ajusta la imagen a múltiplos enteros de píxeles.",
+                  RECOMP_RUNTIME_UI_BOOL, 0, 1, 1, NULL, 0, NULL);
+     if (has(f, RECOMP_RUNTIME_UI_STANDARD_LINEAR_FILTER))
+-        add_item(items, &count, RECOMP_RUNTIME_UI_KEY_LINEAR_FILTER, "Graphics",
+-                 "Linear filter", "Smooth the final game image.",
++        add_item(items, &count, RECOMP_RUNTIME_UI_KEY_LINEAR_FILTER, "Gráficos",
++                 "Filtro lineal", "Suaviza la imagen final del juego.",
+                  RECOMP_RUNTIME_UI_BOOL, 0, 1, 1, NULL, 0, NULL);
+     if (has(f, RECOMP_RUNTIME_UI_STANDARD_TEXTURE_FILTER))
+-        add_item(items, &count, RECOMP_RUNTIME_UI_KEY_TEXTURE_FILTER, "Graphics",
++        add_item(items, &count, RECOMP_RUNTIME_UI_KEY_TEXTURE_FILTER, "Gráficos",
+                  "Texture filtering", "Choose nearest or linear sampling.",
+                  RECOMP_RUNTIME_UI_CHOICE, 0, 1, 1, kTextureFilterChoices, 2, NULL);
+     if (has(f, RECOMP_RUNTIME_UI_STANDARD_FMV_FILTER))
+-        add_item(items, &count, RECOMP_RUNTIME_UI_KEY_FMV_FILTER, "Graphics",
++        add_item(items, &count, RECOMP_RUNTIME_UI_KEY_FMV_FILTER, "Gráficos",
+                  "FMV filtering", "Choose how full-motion video is scaled up.",
+                  RECOMP_RUNTIME_UI_CHOICE, 0, 3, 1, kFmvFilterChoices, 4, NULL);
+     if (has(f, RECOMP_RUNTIME_UI_STANDARD_RESOLUTION_SCALE))
+-        add_item(items, &count, RECOMP_RUNTIME_UI_KEY_RESOLUTION_SCALE, "Graphics",
++        add_item(items, &count, RECOMP_RUNTIME_UI_KEY_RESOLUTION_SCALE, "Gráficos",
+                  "Resolution scale", "Set the internal rendering resolution.",
+                  RECOMP_RUNTIME_UI_INT, 1,
+                  standard->resolution_scale_max > 0 ? standard->resolution_scale_max : 8,
+                  1, NULL, 0, NULL);
+     if (has(f, RECOMP_RUNTIME_UI_STANDARD_COLOR_CORRECTION))
+-        add_item(items, &count, RECOMP_RUNTIME_UI_KEY_COLOR_CORRECTION, "Graphics",
++        add_item(items, &count, RECOMP_RUNTIME_UI_KEY_COLOR_CORRECTION, "Gráficos",
+                  "Color correction", "Use display-aware handheld color correction.",
+                  RECOMP_RUNTIME_UI_BOOL, 0, 1, 1, NULL, 0, NULL);
+     if (has(f, RECOMP_RUNTIME_UI_STANDARD_LCD_GHOSTING))
+-        add_item(items, &count, RECOMP_RUNTIME_UI_KEY_LCD_GHOSTING, "Graphics",
++        add_item(items, &count, RECOMP_RUNTIME_UI_KEY_LCD_GHOSTING, "Gráficos",
+                  "LCD ghosting", "Simulate the original LCD response.",
+                  RECOMP_RUNTIME_UI_BOOL, 0, 1, 1, NULL, 0, NULL);
+     if (has(f, RECOMP_RUNTIME_UI_STANDARD_AUDIO))
+         add_item(items, &count, RECOMP_RUNTIME_UI_KEY_AUDIO, "Audio", "Audio",
+-                 "Enable or mute game audio output.", RECOMP_RUNTIME_UI_BOOL,
++                 "Activa o silencia el audio del juego.", RECOMP_RUNTIME_UI_BOOL,
+                  0, 1, 1, NULL, 0, NULL);
+     if (has(f, RECOMP_RUNTIME_UI_STANDARD_VOLUME))
+-        add_item(items, &count, RECOMP_RUNTIME_UI_KEY_VOLUME, "Audio", "Volume",
+-                 "Set the in-game mixer volume.", RECOMP_RUNTIME_UI_INT,
++        add_item(items, &count, RECOMP_RUNTIME_UI_KEY_VOLUME, "Audio", "Volumen",
++                 "Ajusta el volumen del juego.", RECOMP_RUNTIME_UI_INT,
+                  0, 100, 5, NULL, 0, NULL);
+     if (has(f, RECOMP_RUNTIME_UI_STANDARD_RESUME))
+-        add_item(items, &count, RECOMP_RUNTIME_UI_KEY_RESUME, "System", "Resume game",
+-                 "Close settings and return to the game.", RECOMP_RUNTIME_UI_ACTION,
++        add_item(items, &count, RECOMP_RUNTIME_UI_KEY_RESUME, "Sistema", "Continuar partida",
++                 "Cierra el menú y continúa la partida.", RECOMP_RUNTIME_UI_ACTION,
+                  0, 0, 0, NULL, 0, NULL);
+     if (has(f, RECOMP_RUNTIME_UI_STANDARD_STATE_SLOT))
+-        add_item(items, &count, RECOMP_RUNTIME_UI_KEY_STATE_SLOT, "System", "State slot",
++        add_item(items, &count, RECOMP_RUNTIME_UI_KEY_STATE_SLOT, "Sistema", "State slot",
+                  "The slot Save state and Load state use.", RECOMP_RUNTIME_UI_INT, 1,
+                  standard->state_slot_count > 0 ? standard->state_slot_count : 10,
+                  1, NULL, 0, NULL);
+     if (has(f, RECOMP_RUNTIME_UI_STANDARD_SAVE_STATE))
+-        add_item(items, &count, RECOMP_RUNTIME_UI_KEY_SAVE_STATE, "System", "Save state",
++        add_item(items, &count, RECOMP_RUNTIME_UI_KEY_SAVE_STATE, "Sistema", "Save state",
+                  "Save the current state.", RECOMP_RUNTIME_UI_ACTION,
+                  0, 0, 0, NULL, 0, NULL);
+     if (has(f, RECOMP_RUNTIME_UI_STANDARD_LOAD_STATE))
+-        add_item(items, &count, RECOMP_RUNTIME_UI_KEY_LOAD_STATE, "System", "Load state",
++        add_item(items, &count, RECOMP_RUNTIME_UI_KEY_LOAD_STATE, "Sistema", "Load state",
+                  "Load the current state slot.", RECOMP_RUNTIME_UI_ACTION,
+                  0, 0, 0, NULL, 0, NULL);
+     if (has(f, RECOMP_RUNTIME_UI_STANDARD_PAUSE_IN_MENU))
+-        add_item(items, &count, RECOMP_RUNTIME_UI_KEY_PAUSE_IN_MENU, "System",
+-                 "Pause in menu", "Hold the game while a menu is open.",
++        add_item(items, &count, RECOMP_RUNTIME_UI_KEY_PAUSE_IN_MENU, "Sistema",
++                 "Pausar en el menú", "Pausa el juego mientras el menú está abierto.",
+                  RECOMP_RUNTIME_UI_BOOL, 0, 1, 1, NULL, 0, NULL);
+     if (has(f, RECOMP_RUNTIME_UI_STANDARD_RESET))
+-        add_item(items, &count, RECOMP_RUNTIME_UI_KEY_RESET, "System", "Reset game",
+-                 "Reset the emulated machine.", RECOMP_RUNTIME_UI_ACTION,
++        add_item(items, &count, RECOMP_RUNTIME_UI_KEY_RESET, "Sistema", "Reiniciar juego",
++                 "Reinicia la consola emulada.", RECOMP_RUNTIME_UI_ACTION,
+                  0, 0, 0, NULL, 0, NULL);
+     if (has(f, RECOMP_RUNTIME_UI_STANDARD_RETURN_TO_LAUNCHER)) {
+-        add_item(items, &count, RECOMP_RUNTIME_UI_KEY_RETURN_TO_LAUNCHER, "System",
+-                 "Return to launcher", "Close the game, open the launcher. Press twice.",
++        add_item(items, &count, RECOMP_RUNTIME_UI_KEY_RETURN_TO_LAUNCHER, "Sistema",
++                 "Volver al launcher", "Close the game, open the launcher. Press twice.",
+                  RECOMP_RUNTIME_UI_ACTION, 0, 0, 0, NULL, 0, NULL);
+         confirm_prompts[count - 1] = "Press again for the launcher";
+     }
+     if (has(f, RECOMP_RUNTIME_UI_STANDARD_QUIT)) {
+-        add_item(items, &count, RECOMP_RUNTIME_UI_KEY_QUIT, "System", "Quit game",
++        add_item(items, &count, RECOMP_RUNTIME_UI_KEY_QUIT, "Sistema", "Quit game",
+                  "Close the game. Press twice.", RECOMP_RUNTIME_UI_ACTION,
+                  0, 0, 0, NULL, 0, NULL);
+         confirm_prompts[count - 1] = "Press again to quit";

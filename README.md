@@ -1,252 +1,207 @@
 # Arcade Bros 1983 Recomp
 
-**Recompilación no oficial de Mario Bros. (1983) para Windows, realizada con NESRecomp.**
+**Port no oficial de Mario Bros. (NES) para Windows x64 mediante recompilación estática con NESRecomp.**
 
-Arcade Bros 1983 Recomp es un proyecto de aprendizaje y preservación técnica que busca ejecutar el código del juego original de Nintendo Entertainment System (NES) como código nativo de Windows de 64 bits, conservando su comportamiento y permitiendo añadir mejoras propias en el futuro.
+[![Estado](https://img.shields.io/badge/estado-en%20desarrollo-yellow)](https://github.com/JojitaGamerHD/ArcadeBros1983-Recomp)
+[![Plataforma](https://img.shields.io/badge/plataforma-Windows%20x64-blue)](https://github.com/JojitaGamerHD/ArcadeBros1983-Recomp)
 
-> **Estado del proyecto:** versión inicial **v0.1.0**, compilada y probada manualmente hasta la fase 10. Es una primera versión funcional, no una certificación de compatibilidad completa.
+**Versión en desarrollo: v0.4.0** · Rama `desarrollo`
+
+Arcade Bros 1983 Recomp es un proyecto independiente de aprendizaje y experimentación técnica. Su objetivo es ejecutar la versión de NES de **Mario Bros.** como un programa nativo de Windows, conservando el comportamiento del juego y añadiendo funciones propias orientadas a una experiencia arcade y portable.
+
+> **Importante:** este repositorio **no contiene la ROM**, código C generado a partir de ella ni ejecutables que incorporen contenido derivado del juego. Cada usuario debe proporcionar una copia compatible de la ROM conforme a la legislación aplicable. El proyecto no está afiliado a Nintendo.
 
 ## ¿Cómo funciona?
 
-El proyecto utiliza **[NESRecomp](https://github.com/mstan/nesrecomp)** para traducir instrucciones de la CPU 6502 de la ROM original a código C. Luego, Visual Studio compila ese código para Windows x64.
+[NESRecomp](https://github.com/mstan/nesrecomp) traduce instrucciones de la CPU 6502 de una ROM de NES a código C. Después, el compilador de Visual Studio genera un ejecutable nativo para Windows x64.
 
-El juego sigue dependiendo del entorno de ejecución (*runtime*) de NESRecomp para reproducir el funcionamiento de los componentes de la NES, como gráficos, sonido y controles. La recompilación del código de CPU no significa que se haya reescrito el juego original a mano ni que se haya eliminado toda la reproducción de hardware.
+El resultado sigue utilizando el *runtime* de NESRecomp para reproducir los componentes de la consola, incluidos los gráficos, el sonido y la entrada. **No es una reescritura manual del juego ni una eliminación completa de la emulación del hardware.**
 
-## Estado y características
+Para la interfaz se integra [recomp-ui](https://github.com/RetroPortingToolKit/recomp-ui), adaptado al español mediante un parche mantenido en este repositorio.
 
-### Verificado en la versión v0.1.0
+## Características de v0.4.0
 
-- [x] Generación de código C a partir de la ROM de NES.
-- [x] Compilación de un ejecutable nativo para Windows x64.
-- [x] Inicio y ejecución del juego.
-- [x] Detección y funcionamiento de un mando de Xbox.
-- [x] Prueba manual de jugabilidad hasta la fase 10.
-- [x] Textos, controles y comportamiento de enemigos sin fallos visibles durante esa prueba.
-- [x] Jugabilidad fluida y sin retraso de entrada perceptible durante la prueba.
+- **Launcher gráfico** para iniciar el juego y acceder a su configuración.
+- **Menús en español**, incluidas las principales opciones del launcher y el menú de pausa.
+- **Volver al launcher** desde una partida sin cerrar el ejecutable y comenzar otra sesión.
+- **Versión portable para Windows**: importación de una ROM compatible en la primera ejecución y almacenamiento local de los datos.
+- **Récord permanente**: la puntuación máxima se guarda entre ejecuciones mediante un módulo propio, sin alterar la ROM.
+- **Compatibilidad comprobada con mando Xbox** y controles de teclado.
+- **Opciones de visualización** proporcionadas por el runtime, como pantalla completa, escalado y filtrado.
+- **Enfoque arcade**: desactivación de los atajos habituales de guardar/cargar estado y de avance rápido; las opciones de estados se ocultan del menú de pausa.
 
-### Pendiente de comprobar o desarrollar
+Las funciones anteriores se han probado manualmente en el entorno de desarrollo. **v0.4.0 todavía está en desarrollo** y no implica una certificación de compatibilidad completa.
 
-- [ ] Pruebas más extensas de todas las fases y situaciones del juego.
-- [ ] Pruebas específicas del modo de dos jugadores y del audio.
-- [ ] Configuración propia de controles, pantalla y otras opciones.
-- [ ] Mejoras en la presentación gráfica y el escalado.
-- [ ] Investigación de renderizado a 120, 144 y 180 FPS mediante interpolación, **sin acelerar la lógica original del juego**.
-- [ ] Pruebas automatizadas y compilaciones reproducibles.
+### Limitaciones y trabajo pendiente
 
-**Nota:** la fluidez observada no equivale a una medición instrumental de FPS o latencia. El modo de 120–180 FPS todavía **no está implementado**.
+- Ampliar las pruebas de todas las fases, del modo de dos jugadores y de distintos mandos y equipos.
+- Verificar y restringir cualquier vía alternativa de uso de save states que permanezca disponible en el runtime.
+- Mejorar el proceso de compilación reproducible y las pruebas automatizadas.
+- Investigar renderizado interpolado a **120, 144 y 180 FPS** sin acelerar la lógica original. **Esta función todavía no está implementada.**
 
-## Requisitos
+## Requisitos para compilar
 
-Para compilar el proyecto en Windows:
+- Windows 10 u 11 de **64 bits**.
+- Git y PowerShell.
+- CMake **3.20 o posterior**.
+- Visual Studio 2022 o Build Tools 2022 con las herramientas de **Desarrollo de escritorio con C++**.
+- Las dependencias utilizadas por NESRecomp, incluidas las que prepara el proceso de compilación.
+- Una **ROM compatible de Mario Bros. para NES**, proporcionada por el usuario. La configuración espera el nombre exacto `Mario Bros..nes` (con dos puntos antes de `nes`).
 
-- Windows 10 u 11 de 64 bits.
-- Git.
-- CMake 3.20 o posterior.
-- Visual Studio 2022 Build Tools con herramientas de desarrollo de C/C++ para escritorio.
-- Python 3.11 o posterior.
-- [NESRecomp](https://github.com/mstan/nesrecomp) y sus dependencias de ejecución, incluida SDL2.
-- Una copia de la ROM de NES de **Mario Bros. (1983)** compatible con la configuración del proyecto.
+El proyecto se ha desarrollado y probado principalmente en Windows 11 con el generador `Visual Studio 17 2022` para arquitectura x64.
 
-El entorno utilizado durante la primera compilación fue Windows 11, Git 2.56, CMake 4.5.0-rc1, Python 3.15 y Visual Studio Build Tools 2022. Estas son las versiones **probadas**, no necesariamente requisitos mínimos.
+## Compilación desde el código fuente
 
-## Estructura del proyecto
-
-```text
-Projects/
-├── nesrecomp/                  # Herramienta de terceros (repositorio independiente)
-└── ArcadeBros1983-Recomp/
-    ├── docs/                   # Documentación del proyecto
-    ├── roms/                   # ROM local del usuario; NO se publica
-    ├── src/                    # Espacio para modificaciones propias
-    ├── generated/              # Código generado desde la ROM; NO se publica
-    ├── build/                  # Archivos de compilación; NO se publican
-    ├── .gitignore
-    ├── CMakeLists.txt
-    ├── game.toml
-    └── README.md
-```
-
-Las carpetas ignoradas por Git pueden no aparecer en una descarga limpia del repositorio. Se crean localmente cuando corresponde.
-
-## Compilación paso a paso
-
-Estas instrucciones suponen que **NESRecomp** y **ArcadeBros1983-Recomp** están en carpetas hermanas, tal como lo espera la configuración actual de CMake.
-
-### 1. Descargar y compilar NESRecomp
-
-Desde PowerShell:
+### 1. Clonar el proyecto
 
 ```powershell
-New-Item -ItemType Directory -Force -Path "$env:USERPROFILE\Projects"
-cd "$env:USERPROFILE\Projects"
-git clone https://github.com/mstan/nesrecomp.git
-cd nesrecomp
-cmake -S recompiler -B build/recompiler -G "Visual Studio 17 2022" -A x64
-cmake --build build/recompiler --config Release
+git clone --recurse-submodules https://github.com/JojitaGamerHD/ArcadeBros1983-Recomp.git
+cd ArcadeBros1983-Recomp
+git switch desarrollo
+git submodule update --init --recursive
 ```
 
-### 2. Preparar Arcade Bros 1983 Recomp
+Es importante inicializar los submódulos **después** de seleccionar `desarrollo`, para preparar la revisión que utiliza esta rama. Si ya clonaste el proyecto sin sus submódulos, en una **copia limpia**, ejecuta `git submodule update --init --recursive` antes de continuar. No uses ese comando para restablecer un submódulo que tenga cambios locales sin respaldarlos.
 
-Obtén los archivos de este proyecto y guárdalos en:
+### 2. Preparar la ROM
 
-```text
-C:\Users\TU_USUARIO\Projects\ArcadeBros1983-Recomp\
-```
-
-Cuando este repositorio esté publicado, también se podrá clonar con Git. Asegúrate de conservar la ubicación de carpetas indicada en la sección anterior.
-
-Crea la carpeta local `roms` si todavía no existe y coloca ahí tu ROM, con este nombre exacto:
+Crea la carpeta `roms` si es necesario y coloca tu ROM compatible en:
 
 ```text
 roms/Mario Bros..nes
 ```
 
-**No se incluye ninguna ROM en el repositorio.** La compilación está configurada para una ROM concreta; otras revisiones pueden requerir ajustes.
+**No añadas la ROM a Git y no la subas a GitHub.** Una revisión distinta puede no ser compatible con la recompilación configurada o con la comprobación de la versión portable.
 
-### 3. Generar el código C
-
-Entra en la carpeta de Arcade Bros 1983 Recomp y ejecuta:
+### 3. Preparar las dependencias
 
 ```powershell
-cd "$env:USERPROFILE\Projects\ArcadeBros1983-Recomp"
-& "$env:USERPROFILE\Projects\nesrecomp\build\recompiler\Release\NESRecomp.exe" ".\roms\Mario Bros..nes" --game ".\game.toml"
+powershell -ExecutionPolicy Bypass -File .\tools\preparar_dependencias.ps1
 ```
 
-NESRecomp escribirá los archivos C en `generated/`. Esos archivos se crean a partir de la ROM y no deben modificarse manualmente.
+El script prepara una copia local de NESRecomp en `deps/nesrecomp-arcade`, verifica revisiones fijadas, aplica los parches de este proyecto a NESRecomp y `recomp-ui` y compila la herramienta `NESRecomp.exe` si es necesario.
 
-### 4. Compilar el juego
+Revisiones utilizadas para v0.4.0:
+
+| Componente | Revisión |
+| --- | --- |
+| NESRecomp | `5a2eddeecc646e9325bef53f3c711e119423f99c` |
+| recomp-ui | `7c635c6b366a6e0d5d3c913a7fce6ec04dd9f256` |
+
+Los parches se encuentran en `patches/nesrecomp/arcade-v0.4.patch` y `patches/recomp-ui/espanol-v0.4.patch`. El script detecta si ya están aplicados; no debe utilizarse para sobrescribir cambios manuales incompatibles.
+
+### 4. Compilar
 
 ```powershell
-cmake -S . -B build -G "Visual Studio 17 2022" -A x64
-cmake --build build --config Release --parallel 4
+cmake -S . -B build/arcade-test -G "Visual Studio 17 2022" -A x64
+cmake --build build/arcade-test --config Release --parallel 4
 ```
 
-Si la compilación termina correctamente, el ejecutable debería estar en:
-
-```text
-build/Release/ArcadeBros1983Recomp.exe
-```
-
-### 5. Ejecutar el juego
+### 5. Ejecutar
 
 ```powershell
-& ".\build\Release\ArcadeBros1983Recomp.exe" ".\roms\Mario Bros..nes"
+.\build\arcade-test\Release\ArcadeBros1983Recomp.exe
 ```
 
-El ejecutable se inicia utilizando la ROM local del usuario. No compartas esa ROM cuando publiques el proyecto.
+La compilación genera archivos a partir de la ROM local; **no publiques la carpeta `build/`, `generated/` ni sus ejecutables**.
 
-## Código y futuras modificaciones
+## Crear una versión portable personal
 
-El código recompilado está en `generated/` y procede de las instrucciones originales del juego. Puede ser difícil de leer o mantener y se regenera automáticamente.
-
-Las modificaciones propias se desarrollarán preferentemente en `src/` o mediante las interfaces de extensión compatibles con NESRecomp. Esto permitirá incorporar cambios sin sobrescribir los archivos generados.
-
-La meta es mantener el proyecto preparado para actualizaciones, controles configurables, mejoras visuales y futuras investigaciones sobre renderizado a mayor frecuencia. No se garantiza todavía la compatibilidad de esas mejoras con todas las situaciones del juego.
-
-## Historial de versiones
-
-### v0.1.0 — Primera compilación funcional
-
-- Traducción inicial de **1.235 instrucciones** del procesador 6502 a código C, distribuido en cuatro archivos de banco y un despachador principal.
-- Integración con el runtime de precisión por ciclos de NESRecomp.
-- Generación correcta del ejecutable para Windows x64.
-- Prueba manual hasta la fase 10 sin errores visuales o de jugabilidad observados.
-- Mando de Xbox reconocido correctamente.
-
-## Créditos y agradecimientos
-
-### Matthew Stanley (@mstan) — Creador de NESRecomp
-
-Un agradecimiento especial a **Matthew Stanley**, conocido en GitHub como **[@mstan](https://github.com/mstan)**, creador de **[NESRecomp](https://github.com/mstan/nesrecomp)**.
-
-NESRecomp proporciona las herramientas de recompilación estática de código 6502 a C y el entorno de ejecución que hacen posible este experimento técnico. Agradecemos también las contribuciones de quienes colaboran con NESRecomp.
-
-- **Proyecto original:** https://github.com/mstan/nesrecomp
-- **Autor:** https://github.com/mstan
-- **Licencia de NESRecomp:** [PolyForm Noncommercial 1.0.0](https://github.com/mstan/nesrecomp/blob/master/LICENSE).
-
-### Nintendo
-
-**Mario Bros. (1983)**, sus personajes, marcas, gráficos, sonidos y otros elementos originales pertenecen a Nintendo o a sus respectivos titulares. Este proyecto no está afiliado, patrocinado ni respaldado por Nintendo.
-
-## Aviso legal y distribución
-
-Este es un proyecto **independiente, experimental y sin fines comerciales**.
-
-El repositorio no distribuye la ROM, imágenes, audio ni código generado derivado de la ROM. Cada usuario debe obtener y utilizar su propia copia conforme a la legislación aplicable.
-
-NESRecomp es software de terceros sujeto a su licencia **PolyForm Noncommercial 1.0.0**. Sus condiciones deben respetarse al utilizarlo, modificarlo o redistribuir sus componentes. La licencia de los archivos originales de este repositorio se definirá por separado antes de su publicación; no se debe asumir que el código de terceros o el contenido de Nintendo queda cubierto por ella.
-
----
-
-**Arcade Bros 1983 Recomp** — Una exploración técnica de la recompilación nativa de juegos clásicos.
-
-## Modo portable
-
-Arcade Bros 1983 Recomp incluye un lanzador portable para Windows.
-
-### Primera ejecución
-
-Al ejecutar el juego por primera vez, el lanzador solicita al usuario su ROM original de Mario Bros. (1983).
-
-El programa verifica que la ROM sea compatible y guarda una copia local dentro de la carpeta Datos.
-
-### Siguientes ejecuciones
-
-Una vez importada la ROM, el juego se inicia directamente sin necesidad de volver a seleccionarla.
-
-La carpeta del juego puede trasladarse a otra ubicación, incluyendo una memoria USB, conservando la ROM importada.
-
-### Crear la versión portable
-
-Desde la carpeta del proyecto, ejecutar:
+Con el proyecto y sus dependencias preparados:
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File .\tools\crear_portable.ps1
 ```
 
-El script prepara la distribución dentro de dist/.
+El script genera una instalación **para uso personal** dentro de:
 
-### Estado de las pruebas
+```text
+dist/
+└── Arcade Bros 1983 Recomp/
+    ├── ArcadeBros1983Recomp.exe     # Lanzador portable
+    ├── Bin/
+    │   ├── ArcadeBros1983Recomp.exe # Juego recompilado
+    │   ├── assets/                  # Recursos de recomp-ui
+    │   ├── config.ini
+    │   └── ...                      # DLL y otros recursos
+    └── Datos/
+        ├── ROM/                     # ROM importada por el usuario
+        └── Records/                 # Récords permanentes
+```
 
-- Selector de ROM: funcionando.
-- Importación de ROM: funcionando.
-- Inicio automático posterior: funcionando.
-- Ejecución desde otra carpeta: comprobada.
-- Almacenamiento totalmente local de configuraciones y partidas: pendiente de verificar.
+Abre el ejecutable situado en la **carpeta principal** de la instalación portable. El lanzador solicita una ROM compatible cuando todavía no existe una copia válida en `Datos/ROM`. En las siguientes ejecuciones la reutiliza.
 
-**Importante:** la ROM es proporcionada por el usuario. No se incluye en el repositorio ni en las distribuciones públicas del proyecto.
+La carpeta portable puede moverse a otra ubicación o unidad de almacenamiento, conservando los datos que contenga. Al regenerarla, el script está diseñado para respetar la ROM importada y los récords existentes.
 
-## Edición Arcade (en desarrollo)
+> **No distribuyas `dist/`:** contiene ejecutables derivados de la ROM y puede contener una copia privada del juego. El repositorio público distribuye código fuente, scripts y parches, no el juego de Nintendo.
 
-La siguiente actualización incorpora mejoras propias
-para conservar la experiencia arcade original.
+## Organización del repositorio
 
-### Características
+```text
+ArcadeBros1983-Recomp/
+├── CMakeLists.txt
+├── game.toml
+├── .gitmodules
+├── config/                     # Plantillas de configuración
+├── docs/                       # Documentación técnica
+├── patches/
+│   ├── nesrecomp/              # Adaptaciones del motor
+│   └── recomp-ui/              # Traducciones y ajustes de interfaz
+├── src/
+│   ├── launcher.cpp            # Lanzador portable propio
+│   └── records.c               # Récords y extensiones del juego
+├── tools/
+│   ├── preparar_dependencias.ps1
+│   └── crear_portable.ps1
+├── recomp-ui/                  # Submódulo Git
+├── deps/                       # NESRecomp local: ignorado por Git
+├── roms/                       # ROM privada: ignorada por Git
+├── build/                      # Compilación: ignorada por Git
+├── generated/                  # Código derivado: ignorado por Git
+└── dist/                       # Instalación privada: ignorada por Git
+```
 
-- Lanzador portable para Windows.
-- Importación de la ROM en la primera ejecución.
-- Almacenamiento local de datos.
-- Compatibilidad con mandos Xbox.
-- Récords permanentes entre sesiones.
-- Atajos de save states desactivados.
-- Partidas nuevas desde cero.
+Las carpetas ignoradas pueden no existir inmediatamente después de clonar el repositorio.
 
-### Sistema de récords
+## Historial de versiones
 
-El juego conserva automáticamente la puntuación máxima
-incluso después de cerrar y volver a abrir el programa.
+### v0.4.0 — Interfaz en español y regreso al launcher (en desarrollo)
 
-La implementación utiliza la API de modificaciones
-de NESRecomp, sin alterar la ROM original.
+- Integración de `recomp-ui` y traducción de las opciones principales.
+- Nuevo menú de pausa en español y acción para regresar al launcher.
+- Empaquetado portable actualizado con sus recursos gráficos.
+- Motor NESRecomp aislado en `deps/` con parche reproducible.
+- Script para preparar y verificar las dependencias.
 
-Documentación técnica:
+### v0.3.0 — Edición arcade y récords
 
-[Récords permanentes](docs/RECORDS.md)
+- Sistema de puntuación máxima persistente.
+- Ajustes para evitar el uso habitual de save states desde atajos y menú.
+- Mejoras en el lanzador y la instalación portable.
 
-### Próximas mejoras
+### v0.1.0 — Primera compilación funcional
 
-- Verificar la eliminación completa de los save states.
-- Mejorar las opciones gráficas.
-- Investigar renderizado interpolado a 120, 144 y 180 FPS.
-- Ampliar las pruebas de compatibilidad.
+- Traducción inicial de **1.235 instrucciones** de CPU 6502 a código C, según las pruebas del proyecto.
+- Ejecutable para Windows x64 integrado con el runtime de NESRecomp.
+- Prueba manual hasta la fase 10 y reconocimiento de un mando Xbox.
+
+## Créditos
+
+- **Juego original:** [Nintendo](https://www.nintendo.com/) — creadora y titular de los derechos correspondientes sobre Mario Bros. y sus elementos originales.
+- **Port y modificaciones de Arcade Bros 1983 Recomp:** [JojitaGamerHD](https://github.com/JojitaGamerHD).
+- **Herramienta de recompilación y runtime:** [NESRecomp](https://github.com/mstan/nesrecomp), de [Matthew Stanley (@mstan)](https://github.com/mstan), y colaboradores.
+- **Interfaz gráfica:** [recomp-ui](https://github.com/RetroPortingToolKit/recomp-ui), de [RetroPortingToolKit](https://github.com/RetroPortingToolKit) y colaboradores.
+
+El reconocimiento de estos proyectos no implica afiliación ni aprobación oficial de sus autores.
+
+## Aviso legal y licencias
+
+**Arcade Bros 1983 Recomp es un proyecto no oficial, experimental y sin fines comerciales.** No está afiliado, patrocinado ni respaldado por Nintendo.
+
+Este repositorio no proporciona archivos ROM, recursos extraídos del juego ni código compilado o generado a partir de ellos. El usuario es responsable de obtener y utilizar su copia del juego conforme a la legislación aplicable.
+
+NESRecomp y recomp-ui son proyectos de terceros sujetos a sus respectivas licencias. Consulta sus repositorios y archivos de licencia antes de utilizar, modificar o redistribuir sus componentes. Las condiciones aplicables al código original de este proyecto deben comprobarse en el archivo de licencia correspondiente, si se incorpora uno; **no se presume que una licencia propia cubra derechos de terceros o de Nintendo**.
+
+---
+
+*Arcade Bros 1983 Recomp — Un experimento de recompilación nativa y preservación técnica de videojuegos clásicos.*
