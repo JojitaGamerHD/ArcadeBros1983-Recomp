@@ -1,0 +1,13 @@
+diff --git a/src/common/backends/imgui/launcher_imgui.cpp b/src/common/backends/imgui/launcher_imgui.cpp
+index e1a0bca..76d2d41 100644
+--- a/src/common/backends/imgui/launcher_imgui.cpp
++++ b/src/common/backends/imgui/launcher_imgui.cpp
+@@ -14110,7 +14110,7 @@ void draw_ui(LauncherModel* m, const LauncherTheme& th, int logical_w, int logic
+             const int count = 1 + (m->mods ? 1 : 0) +
+                               (m->has_assist_tools ? 1 : 0) +
+                               ((m->credits_text && m->credits_text[0]) ? 1 : 0);
+-            const float w = px(110.0f);
++            const float w = std::max(px(110.0f), ImGui::CalcTextSize(ui_text("Settings")).x + px(32.0f));
+             const float total = w * count + gap * (count - 1);
+             ImGui::SetCursorPos(ImVec2(right - total, y));
+             if (ImGui::Button(ui_text("Settings"), ImVec2(w, px(34))))

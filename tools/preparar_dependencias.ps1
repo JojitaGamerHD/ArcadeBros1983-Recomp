@@ -123,7 +123,9 @@ if ($actualUI -ne $revisionUI) {
     throw 'recomp-ui tiene una revision diferente. No se modificara automaticamente.'
 }
 
+$parcheBoton = Join-Path $proyecto 'patches\recomp-ui\boton-configuracion-v0.5.patch'
 Aplicar-Parche $ui $parcheUI 'recomp-ui'
+Aplicar-Parche $ui $parcheBoton 'Boton Configuracion v0.5.0'
 
 # 4. Compilar el recompilador de NES
 $carpetaBuild = Join-Path $motor 'build\recompiler'
