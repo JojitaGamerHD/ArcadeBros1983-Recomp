@@ -1,4 +1,4 @@
-﻿# ROM original y archivos privados
+# ROM original y archivos privados
 roms/
 *.nes
 
@@ -16,9 +16,6 @@ build/
 .vs/
 keybinds.ini
 *.log
-
-dist/
-Datos/
 
 dist/
 Datos/

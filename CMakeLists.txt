@@ -5,7 +5,7 @@ project(ArcadeBros1983Recomp LANGUAGES C CXX)
 set(CMAKE_C_STANDARD 11)
 set(CMAKE_CXX_STANDARD 17)
 
-# Motor NESRecomp independiente con parche Arcade v0.4.0
+# Motor NESRecomp independiente con parche Arcade v0.6.0
 get_filename_component(NESRECOMP_ROOT
     "${CMAKE_CURRENT_SOURCE_DIR}/deps/nesrecomp-arcade"
     ABSOLUTE
@@ -31,4 +31,29 @@ if(WIN32)
     target_compile_features(ArcadeBrosLauncher PRIVATE cxx_std_17)
     target_link_libraries(ArcadeBrosLauncher PRIVATE comdlg32 bcrypt)
 endif()
+# ARCADE_PIXEL_FONT_V050
+# Fuente pixelada exclusiva del menu de pausa.
+add_custom_command(TARGET ArcadeBros1983Recomp POST_BUILD
+    COMMAND "${CMAKE_COMMAND}" -E make_directory
+        "$<TARGET_FILE_DIR:ArcadeBros1983Recomp>/assets/fonts"
+    COMMAND "${CMAKE_COMMAND}" -E copy_if_different
+        "${CMAKE_CURRENT_SOURCE_DIR}/assets/fonts/PixelifySans.ttf"
+        "$<TARGET_FILE_DIR:ArcadeBros1983Recomp>/assets/fonts/PixelifySans.ttf"
+    COMMAND "${CMAKE_COMMAND}" -E copy_if_different
+        "${CMAKE_CURRENT_SOURCE_DIR}/assets/fonts/OFL-PixelifySans.txt"
+        "$<TARGET_FILE_DIR:ArcadeBros1983Recomp>/assets/fonts/OFL-PixelifySans.txt"
+    COMMENT "Copiando tipografia pixelada de Arcade Bros"
+    VERBATIM
+)
 
+# ARCADE_BOXART_V060
+# Portada del launcher Arcade Bros 1983 Recomp.
+add_custom_command(TARGET ArcadeBros1983Recomp POST_BUILD
+    COMMAND "${CMAKE_COMMAND}" -E make_directory
+        "$<TARGET_FILE_DIR:ArcadeBros1983Recomp>/assets/img"
+    COMMAND "${CMAKE_COMMAND}" -E copy_if_different
+        "${CMAKE_CURRENT_SOURCE_DIR}/assets/img/arcade_bros_1983.png"
+        "$<TARGET_FILE_DIR:ArcadeBros1983Recomp>/assets/img/arcade_bros_1983.png"
+    COMMENT "Copiando portada Arcade Bros 1983"
+    VERBATIM
+)
