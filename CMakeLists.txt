@@ -31,4 +31,17 @@ if(WIN32)
     target_compile_features(ArcadeBrosLauncher PRIVATE cxx_std_17)
     target_link_libraries(ArcadeBrosLauncher PRIVATE comdlg32 bcrypt)
 endif()
-
+# ARCADE_PIXEL_FONT_V050
+# Fuente pixelada exclusiva del menu de pausa.
+add_custom_command(TARGET ArcadeBros1983Recomp POST_BUILD
+    COMMAND "${CMAKE_COMMAND}" -E make_directory
+        "$<TARGET_FILE_DIR:ArcadeBros1983Recomp>/assets/fonts"
+    COMMAND "${CMAKE_COMMAND}" -E copy_if_different
+        "${CMAKE_CURRENT_SOURCE_DIR}/assets/fonts/PixelifySans.ttf"
+        "$<TARGET_FILE_DIR:ArcadeBros1983Recomp>/assets/fonts/PixelifySans.ttf"
+    COMMAND "${CMAKE_COMMAND}" -E copy_if_different
+        "${CMAKE_CURRENT_SOURCE_DIR}/assets/fonts/OFL-PixelifySans.txt"
+        "$<TARGET_FILE_DIR:ArcadeBros1983Recomp>/assets/fonts/OFL-PixelifySans.txt"
+    COMMENT "Copiando tipografia pixelada de Arcade Bros"
+    VERBATIM
+)

@@ -1,0 +1,540 @@
+diff --git a/runner/cyc/cyc_host.c b/runner/cyc/cyc_host.c
+index a05b7f9..c95844c 100644
+--- a/runner/cyc/cyc_host.c
++++ b/runner/cyc/cyc_host.c
+@@ -208,6 +208,7 @@ void cyc_sdl_option(const char *name, const char *value);
+ void cyc_sdl_present_out(const char *path, long every);
+ void cyc_sdl_image_path(const char *path);
+ #endif
++
+ #ifdef CYC_ORACLE
+ void cyc_oracle_address_report(void *file);
+ #endif
+@@ -1213,6 +1214,7 @@ session_restart:
+     save_file=offline_save_file;datach_save=offline_datach_save;
+ #endif
+ #if defined(CYC_WITH_SDL)
++arcade_session_restart:
+     /* The window: its settings, and recomp-ui's launcher where the build has it. */
+     if (!headless) {
+         int launch = cyc_sdl_prelaunch(&rom_path, fds_bios, &saved_hle, &saved_bios);
+@@ -1525,6 +1527,14 @@ session_restart:
+ #endif
+         if(result==3)result=net_error[0]?2:0;
+ #endif
++/* Arcade Bros: regresar al launcher tras cerrar la sesion. */
++if (saves_ok && result == 4) {
++    extern bool cyc_sdl_force_launcher;
++
++    cyc_sdl_force_launcher = true;
++    free(image);
++    goto arcade_session_restart;
++}
+         return saves_ok?result:2;
+     }
+ #else
+diff --git a/runner/cyc/cyc_input.c b/runner/cyc/cyc_input.c
+index b41ed98..e9b9f21 100644
+--- a/runner/cyc/cyc_input.c
++++ b/runner/cyc/cyc_input.c
+@@ -19,7 +19,13 @@ static const char *const BUTTON_LABELS[CYC_INPUT_BUTTONS] = { "A", "B", "Select"
+ static const char *const SHORTCUT_KEYS[CYC_SC_COUNT] = { "disk", "menu", "fast_forward", "screenshot", "fullscreen",
+                                                           "save_state", "load_state" };
+ static const char *const SHORTCUT_LABELS[CYC_SC_COUNT] = {
+-    "Disk (show / swap side)", "Menu", "Fast-forward (hold)", "Screenshot", "Fullscreen", "Save state", "Load state",
++    "Disco (mostrar / cambiar cara)",
++    "Menú",
++    "Avance rápido (mantener)",
++    "Captura de pantalla",
++    "Pantalla completa",
++    "Guardar estado",
++    "Cargar estado",
+ };
+ 
+ const char *cyc_button_key(int b) { return b >= 0 && b < CYC_INPUT_BUTTONS ? BUTTON_KEYS[b] : ""; }
+diff --git a/runner/cyc/cyc_sdl.c b/runner/cyc/cyc_sdl.c
+index 150a0e8..fea95a0 100644
+--- a/runner/cyc/cyc_sdl.c
++++ b/runner/cyc/cyc_sdl.c
+@@ -118,6 +118,7 @@ static bool        s_uncapped; /* measurement pacing only; render and audio stil
+ static bool        s_pause_unfocused;
+ static char        s_image[1024];                   /* the image running (the save state slot's name) */
+ bool cyc_sdl_force_launcher;
++bool cyc_sdl_return_to_launcher;
+ #ifdef NESRECOMP_NET
+ void cyc_sdl_net_name_store(const char *name) {
+     snprintf(s_set.netplay_player_name,sizeof s_set.netplay_player_name,"%s",name&&*name?name:"Player");
+@@ -1135,6 +1136,58 @@ static void present_shot(long frame)
+     free(px);
+ }
+ 
++/* ARCADE_FPS_OVERLAY_V050 */
++static double s_arcade_fps_nes = 0.0;
++static double s_arcade_fps_pantalla = 0.0;
++
++static void arcade_fps_texto(
++    int x, int y, const char *texto,
++    Uint8 r, Uint8 g, Uint8 b)
++{
++    SDL_SetRenderDrawColor(s_ren, r, g, b, 255);
++
++    for (const char *p = texto; *p; ++p, x += 8) {
++        const uint8_t *glifo = cyc_overlay_glyph(*p);
++        if (!glifo) continue;
++
++        for (int fila = 0; fila < 5; ++fila) {
++            for (int col = 0; col < 3; ++col) {
++                if (glifo[fila] & (4 >> col)) {
++                    SDL_Rect pixel = {
++                        x + col * 2,
++                        y + fila * 2,
++                        2, 2
++                    };
++                    SDL_RenderFillRect(s_ren, &pixel);
++                }
++            }
++        }
++    }
++}
++
++static void arcade_fps_dibujar(void)
++{
++    char nes[32], pantalla[32];
++
++    snprintf(nes, sizeof(nes), "NES %.1f", s_arcade_fps_nes);
++    snprintf(pantalla, sizeof(pantalla), "FPS %.1f", s_arcade_fps_pantalla);
++
++    /* Esquina superior derecha del area del juego. */
++    const int ancho = 84;
++    const int alto = 30;
++    const int x = s_tex_w - ancho - 4;
++    const int y = 4;
++
++    if (x < 0) return;
++
++    SDL_Rect fondo = { x, y, ancho, alto };
++
++    SDL_SetRenderDrawColor(s_ren, 15, 19, 25, 255);
++    SDL_RenderFillRect(s_ren, &fondo);
++
++    arcade_fps_texto(x + 6, y + 4, nes, 150, 240, 150);
++    arcade_fps_texto(x + 6, y + 17, pantalla, 150, 205, 255);
++}
+ static void show(bool loading, const char *toast_title, const char *toast_body)
+ {
+     int w, h;
+@@ -1182,6 +1235,8 @@ static void show(bool loading, const char *toast_title, const char *toast_body)
+     (void)loading;
+ #endif
+ #ifdef CYC_WITH_RECOMP_UI
++    if (s_set.show_fps && !menu_open())
++        arcade_fps_dibujar();
+     cyc_ui_render();
+ #endif
+     if (s_ui_shot_id >= 0) {
+@@ -1267,6 +1322,7 @@ int cyc_sdl_main(const char *title_in, int scale)
+         fprintf(stderr, "--uncapped requires a positive --exit-after frame limit\n");
+         return 2;
+     }
++cyc_sdl_return_to_launcher = false;
+     s_running=true;s_frames_done=(long)cyc_ring_frame;s_tex=NULL;s_pad_count=0;s_vpad_joy=NULL;
+     /* a path names the game by its file's stem */
+     char title[256];
+@@ -1352,6 +1408,15 @@ int cyc_sdl_main(const char *title_in, int scale)
+     const double frame_seconds = cyc_host_frame_seconds();
+     const Uint64 freq = SDL_GetPerformanceFrequency();
+     const Uint64 frame_ticks = (Uint64)(frame_seconds * (double)freq);
++    /* Arcade v0.5: FPS configurables sin alterar la simulacion NES. */
++    unsigned arcade_guest_count = 0;
++    unsigned arcade_present_count = 0;
++    Uint64 arcade_report_mark = SDL_GetPerformanceCounter();
++
++    fprintf(stderr,
++        "[arcade fps] presentacion solicitada: %d FPS; "
++        "logica NES sin modificar; sin interpolacion\n",
++        s_set.fps_target);
+     Uint64 next = SDL_GetPerformanceCounter();
+     Uint64 fps_mark = next, shown = 0;
+     const Uint64 measurement_start = next;
+@@ -1442,8 +1507,7 @@ int cyc_sdl_main(const char *title_in, int scale)
+             apply_settings();
+             save_settings();
+         }
+-        if (edge[CYC_SC_SAVE_STATE] && !menu_open()) save_state_slot();
+-        if (edge[CYC_SC_LOAD_STATE] && !menu_open()) load_state_slot();
++/* Modo arcade: F8 y F9 no permiten guardar ni cargar partidas. */;
+         if (edge[CYC_SC_SCREENSHOT]) {
+             char name[64];
+             int pw, ph;
+@@ -1519,9 +1583,11 @@ int cyc_sdl_main(const char *title_in, int scale)
+             if(online)cyc_net_finish();
+ #endif
+             frames++;
++            arcade_guest_count++;
+             cyc_host_frame_done(++s_frames_done);
+             loading = s_fds && cyc_host_frame_unpaced();
+-            fast = !online&&(st.shortcut[CYC_SC_FAST_FORWARD] || loading);
++            /* Modo arcade: no acelerar mediante Tab o RT. */
++fast = !online && loading;
+         }
+         int16_t pcm[4096];
+         size_t n;
+@@ -1545,14 +1611,20 @@ int cyc_sdl_main(const char *title_in, int scale)
+          * presents rather than slowing guest execution. */
+         Uint64 tnow = SDL_GetPerformanceCounter();
+         bool unpaced = fast || s_uncapped;
+-        renderer_vsync(s_set.vsync && !unpaced);
++        renderer_vsync(s_set.vsync && !unpaced && s_set.fps_target == 60);
+         bool present = cyc_frame_present_due(tnow, next, frame_ticks, shown,
+                                              s_vsync_active, unpaced || open || inactive);
+-        if (present && !(unpaced && s_vsync_active) &&
++        /* Arcade v0.5: 30 FPS solo afecta la presentacion. */
++        const bool arcade_omitir_30 =
++            s_set.fps_target == 30 &&
++            !unpaced && !open && !inactive && !online &&
++            (s_frames_done % 2) != 0;
++        if (present && !arcade_omitir_30 && !(unpaced && s_vsync_active) &&
+             (!loading || tnow - shown >= frame_ticks)) {
+             show(loading, toast_title, toast_body);
+             if (s_present_out && s_present_every > 0 && loops % s_present_every == 0) present_shot(s_frames_done);
+             SDL_RenderPresent(s_ren);
++            arcade_present_count++;
+             shown = SDL_GetPerformanceCounter();
+             /* the one point a new width applies: after this present, before the next picture */
+             cyc_video_apply_pending();
+@@ -1583,6 +1655,66 @@ int cyc_sdl_main(const char *title_in, int scale)
+             continue;
+         }
+         next += frame_ticks;
++
++        /* FPS configurables: 1, 2 o 3 presentaciones por frame NES.
++           Sin interpolacion: se reutiliza el ultimo fotograma.
++           La logica, el sonido y los controles no se aceleran. */
++        int arcade_partes = s_set.fps_target >= 60 ? s_set.fps_target / 60 : 1;
++
++        if (arcade_partes > 1 &&
++            !fast && !s_uncapped && !open && !inactive &&
++            !online && !s_vsync_active && next > tnow) {
++
++            for (int fraccion = 1; fraccion < arcade_partes; ++fraccion) {
++
++                Uint64 objetivo = next -
++                    (frame_ticks * (Uint64)(arcade_partes - fraccion)) /
++                    (Uint64)arcade_partes;
++
++                Uint64 actual = SDL_GetPerformanceCounter();
++
++                if (objetivo > actual) {
++                    Uint64 diferencia = objetivo - actual;
++                    Uint32 ms = (Uint32)(diferencia * 1000 / freq);
++
++                    if (ms > 1) SDL_Delay(ms - 1);
++
++                    while (SDL_GetPerformanceCounter() < objetivo) {}
++                }
++
++                actual = SDL_GetPerformanceCounter();
++
++                /* Evitar una presentacion demasiado cerca del
++                   siguiente frame NES. */
++                if (actual + freq / 1000 >= next)
++                    break;
++
++                show(false, toast_title, toast_body);
++                SDL_RenderPresent(s_ren);
++
++                shown = SDL_GetPerformanceCounter();
++                arcade_present_count++;
++            }
++
++            tnow = SDL_GetPerformanceCounter();
++        }
++        /* Diagnostico: simulacion frente a presentaciones. */
++        Uint64 arcade_now = SDL_GetPerformanceCounter();
++        if (arcade_now - arcade_report_mark >= freq) {
++            double segundos =
++                (double)(arcade_now - arcade_report_mark) / (double)freq;
++
++            fprintf(stderr,
++                "[arcade fps] NES=%.1f FPS | pantalla=%.1f FPS\n",
++                arcade_guest_count / segundos,
++                arcade_present_count / segundos);
++
++            s_arcade_fps_nes = arcade_guest_count / segundos;
++            s_arcade_fps_pantalla = arcade_present_count / segundos;
++            arcade_guest_count = 0;
++            arcade_present_count = 0;
++            arcade_report_mark = arcade_now;
++        }
+         if (next > tnow) {
+             Uint32 ms = (Uint32)((next - tnow) * 1000 / freq);
+             if (ms > 1) SDL_Delay(ms - 1);
+@@ -1617,5 +1749,5 @@ int cyc_sdl_main(const char *title_in, int scale)
+ #ifdef NESRECOMP_NET
+     if(nes_netplay_active())return 3;
+ #endif
+-    return 0;
++    return cyc_sdl_return_to_launcher ? 4 : 0;
+ }
+diff --git a/runner/cyc/cyc_settings.c b/runner/cyc/cyc_settings.c
+index b9fe775..b278d68 100644
+--- a/runner/cyc/cyc_settings.c
++++ b/runner/cyc/cyc_settings.c
+@@ -19,6 +19,8 @@ void cyc_settings_default(CycSettings *s)
+     s->fullscreen = 0;
+     s->integer_scale = 1;
+     s->linear_filter = 0;
++    s->show_fps = 0;
++    s->fps_target = 60;
+     s->vsync = 0;
+     s->audio_enabled = 1;
+     s->volume = 100;
+@@ -125,6 +127,15 @@ bool cyc_settings_load(CycSettings *s, const char *path, FILE *log, const CycSet
+             else if (eq_ci(key, "IntegerScale")) bad = !parse_int(val, &v) || (s->integer_scale = v != 0, 0);
+             else if (eq_ci(key, "LinearFilter")) bad = !parse_int(val, &v) || (s->linear_filter = v != 0, 0);
+             else if (eq_ci(key, "VSync")) bad = !parse_int(val, &v) || (s->vsync = v != 0, 0);
++            else if (eq_ci(key, "ShowFPS")) bad = !parse_int(val, &v) || (s->show_fps = v != 0, 0);
++            else if (eq_ci(key, "TargetFPS")) {
++                bad = !parse_int(val, &v);
++                if (!bad) {
++                    if (v == 30 || v == 60 || v == 120 || v == 180)
++                        s->fps_target = v;
++                    else bad = true;
++                }
++            }
+             else if (eq_ci(key, "HdPackEnabled")) bad = !parse_int(val, &v) || (s->hdpack_enabled = v != 0, 0);
+             else if (eq_ci(key, "HdPackDir")) snprintf(s->hdpack_dir,sizeof s->hdpack_dir,"%s",val);
+             break;
+@@ -210,6 +221,8 @@ bool cyc_settings_save(const CycSettings *s, const char *path, const CycSettings
+     fprintf(f, "[Display]\nWindowScale = %d\nFullscreen = %d\nIntegerScale = %d\nLinearFilter = %d\nVSync = %d\n",
+             s->window_scale, s->fullscreen, s->integer_scale, s->linear_filter, s->vsync);
+     fprintf(f,"HdPackEnabled = %d\nHdPackDir = %s\n",s->hdpack_enabled,s->hdpack_dir);
++    fprintf(f, "ShowFPS = %d\n", s->show_fps);
++    fprintf(f, "TargetFPS = %d\n", s->fps_target);
+     fprintf(f, "[Audio]\nEnabled = %d\nVolume = %d\n", s->audio_enabled, s->volume);
+     fprintf(f, "[Input]\n");
+     for (int p = 0; p < CYC_INPUT_PLAYERS; ++p)
+diff --git a/runner/cyc/cyc_settings.h b/runner/cyc/cyc_settings.h
+index 0d80d9d..4c71d69 100644
+--- a/runner/cyc/cyc_settings.h
++++ b/runner/cyc/cyc_settings.h
+@@ -35,6 +35,8 @@ typedef struct CycSettings {
+     int  fullscreen;        /* 0 off, 1 borderless, 2 exclusive */
+     int  integer_scale;     /* bool */
+     int  linear_filter;     /* bool */
++    int  show_fps;          /* bool */
++    int  fps_target;        /* 60, 120, 180 */
+     int  vsync;             /* bool: sync presents to the display refresh */
+     int  audio_enabled;     /* bool */
+     int  volume;            /* 0..100 */
+diff --git a/runner/cyc/cyc_ui_imgui.cpp b/runner/cyc/cyc_ui_imgui.cpp
+index 6c75cf1..b6c1be6 100644
+--- a/runner/cyc/cyc_ui_imgui.cpp
++++ b/runner/cyc/cyc_ui_imgui.cpp
+@@ -40,6 +40,45 @@ extern "C" bool cyc_ui_init(SDL_Window *win, SDL_Renderer *ren, const CycUiHost
+     ImGuiIO &io = ImGui::GetIO();
+     io.IniFilename = nullptr;
+     io.LogFilename = nullptr;
++    /* ARCADE_PIXEL_FONT_V050 */
++    ImFontConfig arcade_font_config;
++    arcade_font_config.OversampleH = 1;
++    arcade_font_config.OversampleV = 1;
++    arcade_font_config.PixelSnapH = true;
++
++    ImFont *arcade_font = nullptr;
++    char *arcade_base = SDL_GetBasePath();
++
++    if (arcade_base) {
++        char arcade_path[2048];
++
++        int n = std::snprintf(
++            arcade_path,
++            sizeof(arcade_path),
++            "%sassets/fonts/PixelifySans.ttf",
++            arcade_base
++        );
++
++        SDL_free(arcade_base);
++
++        if (n > 0 && n < (int)sizeof(arcade_path)) {
++            arcade_font = io.Fonts->AddFontFromFileTTF(
++                arcade_path,
++                17.0f,
++                &arcade_font_config,
++                io.Fonts->GetGlyphRangesDefault()
++            );
++        }
++    }
++
++    if (arcade_font) {
++        std::fprintf(stderr,
++            "[arcade ui] fuente Pixelify Sans cargada\n");
++    } else {
++        io.Fonts->AddFontDefault();
++        std::fprintf(stderr,
++            "[arcade ui] fuente no disponible; usando fuente normal\n");
++    }
+     ImGui::StyleColorsDark();
+     if (!ImGui_ImplSDL2_InitForSDLRenderer(win, ren)) {
+         std::fprintf(stderr, "cyc ui: ImGui SDL2 platform initialization failed\n");
+diff --git a/runner/cyc/cyc_ui_launcher.c b/runner/cyc/cyc_ui_launcher.c
+index 8d1ae45..f097eea 100644
+--- a/runner/cyc/cyc_ui_launcher.c
++++ b/runner/cyc/cyc_ui_launcher.c
+@@ -46,11 +46,22 @@ _Static_assert(CYC_SC_COUNT <= RECOMP_LAUNCHER_MAX_ASSIST_BINDINGS, "shortcuts")
+ static int shortcut_list(bool fds, int out[CYC_SC_COUNT])
+ {
+     int n = 0;
+-    for (int i = 0; i < CYC_SC_COUNT; ++i)
+-        if (i != CYC_SC_DISK || fds) out[n++] = i;
++
++    for (int i = 0; i < CYC_SC_COUNT; ++i) {
++
++        /* Modo arcade: ocultar guardado y carga. */
++        if (i == CYC_SC_SAVE_STATE ||
++            i == CYC_SC_LOAD_STATE)
++            continue;
++
++        if (i == CYC_SC_DISK && !fds)
++            continue;
++
++        out[n++] = i;
++    }
++
+     return n;
+ }
+-
+ static void to_launcher(const CycSettings *s, RecompLauncherCSettings *io, const int *shortcuts, int count)
+ {
+     io->window_scale = s->window_scale;
+@@ -203,7 +214,24 @@ int cyc_ui_launcher(CycSettings *settings, const char *settings_path, const CycH
+     if (cyc_native_display_name) snprintf(name, sizeof(name), "%s", cyc_native_display_name);
+     else if (cyc_native_program_name) snprintf(name, sizeof(name), "%s", cyc_native_program_name);
+     else stem_of(*rom_path ? *rom_path : "NES", name, sizeof(name));
+-    gi.name = name;
++    static char titulo_port[320];
++
++snprintf(titulo_port, sizeof(titulo_port),
++         "%s por JojitaGamerHD", name);
++
++gi.name = titulo_port;
++gi.credits_text =
++    "ARCADE BROS 1983 RECOMP\n\n"
++    "Port desarrollado por JojitaGamerHD\n"
++    "GitHub: https://github.com/JojitaGamerHD\n\n"
++    "JUEGO ORIGINAL\n"
++    "Mario Bros. (1983) - Nintendo\n\n"
++    "HERRAMIENTAS UTILIZADAS\n"
++    "NESRecomp - Matthew Stanley (mstan)\n"
++    "https://github.com/mstan/nesrecomp\n\n"
++    "recomp-ui - RetroPortingToolKit\n"
++    "https://github.com/RetroPortingToolKit/recomp-ui\n\n"
++    "Proyecto independiente, no afiliado a Nintendo.";
+ #ifdef NES_HOST_HAS_RECOMP_UI
+     gi.netplay=nes_host_lobby_init(name,*rom_path);
+     gi.netplay_supported=gi.netplay!=NULL;
+diff --git a/runner/cyc/cyc_ui_menu.c b/runner/cyc/cyc_ui_menu.c
+index f52abd0..bfa1c23 100644
+--- a/runner/cyc/cyc_ui_menu.c
++++ b/runner/cyc/cyc_ui_menu.c
+@@ -220,6 +220,10 @@ static int mod_enabled(const ModRow *m)
+ static const char *const HLE_CHOICES[] = { "Game default", "On", "Off" };
+ static const int HLE_VALUES[] = { -1, 1, 0 };
+ 
++static const char *const ARCADE_FPS_CHOICES[] = {
++    "30 FPS", "60 FPS", "120 FPS", "180 FPS"
++};
++static const int ARCADE_FPS_VALUES[] = {30, 60, 120, 180};
+ static bool is_key(const RecompRuntimeUiItem *it, const char *k) { return it->key && !strcmp(it->key, k); }
+ static bool game_row(const RecompRuntimeUiItem *it)
+ {
+@@ -302,6 +306,8 @@ static int get_value(void *ctx, const RecompRuntimeUiItem *it, int *out)
+     else if (is_key(it, RECOMP_RUNTIME_UI_KEY_WINDOW_SCALE)) *out = s->window_scale;
+     else if (is_key(it, RECOMP_RUNTIME_UI_KEY_INTEGER_SCALE)) *out = s->integer_scale;
+     else if (is_key(it, RECOMP_RUNTIME_UI_KEY_LINEAR_FILTER)) *out = s->linear_filter;
++    else if (is_key(it, "cyc.arcade.show_fps")) *out = s->show_fps;
++    else if (is_key(it, "cyc.arcade.target_fps")) *out = s->fps_target;
+     else if (is_key(it, RECOMP_RUNTIME_UI_KEY_AUDIO)) *out = s->audio_enabled;
+     else if (is_key(it, RECOMP_RUNTIME_UI_KEY_VOLUME)) *out = s->volume;
+     else if (is_key(it, "cyc.zapper.mouse")) *out = s->zapper_mouse;
+@@ -331,6 +337,11 @@ static int set_value(void *ctx, const RecompRuntimeUiItem *it, int v)
+     else if (is_key(it, RECOMP_RUNTIME_UI_KEY_WINDOW_SCALE)) s->window_scale = v < 1 ? 1 : v > 8 ? 8 : v;
+     else if (is_key(it, RECOMP_RUNTIME_UI_KEY_INTEGER_SCALE)) s->integer_scale = v != 0;
+     else if (is_key(it, RECOMP_RUNTIME_UI_KEY_LINEAR_FILTER)) s->linear_filter = v != 0;
++    else if (is_key(it, "cyc.arcade.show_fps")) s->show_fps = v != 0;
++    else if (is_key(it, "cyc.arcade.target_fps")) {
++        if (v != 30 && v != 60 && v != 120 && v != 180) return 0;
++        s->fps_target = v;
++    }
+     else if (is_key(it, RECOMP_RUNTIME_UI_KEY_AUDIO)) s->audio_enabled = v != 0;
+     else if (is_key(it, RECOMP_RUNTIME_UI_KEY_VOLUME)) s->volume = v < 0 ? 0 : v > 100 ? 100 : v;
+     else if (is_key(it, "cyc.zapper.mouse")) s->zapper_mouse = v != 0;
+@@ -394,6 +405,13 @@ static int run_action(void *ctx, const RecompRuntimeUiItem *it)
+         if (ok) recomp_runtime_ui_close(s_ui);
+         return ok;
+     }
++if (is_key(it, "cyc.return_to_launcher")) {
++    extern bool cyc_sdl_return_to_launcher;
++
++    cyc_sdl_return_to_launcher = true;
++    s_host.quit();
++    return 1;
++}
+     if (is_key(it, "cyc.quit")) {
+         uint64_t now = s_host.now_ms();
+         if (s_quit_armed && now - s_quit_armed < 3000) { s_host.quit(); return 1; }
+@@ -479,15 +497,21 @@ RecompRuntimeUi *cyc_ui_menu_create(const CycUiHost *host)
+     }
+     for (int i = 0; i < CYC_SC_COUNT; ++i) {
+         if (i == CYC_SC_DISK && !host->fds) continue;
++/* Modo arcade: ocultar funciones desactivadas. */
++if (i == CYC_SC_SAVE_STATE ||
++    i == CYC_SC_LOAD_STATE ||
++    i == CYC_SC_FAST_FORWARD)
++    continue;
+         snprintf(s_shortcut_key[i], sizeof(s_shortcut_key[i]), "cyc.shortcut.%d", i);
+-        add(s_shortcut_key[i], "Controls", s_shortcut_label[i], "Change bindings in the launcher's Controls page.",
+-            RECOMP_RUNTIME_UI_ACTION, 0, 0, 0, NULL, 0, NULL);
++        /* Atajos visibles solo en la configuracion del launcher. */
+     }
+     if (x && x->menu_items)
+         /* Game-defined additions follow the host's controls. */
+         for (size_t i = 0; i < x->menu_item_count; ++i)
+             if (s_item_count < sizeof(s_items) / sizeof(s_items[0])) s_items[s_item_count++] = x->menu_items[i];
+     add_mod_rows();
++    add("cyc.arcade.show_fps", "Gráficos", "Mostrar FPS", "Muestra los FPS de NES y pantalla.", RECOMP_RUNTIME_UI_BOOL, 0, 1, 1, NULL, 0, NULL);
++    add("cyc.arcade.target_fps", "Gráficos", "Limite de FPS", "La NES mantiene su velocidad original.", RECOMP_RUNTIME_UI_CHOICE, 30, 180, 30, ARCADE_FPS_CHOICES, 4, ARCADE_FPS_VALUES);
+     CycZapperState gun;
+     cyc_zapper_state(&gun);
+     if (gun.port) {
+@@ -496,13 +520,18 @@ RecompRuntimeUi *cyc_ui_menu_create(const CycUiHost *host)
+         add("cyc.zapper.crosshair", "Zapper", "Crosshair", "Show the aiming marker.",
+             RECOMP_RUNTIME_UI_BOOL, 0, 1, 1, NULL, 0, NULL);
+     }
+-    add("cyc.quit", "System", "Quit", "Close the game (the disk save is written first).", RECOMP_RUNTIME_UI_ACTION,
++add("cyc.return_to_launcher", "Sistema",
++    "Volver al launcher",
++    "Termina la partida y regresa al menu principal.",
++    RECOMP_RUNTIME_UI_ACTION,
++    0, 0, 0, NULL, 0, NULL);
++    add("cyc.quit", "Sistema", "Salir del juego", "Cierra el juego.", RECOMP_RUNTIME_UI_ACTION,
+         0, 0, 0, NULL, 0, NULL);
+     refresh();
+ 
+     RecompRuntimeUiStandardConfig std;
+     memset(&std, 0, sizeof(std));
+-    std.menu.title = host->title;
++    std.menu.title = "MARIO BROS. 1983 - PAUSA";
+     std.menu.subtitle = host->fds ? "FAMICOM DISK SYSTEM" : "NES";
+     std.menu.theme = "nes";
+     std.menu.accept_label = "Enter / A";
+@@ -517,8 +546,7 @@ RecompRuntimeUi *cyc_ui_menu_create(const CycUiHost *host)
+                    RECOMP_RUNTIME_UI_STANDARD_INTEGER_SCALE | RECOMP_RUNTIME_UI_STANDARD_LINEAR_FILTER |
+                    RECOMP_RUNTIME_UI_STANDARD_AUDIO | RECOMP_RUNTIME_UI_STANDARD_VOLUME |
+                    RECOMP_RUNTIME_UI_STANDARD_RESUME;
+-    if (host->save_state && host->load_state)
+-        std.features |= RECOMP_RUNTIME_UI_STANDARD_SAVE_STATE | RECOMP_RUNTIME_UI_STANDARD_LOAD_STATE;
++    /* Modo arcade: no mostrar Save State ni Load State en el menu. */
+     if (x && x->view_modes && x->set_view_mode) {
+         std.features |= RECOMP_RUNTIME_UI_STANDARD_VIEW_MODE;
+         std.view_modes = x->view_modes;

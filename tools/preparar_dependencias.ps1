@@ -13,8 +13,8 @@ $ui = Join-Path $proyecto 'recomp-ui'
 $revisionMotor = '5a2eddeecc646e9325bef53f3c711e119423f99c'
 $revisionUI = '7c635c6b366a6e0d5d3c913a7fce6ec04dd9f256'
 
-$parcheMotor = Join-Path $proyecto 'patches\nesrecomp\arcade-v0.4.patch'
-$parcheUI = Join-Path $proyecto 'patches\recomp-ui\espanol-v0.4.patch'
+$parcheMotor = Join-Path $proyecto 'patches\nesrecomp\arcade-v0.5.patch'
+$parcheUI = Join-Path $proyecto 'patches\recomp-ui\arcade-v0.5.patch'
 
 function Verificar-Comando {
     param([string]$mensaje)
@@ -59,7 +59,7 @@ finally {
     Write-Host "Parche de $nombre aplicado." -ForegroundColor Green
 }
 
-Write-Host "`n=== PREPARANDO DEPENDENCIAS v0.4.0 ===" -ForegroundColor Cyan
+Write-Host "`n=== PREPARANDO DEPENDENCIAS v0.5.0 ===" -ForegroundColor Cyan
 
 # 1. Comprobar los parches
 foreach ($parche in @($parcheMotor, $parcheUI)) {
