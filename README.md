@@ -5,7 +5,7 @@
 [![Estado](https://img.shields.io/badge/estado-en%20desarrollo-yellow)](https://github.com/JojitaGamerHD/ArcadeBros1983-Recomp)
 [![Plataforma](https://img.shields.io/badge/plataforma-Windows%20x64-blue)](https://github.com/JojitaGamerHD/ArcadeBros1983-Recomp)
 
-**Versión en desarrollo: v0.5.0** · Rama `desarrollo-v0.5.0`
+**Versión en desarrollo: v0.6.0** · Rama `desarrollo-v0.6.0`
 
 Arcade Bros 1983 Recomp es un proyecto independiente de aprendizaje y experimentación técnica. Su objetivo es ejecutar la versión de NES de **Mario Bros.** como un programa nativo de Windows, conservando el comportamiento del juego y añadiendo funciones propias orientadas a una experiencia arcade y portable.
 
@@ -30,12 +30,14 @@ Para la interfaz se integra [recomp-ui](https://github.com/RetroPortingToolKit/r
 - **Opciones de visualización** proporcionadas por el runtime, como pantalla completa, escalado y filtrado.
 - **Enfoque arcade**: desactivación de los atajos habituales de guardar/cargar estado y de avance rápido; las opciones de estados se ocultan del menú de pausa.
 
-Las funciones anteriores se han probado manualmente en el entorno de desarrollo. **v0.5.0 todavía está en desarrollo** y no implica una certificación de compatibilidad completa.
+Las funciones anteriores se han probado manualmente en el entorno de desarrollo. **v0.6.0 todavía está en desarrollo** y no implica una certificación de compatibilidad completa.
 
-### Novedades experimentales de v0.5.0
+### Funciones de v0.5.0 y v0.6.0
 
 - **FPS configurables:** 30, 60, 120 y 180 FPS.
 - **Contador de FPS:** simulación NES y presentación.
+- **HUD de FPS v0.6.0:** indicador discreto, de tamaño reducido y sin recuadro.
+- **Portada v0.6.0:** imagen pixel art personalizada integrada al launcher.
 - **Menú NES:** diseño compacto con fuente Pixelify Sans.
 - **Gráficos:** ajustes de FPS en una sola sección.
 - **Controles:** configuración conservada en el launcher.
@@ -68,7 +70,7 @@ El proyecto se ha desarrollado y probado principalmente en Windows 11 con el gen
 ```powershell
 git clone --recurse-submodules https://github.com/JojitaGamerHD/ArcadeBros1983-Recomp.git
 cd ArcadeBros1983-Recomp
-git switch desarrollo-v0.5.0
+git switch desarrollo-v0.6.0
 git submodule update --init --recursive
 ```
 
@@ -92,14 +94,14 @@ powershell -ExecutionPolicy Bypass -File .\tools\preparar_dependencias.ps1
 
 El script prepara una copia local de NESRecomp en `deps/nesrecomp-arcade`, verifica revisiones fijadas, aplica los parches de este proyecto a NESRecomp y `recomp-ui` y compila la herramienta `NESRecomp.exe` si es necesario.
 
-Revisiones utilizadas para v0.5.0:
+Revisiones utilizadas para v0.6.0:
 
 | Componente | Revisión |
 | --- | --- |
 | NESRecomp | `5a2eddeecc646e9325bef53f3c711e119423f99c` |
 | recomp-ui | `7c635c6b366a6e0d5d3c913a7fce6ec04dd9f256` |
 
-Los parches se encuentran en `patches/nesrecomp/arcade-v0.5.patch` y `patches/recomp-ui/arcade-v0.5.patch`. El script detecta si ya están aplicados; no debe utilizarse para sobrescribir cambios manuales incompatibles.
+Los parches se encuentran en `patches/nesrecomp/arcade-v0.6.patch` y `patches/recomp-ui/arcade-v0.6.patch`. El script detecta si ya están aplicados; no debe utilizarse para sobrescribir cambios manuales incompatibles.
 
 ### 4. Compilar
 
@@ -118,7 +120,7 @@ La compilación genera archivos a partir de la ROM local; **no publiques la carp
 
 ## Crear una versión portable personal
 
-**Validación v0.5.0:** empaquetado portable generado y probado correctamente.
+**Validación v0.6.0:** compilación limpia y copia portable de Release probadas correctamente (8/8 comprobaciones manuales). El script crear_portable.ps1 aún requiere una prueba específica en esta versión.
 
 Con el proyecto y sus dependencias preparados:
 
@@ -177,6 +179,16 @@ ArcadeBros1983-Recomp/
 Las carpetas ignoradas pueden no existir inmediatamente después de clonar el repositorio.
 
 ## Historial de versiones
+
+### v0.6.0 — Launcher, HUD y reconstrucción limpia (en desarrollo)
+
+- Nueva portada pixel art personalizada para el launcher.
+- Contador de FPS compacto, sin recuadro y menos invasivo.
+- Parches de NESRecomp y recomp-ui verificados sobre las revisiones originales.
+- Compilación limpia del juego y del launcher en Release x64.
+- Recursos visuales y tipografía integrados correctamente.
+- Instalación portable de prueba con 8 de 8 comprobaciones funcionales satisfactorias.
+- Pendiente: validar nuevamente crear_portable.ps1 y probar en otros equipos.
 
 ### v0.5.0 — FPS configurables y menú NES (en desarrollo)
 
