@@ -30,7 +30,7 @@ No se generan animaciones nuevas mediante interpolación.
 - Proyecto experimental.
 - Sin interpolación real.
 - Pendientes pruebas en otros equipos.
-- Empaquetado portable pendiente de validar.
+- Empaquetado portable generado y probado correctamente.
 
 ## Aviso legal
 

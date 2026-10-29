@@ -118,7 +118,7 @@ La compilación genera archivos a partir de la ROM local; **no publiques la carp
 
 ## Crear una versión portable personal
 
-**Nota v0.5.0:** el empaquetado portable todavía requiere validación.
+**Validación v0.5.0:** empaquetado portable generado y probado correctamente.
 
 Con el proyecto y sus dependencias preparados:
 
