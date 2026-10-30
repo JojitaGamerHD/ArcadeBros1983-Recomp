@@ -5,7 +5,7 @@
 [![Estado](https://img.shields.io/badge/estado-en%20desarrollo-yellow)](https://github.com/JojitaGamerHD/ArcadeBros1983-Recomp)
 [![Plataforma](https://img.shields.io/badge/plataforma-Windows%20x64-blue)](https://github.com/JojitaGamerHD/ArcadeBros1983-Recomp)
 
-**Versión en desarrollo: v0.6.0** · Rama `desarrollo-v0.6.0`
+**Versión en desarrollo: v0.7.0** · Rama `desarrollo-v0.7.0`
 
 Arcade Bros 1983 Recomp es un proyecto independiente de aprendizaje y experimentación técnica. Su objetivo es ejecutar la versión de NES de **Mario Bros.** como un programa nativo de Windows, conservando el comportamiento del juego y añadiendo funciones propias orientadas a una experiencia arcade y portable.
 
@@ -30,7 +30,18 @@ Para la interfaz se integra [recomp-ui](https://github.com/RetroPortingToolKit/r
 - **Opciones de visualización** proporcionadas por el runtime, como pantalla completa, escalado y filtrado.
 - **Enfoque arcade**: desactivación de los atajos habituales de guardar/cargar estado y de avance rápido; las opciones de estados se ocultan del menú de pausa.
 
-Las funciones anteriores se han probado manualmente en el entorno de desarrollo. **v0.6.0 todavía está en desarrollo** y no implica una certificación de compatibilidad completa.
+Las funciones anteriores se han probado manualmente en el entorno de desarrollo. **v0.7.0 todavía está en desarrollo** y no implica una certificación de compatibilidad completa.
+
+### Novedades de v0.7.0
+
+- **Configuración consistente:** Pantalla, Gráficos y Audio comparten los ajustes entre el launcher y el menú de pausa.
+- **Launcher:** incorpora Mostrar FPS, Límite de FPS y el interruptor de Audio.
+- **Escala de ventana:** los dos menús ofrecen de 1× a 8×; el control se habilita en modo ventana.
+- **VSync:** disponible en ambos menús con el límite de 60 FPS; a otras frecuencias se conserva la preferencia, pero no se aplica.
+- **Menú de pausa fijo:** centrado y adaptado al espacio disponible, con texto que se ajusta al ancho. No se arrastra ni se redimensiona manualmente.
+- **Ventana del juego:** cambiar FPS, audio o filtro ya no vuelve a imponer su tamaño configurado. Los cambios explícitos de escala o pantalla completa siguen disponibles.
+
+Consulta los detalles y el alcance de las pruebas en [las notas de v0.7.0](docs/NOTAS-v0.7.0.md).
 
 ### Funciones de v0.5.0 y v0.6.0
 
@@ -41,7 +52,7 @@ Las funciones anteriores se han probado manualmente en el entorno de desarrollo.
 - **Menú NES:** diseño compacto con fuente Pixelify Sans.
 - **Gráficos:** ajustes de FPS en una sola sección.
 - **Controles:** configuración conservada en el launcher.
-- **Reproducibilidad:** parches y compilación limpia verificados.
+- **Reproducibilidad:** parches acumulativos comprobados sobre las revisiones fijadas.
 
 **Importante:** los modos superiores a 60 FPS repiten
 fotogramas de presentación. No existe interpolación real.
@@ -57,6 +68,7 @@ fotogramas de presentación. No existe interpolación real.
 - Windows 10 u 11 de **64 bits**.
 - Git y PowerShell.
 - CMake **3.20 o posterior**.
+- Python **3.11 o posterior**, disponible en `PATH`.
 - Visual Studio 2022 o Build Tools 2022 con las herramientas de **Desarrollo de escritorio con C++**.
 - Las dependencias utilizadas por NESRecomp, incluidas las que prepara el proceso de compilación.
 - Una **ROM compatible de Mario Bros. para NES**, proporcionada por el usuario. La configuración espera el nombre exacto `Mario Bros..nes` (con dos puntos antes de `nes`).
@@ -70,11 +82,11 @@ El proyecto se ha desarrollado y probado principalmente en Windows 11 con el gen
 ```powershell
 git clone --recurse-submodules https://github.com/JojitaGamerHD/ArcadeBros1983-Recomp.git
 cd ArcadeBros1983-Recomp
-git switch desarrollo-v0.6.0
+git switch desarrollo-v0.7.0
 git submodule update --init --recursive
 ```
 
-Es importante inicializar los submódulos **después** de seleccionar `desarrollo`, para preparar la revisión que utiliza esta rama. Si ya clonaste el proyecto sin sus submódulos, en una **copia limpia**, ejecuta `git submodule update --init --recursive` antes de continuar. No uses ese comando para restablecer un submódulo que tenga cambios locales sin respaldarlos.
+Es importante inicializar los submódulos **después** de seleccionar `desarrollo-v0.7.0`, para preparar la revisión que utiliza esta rama. Si ya clonaste el proyecto sin sus submódulos, en una **copia limpia**, ejecuta `git submodule update --init --recursive` antes de continuar. No uses ese comando para restablecer un submódulo que tenga cambios locales sin respaldarlos.
 
 ### 2. Preparar la ROM
 
@@ -94,14 +106,14 @@ powershell -ExecutionPolicy Bypass -File .\tools\preparar_dependencias.ps1
 
 El script prepara una copia local de NESRecomp en `deps/nesrecomp-arcade`, verifica revisiones fijadas, aplica los parches de este proyecto a NESRecomp y `recomp-ui` y compila la herramienta `NESRecomp.exe` si es necesario.
 
-Revisiones utilizadas para v0.6.0:
+Revisiones utilizadas para v0.7.0:
 
 | Componente | Revisión |
 | --- | --- |
 | NESRecomp | `5a2eddeecc646e9325bef53f3c711e119423f99c` |
 | recomp-ui | `7c635c6b366a6e0d5d3c913a7fce6ec04dd9f256` |
 
-Los parches se encuentran en `patches/nesrecomp/arcade-v0.6.patch` y `patches/recomp-ui/arcade-v0.6.patch`. El script detecta si ya están aplicados; no debe utilizarse para sobrescribir cambios manuales incompatibles.
+Los parches se encuentran en `patches/nesrecomp/arcade-v0.7.patch` y `patches/recomp-ui/arcade-v0.7.patch`. Son acumulativos sobre las revisiones originales: no deben aplicarse encima de los parches de una versión anterior. El script detecta si ya están aplicados; no debe utilizarse para sobrescribir cambios manuales incompatibles.
 
 ### 4. Compilar
 
@@ -120,7 +132,7 @@ La compilación genera archivos a partir de la ROM local; **no publiques la carp
 
 ## Crear una versión portable personal
 
-**Validación v0.6.0:** compilación limpia y copia portable de Release probadas correctamente (8/8 comprobaciones manuales). El script crear_portable.ps1 aún requiere una prueba específica en esta versión.
+**Estado v0.7.0:** compilación Release y revisión visual del menú confirmadas en el equipo de desarrollo. La generación y las pruebas específicas del portable mediante `crear_portable.ps1` siguen pendientes para esta versión.
 
 Con el proyecto y sus dependencias preparados:
 
@@ -179,6 +191,15 @@ ArcadeBros1983-Recomp/
 Las carpetas ignoradas pueden no existir inmediatamente después de clonar el repositorio.
 
 ## Historial de versiones
+
+### v0.7.0 — Configuración compartida y menú de pausa adaptable (en desarrollo)
+
+- Mismas opciones de pantalla, gráficos y audio en launcher y pausa.
+- Contador y límite de FPS configurables también desde el launcher.
+- Menú fijo, centrado y proporcional, con descripciones que se ajustan al ancho.
+- Corrección del redimensionado involuntario al cambiar opciones ajenas al tamaño de ventana.
+- Parches acumulativos v0.7.0 y comprobación de reconstrucción de las fuentes.
+- Pendiente ampliar pruebas en otros equipos y validar el empaquetador portable.
 
 ### v0.6.0 — Launcher, HUD y reconstrucción limpia (en desarrollo)
 

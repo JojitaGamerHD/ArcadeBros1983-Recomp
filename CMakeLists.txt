@@ -5,7 +5,7 @@ project(ArcadeBros1983Recomp LANGUAGES C CXX)
 set(CMAKE_C_STANDARD 11)
 set(CMAKE_CXX_STANDARD 17)
 
-# Motor NESRecomp independiente con parche Arcade v0.6.0
+# Motor NESRecomp independiente con parche Arcade v0.7.0
 get_filename_component(NESRECOMP_ROOT
     "${CMAKE_CURRENT_SOURCE_DIR}/deps/nesrecomp-arcade"
     ABSOLUTE
