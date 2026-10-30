@@ -5,7 +5,7 @@
 [![Estado](https://img.shields.io/badge/estado-en%20desarrollo-yellow)](https://github.com/JojitaGamerHD/ArcadeBros1983-Recomp)
 [![Plataforma](https://img.shields.io/badge/plataforma-Windows%20x64-blue)](https://github.com/JojitaGamerHD/ArcadeBros1983-Recomp)
 
-**Versión en desarrollo: v0.7.0** · Rama `desarrollo-v0.7.0`
+**Versión en desarrollo: v0.8.0** · Rama `desarrollo-v0.8.0`
 
 Arcade Bros 1983 Recomp es un proyecto independiente de aprendizaje y experimentación técnica. Su objetivo es ejecutar la versión de NES de **Mario Bros.** como un programa nativo de Windows, conservando el comportamiento del juego y añadiendo funciones propias orientadas a una experiencia arcade y portable.
 
@@ -30,7 +30,18 @@ Para la interfaz se integra [recomp-ui](https://github.com/RetroPortingToolKit/r
 - **Opciones de visualización** proporcionadas por el runtime, como pantalla completa, escalado y filtrado.
 - **Enfoque arcade**: desactivación de los atajos habituales de guardar/cargar estado y de avance rápido; las opciones de estados se ocultan del menú de pausa.
 
-Las funciones anteriores se han probado manualmente en el entorno de desarrollo. **v0.7.0 todavía está en desarrollo** y no implica una certificación de compatibilidad completa.
+Las funciones anteriores se han probado manualmente en el entorno de desarrollo. **v0.8.0 todavía está en desarrollo** y no implica una certificación de compatibilidad completa.
+
+### Novedades de v0.8.0
+
+- **Música de fondo opcional:** reproduce una pista local durante las fases, después de que termine la introducción original del juego.
+- **Inicio y pausa coordinados:** no suena en la portada, las demostraciones ni Game Over; al abrir el menú se pausa y al continuar retoma su posición.
+- **Reinicio por fase:** la misma pista vuelve al inicio en cada fase y se repite en bucle mientras se juega. Esta versión no incluye una lista de canciones.
+- **Ajustes compartidos:** Música de fondo y Volumen de música están disponibles en Audio tanto en el launcher como en el menú de pausa.
+- **Audio original conservado:** los efectos de NES siguen activos; el interruptor y el volumen generales se aplican también a la música.
+- **Archivo privado:** cada usuario aporta `assets/music/stage1.m4a`. La música empieza desactivada y su volumen independiente predeterminado es 35 %.
+
+Consulta la preparación de la pista más abajo y el alcance de las pruebas en [las notas de v0.8.0](docs/NOTAS-v0.8.0.md).
 
 ### Novedades de v0.7.0
 
@@ -62,10 +73,13 @@ fotogramas de presentación. No existe interpolación real.
 - Verificar y restringir cualquier vía alternativa de uso de save states que permanezca disponible en el runtime.
 - Mejorar el proceso de compilación reproducible y las pruebas automatizadas.
 - Investigar interpolación real de fotogramas sin alterar la velocidad del juego.
+- Validar el empaquetador portable con los recursos opcionales de música y ampliar las pruebas de transiciones durante partidas reales.
+- Incorporar en el futuro varias pistas o una selección de música por fase.
 
 ## Requisitos para compilar
 
 - Windows 10 u 11 de **64 bits**.
+- Componentes multimedia de Windows (Media Foundation) para la música opcional. En las ediciones Windows N puede ser necesario instalar Media Feature Pack.
 - Git y PowerShell.
 - CMake **3.20 o posterior**.
 - Python **3.11 o posterior**, disponible en `PATH`.
@@ -82,11 +96,11 @@ El proyecto se ha desarrollado y probado principalmente en Windows 11 con el gen
 ```powershell
 git clone --recurse-submodules https://github.com/JojitaGamerHD/ArcadeBros1983-Recomp.git
 cd ArcadeBros1983-Recomp
-git switch desarrollo-v0.7.0
+git switch desarrollo-v0.8.0
 git submodule update --init --recursive
 ```
 
-Es importante inicializar los submódulos **después** de seleccionar `desarrollo-v0.7.0`, para preparar la revisión que utiliza esta rama. Si ya clonaste el proyecto sin sus submódulos, en una **copia limpia**, ejecuta `git submodule update --init --recursive` antes de continuar. No uses ese comando para restablecer un submódulo que tenga cambios locales sin respaldarlos.
+Es importante inicializar los submódulos **después** de seleccionar `desarrollo-v0.8.0`, para preparar la revisión que utiliza esta rama. Si ya clonaste el proyecto sin sus submódulos, en una **copia limpia**, ejecuta `git submodule update --init --recursive` antes de continuar. No uses ese comando para restablecer un submódulo que tenga cambios locales sin respaldarlos.
 
 ### 2. Preparar la ROM
 
@@ -106,23 +120,37 @@ powershell -ExecutionPolicy Bypass -File .\tools\preparar_dependencias.ps1
 
 El script prepara una copia local de NESRecomp en `deps/nesrecomp-arcade`, verifica revisiones fijadas, aplica los parches de este proyecto a NESRecomp y `recomp-ui` y compila la herramienta `NESRecomp.exe` si es necesario.
 
-Revisiones utilizadas para v0.7.0:
+Revisiones utilizadas para v0.8.0:
 
 | Componente | Revisión |
 | --- | --- |
 | NESRecomp | `5a2eddeecc646e9325bef53f3c711e119423f99c` |
 | recomp-ui | `7c635c6b366a6e0d5d3c913a7fce6ec04dd9f256` |
 
-Los parches se encuentran en `patches/nesrecomp/arcade-v0.7.patch` y `patches/recomp-ui/arcade-v0.7.patch`. Son acumulativos sobre las revisiones originales: no deben aplicarse encima de los parches de una versión anterior. El script detecta si ya están aplicados; no debe utilizarse para sobrescribir cambios manuales incompatibles.
+Los parches se encuentran en `patches/nesrecomp/arcade-v0.8.patch` y `patches/recomp-ui/arcade-v0.8.patch`. Son acumulativos sobre las revisiones originales: no deben aplicarse encima de los parches de una versión anterior. El script detecta si ya están aplicados; no debe utilizarse para sobrescribir cambios manuales incompatibles.
 
-### 4. Compilar
+### 4. Preparar la música opcional
+
+Antes de configurar CMake, coloca una pista propia en:
+
+```text
+assets/music/stage1.m4a
+```
+
+Debe ser un archivo de audio M4A/MP4 válido compatible con Media Foundation. **Cambiar la extensión de un MP3 a `.m4a` no convierte el audio.** Si tu pista está realmente en MP3, conviértela primero a M4A con una herramienta de audio.
+
+La carpeta `assets/music/` está excluida de Git. La pista no se incluye en el repositorio ni se incorpora dentro del ejecutable. Durante la compilación, si estaba presente al configurar CMake, se copia a `assets/music/stage1.m4a` junto al juego. Si la añades después, vuelve a ejecutar la configuración de CMake y la compilación del paso siguiente.
+
+Si no aportas música o no puede decodificarse, el juego conserva su audio NES. Para escucharla, activa una vez **Audio → Música de fondo** en el launcher o en la pausa y ajusta **Volumen de música**. Los ajustes se guardan entre sesiones.
+
+### 5. Compilar
 
 ```powershell
 cmake -S . -B build/arcade-test -G "Visual Studio 17 2022" -A x64
 cmake --build build/arcade-test --config Release --parallel 4
 ```
 
-### 5. Ejecutar
+### 6. Ejecutar
 
 ```powershell
 .\build\arcade-test\Release\ArcadeBros1983Recomp.exe
@@ -130,9 +158,21 @@ cmake --build build/arcade-test --config Release --parallel 4
 
 La compilación genera archivos a partir de la ROM local; **no publiques la carpeta `build/`, `generated/` ni sus ejecutables**.
 
+### Pruebas aisladas de música
+
+Las pruebas se configuran por separado y no necesitan recompilar el juego:
+
+```powershell
+cmake -S tests -B build/tests-v080 -G "Visual Studio 17 2022" -A x64
+cmake --build build/tests-v080 --config Release --parallel 1
+ctest --test-dir build/tests-v080 -C Release --output-on-failure
+```
+
+Comprueban las preferencias, la mezcla y la coordinación con los estados del juego. La prueba de decodificación con la pista real se omite si no existe el archivo local; las demás se ejecutan normalmente. Estas pruebas no sustituyen la escucha y las partidas de comprobación.
+
 ## Crear una versión portable personal
 
-**Estado v0.7.0:** compilación Release y revisión visual del menú confirmadas en el equipo de desarrollo. La generación y las pruebas específicas del portable mediante `crear_portable.ps1` siguen pendientes para esta versión.
+**Estado v0.8.0:** compilación Release y prueba manual de la música confirmadas en el equipo de desarrollo. La generación y las pruebas específicas del portable mediante `crear_portable.ps1`, incluida la música opcional, siguen pendientes para esta versión.
 
 Con el proyecto y sus dependencias preparados:
 
@@ -160,7 +200,7 @@ Abre el ejecutable situado en la **carpeta principal** de la instalación portab
 
 La carpeta portable puede moverse a otra ubicación o unidad de almacenamiento, conservando los datos que contenga. Al regenerarla, el script está diseñado para respetar la ROM importada y los récords existentes.
 
-> **No distribuyas `dist/`:** contiene ejecutables derivados de la ROM y puede contener una copia privada del juego. El repositorio público distribuye código fuente, scripts y parches, no el juego de Nintendo.
+> **No distribuyas `dist/`:** contiene ejecutables derivados de la ROM y puede contener una copia privada del juego y de la música. La publicación pública de esta versión se limita a código fuente, scripts y parches; cada usuario aporta su ROM y su pista.
 
 ## Organización del repositorio
 
@@ -169,6 +209,7 @@ ArcadeBros1983-Recomp/
 ├── CMakeLists.txt
 ├── game.toml
 ├── .gitmodules
+├── assets/music/               # Música privada opcional: ignorada por Git
 ├── config/                     # Plantillas de configuración
 ├── docs/                       # Documentación técnica
 ├── patches/
@@ -176,7 +217,11 @@ ArcadeBros1983-Recomp/
 │   └── recomp-ui/              # Traducciones y ajustes de interfaz
 ├── src/
 │   ├── launcher.cpp            # Lanzador portable propio
-│   └── records.c               # Récords y extensiones del juego
+│   ├── records.c               # Récords y conexión con la música
+│   ├── music.cpp               # Decodificación y mezcla de la pista local
+│   ├── music.h                 # Interfaz de música
+│   └── music_gate.h            # Coordinación con las fases del juego
+├── tests/                      # Pruebas aisladas de música y preferencias
 ├── tools/
 │   ├── preparar_dependencias.ps1
 │   └── crear_portable.ps1
@@ -191,6 +236,15 @@ ArcadeBros1983-Recomp/
 Las carpetas ignoradas pueden no existir inmediatamente después de clonar el repositorio.
 
 ## Historial de versiones
+
+### v0.8.0 — Música opcional durante las fases (en desarrollo)
+
+- Pista local en bucle, coordinada con la introducción, la pausa y los cambios de fase.
+- Controles compartidos de activación y volumen de música en launcher y pausa.
+- Decodificación con Media Foundation y mezcla con los efectos originales de NES.
+- Pruebas aisladas de preferencias, mezcla y estados del juego; revisión manual de la música en el equipo de desarrollo.
+- Parches acumulativos v0.8.0 con reconstrucción comprobada de las fuentes afectadas.
+- Pendiente validar el portable y ampliar las partidas de prueba en otros equipos.
 
 ### v0.7.0 — Configuración compartida y menú de pausa adaptable (en desarrollo)
 
