@@ -14,6 +14,14 @@ endif()
 
 enable_testing()
 
+add_executable(smooth_video_test smooth_video_test.cpp "${ARCADE_ROOT}/src/smooth_video.cpp")
+target_compile_features(smooth_video_test PRIVATE cxx_std_17)
+target_include_directories(smooth_video_test PRIVATE "${ARCADE_ROOT}/src")
+if(MSVC)
+    target_compile_options(smooth_video_test PRIVATE /utf-8 /W4)
+endif()
+add_test(NAME smooth_video_geometry COMMAND smooth_video_test)
+
 add_executable(music_mix_test music_mix_test.cpp "${ARCADE_ROOT}/src/music.cpp")
 target_compile_features(music_mix_test PRIVATE cxx_std_17)
 target_include_directories(music_mix_test PRIVATE "${ARCADE_ROOT}/src")

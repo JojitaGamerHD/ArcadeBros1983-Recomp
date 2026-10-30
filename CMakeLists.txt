@@ -5,7 +5,7 @@ project(ArcadeBros1983Recomp LANGUAGES C CXX)
 set(CMAKE_C_STANDARD 11)
 set(CMAKE_CXX_STANDARD 17)
 
-# Motor NESRecomp independiente con parche Arcade v0.8.0
+# Motor NESRecomp independiente con parche Arcade v0.9.0
 get_filename_component(NESRECOMP_ROOT
     "${CMAKE_CURRENT_SOURCE_DIR}/deps/nesrecomp-arcade"
     ABSOLUTE
@@ -24,6 +24,8 @@ nesrecomp_add_cycle_game(ArcadeBros1983Recomp
     REGION NTSC
     HOST_EXTRAS "${CMAKE_CURRENT_SOURCE_DIR}/src/records.c"
                 "${CMAKE_CURRENT_SOURCE_DIR}/src/music.cpp"
+                "${CMAKE_CURRENT_SOURCE_DIR}/src/smooth_video.cpp"
+                "${CMAKE_CURRENT_SOURCE_DIR}/src/smooth_host.c"
 )
 
 # Lanzador portable de Arcade Bros 1983 Recomp
