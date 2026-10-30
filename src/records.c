@@ -13,6 +13,8 @@
 #define _CRT_SECURE_NO_WARNINGS
 #include "cyc_host_extras.h"
 #include "cyc_mod.h"
+#include "music.h"
+#include "music_gate.h"
 #include "recomp_runtime_ui.h"
 #include <stdbool.h>
 #include <stdint.h>
@@ -34,6 +36,40 @@
 static uint32_t mejor_record = 0;
 static unsigned fotogramas = 0;
 static bool inicializado = false;
+/* ARCADE_MUSIC_V080: controls are supplied by the host on its producer thread. */
+static int musica_activada = 0;
+static int volumen_musica = 35;
+static ArcadeMusicGate puerta_musica;
+/* ARCADE_LEVEL_MUSIC_V080: read game state; never change the original RAM. */
+static void actualizar_estado_musica(int antes_del_fotograma) {
+    const ArcadeMusicSnapshot estado = {
+        .demo = cyc_mod_peek(0x0030),
+        .mode = cyc_mod_peek(0x0040),
+        .phase = cyc_mod_peek(0x0041),
+        .complete = cyc_mod_peek(0x0051),
+        .jingle = cyc_mod_peek(0x06A2),
+        .pending = cyc_mod_peek(0x00FD),
+        .mario_active = cyc_mod_peek(0x0300),
+        .mario_state = cyc_mod_peek(0x0316),
+        .luigi_active = cyc_mod_peek(0x0320),
+        .luigi_state = cyc_mod_peek(0x0336)
+    };
+    const int anterior = puerta_musica.ready;
+    const int acciones = arcade_music_gate_update(&puerta_musica, &estado, antes_del_fotograma);
+    if (acciones & ARCADE_MUSIC_RESET) arcade_music_reset();
+    if (anterior != puerta_musica.ready)
+        fprintf(stderr, "[arcade music] fase=%u fondo=%s\n",
+            (unsigned)estado.phase, puerta_musica.ready ? "listo" : "en espera");
+}
+static void configurar_musica(void *ctx, int activada, int volumen) {
+    (void)ctx;
+    musica_activada = activada;
+    volumen_musica = volumen;
+}
+static void mezclar_musica(void *ctx, int16_t *samples, size_t count) {
+    (void)ctx;
+    arcade_music_mix(samples, count, musica_activada && puerta_musica.ready, volumen_musica);
+}
 
 /* Devuelve false si aparece algun nibble que no sea un digito BCD. */
 static bool leer_puntuacion(uint16_t direccion, uint32_t *salida) {
@@ -123,6 +159,8 @@ static void restaurar_si_falta(void) {
 
 static void al_encender(void *ctx) {
     (void)ctx;
+    arcade_music_load_default();
+    memset(&puerta_musica, 0, sizeof(puerta_musica));
     fotogramas = 0;
     mejor_record = 0;
     cargar_record();
@@ -133,11 +171,13 @@ static void al_encender(void *ctx) {
 
 static void al_empezar_fotograma(void *ctx) {
     (void)ctx;
+    actualizar_estado_musica(1);
     restaurar_si_falta();
 }
 
 static void al_terminar_fotograma(void *ctx) {
     (void)ctx;
+    actualizar_estado_musica(0);
     ++fotogramas;
 
     /* El juego pudo haber limpiado el TOP durante su inicio. */
@@ -206,6 +246,9 @@ static const RecompRuntimeUiCallbacks callbacks_creditos = {
     .run_action = mostrar_creditos
 };
 static const CycHostExtras extras = {
+    .audio_rate = 48000,
+    .audio_mix = mezclar_musica,
+    .audio_mix_options = configurar_musica,
     .power_on = al_encender,
     .frame_begin = al_empezar_fotograma,
     .frame_end = al_terminar_fotograma,

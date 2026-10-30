@@ -25,3 +25,6 @@ Datos/
 
 # Dependencias locales del motor
 /deps/
+
+# Musica local del usuario
+/assets/music/

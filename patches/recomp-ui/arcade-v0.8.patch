@@ -1,0 +1,880 @@
+diff --git a/src/common/backends/imgui/launcher_imgui.cpp b/src/common/backends/imgui/launcher_imgui.cpp
+index e1a0bca6843cbf6438be8c6199ba1f0ed6c244ee..40fc12983aeebe479342c7fc7725c6a073b683ee 100644
+--- a/src/common/backends/imgui/launcher_imgui.cpp
++++ b/src/common/backends/imgui/launcher_imgui.cpp
+@@ -3779,6 +3779,7 @@ bool any_deep_display(const LauncherModel* m) {
+ // Gated exactly like the row itself so the SNES legacy surface stays pinned to
+ // the fixed height (byte-identical to before this console existed).
+ bool video_card_grows(const LauncherModel* m) {
++    if (m->has_arcade_settings) return true;
+     if (any_deep_display(m)) return true;
+     if (has_display_aspect_row(m)) return true;
+     if (m->has_shader) return true;
+@@ -3923,7 +3924,59 @@ void draw_quality_preset_row(LauncherModel* m, const LauncherTheme& th) {
+     }
+ }
+ 
++/* ARCADE_OPTIONS_V070: the same values as the in-game menu. */
++void draw_arcade_display_controls(LauncherModel* m, const LauncherTheme& th) {
++    static const SettingsChoice modes[] = {
++        {0, "Ventana"}, {1, "Sin bordes"}, {2, "Exclusiva"}
++    };
++    static const SettingsChoice scales[] = {
++        {1, "1x"}, {2, "2x"}, {3, "3x"}, {4, "4x"},
++        {5, "5x"}, {6, "6x"}, {7, "7x"}, {8, "8x"}
++    };
++    static const SettingsChoice targets[] = {
++        {30, "30 FPS"}, {60, "60 FPS"}, {120, "120 FPS"}, {180, "180 FPS"}
++    };
++    const float cb = ImGui::GetFrameHeight();
++    eyebrow("DISPLAY");
++    launcher_model_set_fullscreen(m, settings_combo_row(
++        "Pantalla completa", th, "##arcade_fullscreen", modes, 3, m->s.fullscreen));
++    ImGui::BeginDisabled(m->s.fullscreen != 0);
++    m->s.window_scale = settings_combo_row("Escala de ventana", th,
++        "##arcade_scale", scales, 8, m->s.window_scale);
++    ImGui::EndDisabled();
++
++    ImGui::Spacing();
++    eyebrow(u8"GR\u00c1FICOS");
++    row_label_right("Escalado entero", th, cb);
++    bool integer_scale = m->s.integer_scale != 0;
++    if (ImGui::Checkbox("##arcade_integer", &integer_scale))
++        launcher_model_toggle_integer_scale(m);
++    row_label_right("Filtro lineal", th, cb);
++    bool filter = m->s.linear_filter != 0;
++    if (ImGui::Checkbox("##arcade_filter", &filter)) launcher_model_toggle_filter(m);
++    row_label_right("Mostrar FPS", th, cb);
++    bool show_fps = m->s.arcade_show_fps != 0;
++    if (ImGui::Checkbox("##arcade_show_fps", &show_fps))
++        m->s.arcade_show_fps = show_fps ? 1 : 0;
++    m->s.arcade_target_fps = settings_combo_row(u8"L\u00edmite de FPS", th,
++        "##arcade_target_fps", targets, 4, m->s.arcade_target_fps);
++    if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayNormal))
++        ImGui::SetTooltip("La NES mantiene su velocidad original.\n"
++                          "120/180 FPS repiten la imagen; no interpolan.");
++    row_label_right("VSync", th, cb);
++    ImGui::BeginDisabled(m->s.arcade_target_fps != 60);
++    bool vsync = m->s.vsync != RECOMP_LAUNCHER_VSYNC_OFF;
++    if (ImGui::Checkbox("##arcade_vsync", &vsync)) launcher_model_toggle_vsync(m);
++    ImGui::EndDisabled();
++    if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayNormal | ImGuiHoveredFlags_AllowWhenDisabled))
++        ImGui::SetTooltip("VSync solo se aplica con el limite de 60 FPS.");
++}
++
+ void draw_display_controls(LauncherModel* m, const LauncherTheme& th) {
++    if (m->has_arcade_settings) {
++        draw_arcade_display_controls(m, th);
++        return;
++    }
+     eyebrow("DISPLAY");
+     draw_quality_preset_row(m, th);
+ 
+@@ -4484,6 +4537,12 @@ void panel_video_draw(LauncherModel* m, const LauncherTheme* th) {
+ 
+ void draw_audio_controls(LauncherModel* m, const LauncherTheme& th) {
+     eyebrow("AUDIO");
++    if (m->has_arcade_settings) {
++        row_label_right("Audio", th, ImGui::GetFrameHeight());
++        bool enabled = m->s.enable_audio != 0;
++        if (ImGui::Checkbox("##arcade_audio", &enabled))
++            m->s.enable_audio = enabled ? 1 : 0;
++    }
+     // Labels at the card's left edge, controls at its right (row_label_right),
+     // matching DISPLAY. Every control is SETTINGS_CTRL_W wide -- including the
+     // volume stepper, which stretches its value field to reach it -- so the
+@@ -4501,6 +4560,17 @@ void draw_audio_controls(LauncherModel* m, const LauncherTheme& th) {
+     row_label_right("Volume", th, px(SETTINGS_CTRL_W));
+     int dv = 0; stepper("vol", m->s.volume, "%", &dv, px(SETTINGS_CTRL_W));
+     if (dv) launcher_model_volume_delta(m, dv);
++    if (m->has_arcade_settings) {
++        ImGui::Spacing();
++        row_label_right(u8"M\u00fasica de fondo", th, ImGui::GetFrameHeight());
++        bool music = m->s.arcade_music_enabled != 0;
++        if (ImGui::Checkbox("##arcade_music", &music))
++            m->s.arcade_music_enabled = music ? 1 : 0;
++        row_label_right(u8"Volumen de m\u00fasica", th, px(SETTINGS_CTRL_W));
++        int change = 0;
++        stepper("arcade_music_volume", m->s.arcade_music_volume, "%", &change, px(SETTINGS_CTRL_W));
++        if (change) m->s.arcade_music_volume = std::clamp(m->s.arcade_music_volume + change, 0, 100);
++    }
+ 
+     // Output-device pick (host-enumerated names; N64/RT64 hosts) — "(system
+     // default)" first, committing "" so an unplugged device degrades sanely.
+@@ -4581,7 +4651,7 @@ void draw_audio_controls(LauncherModel* m, const LauncherTheme& th) {
+ // panel_video_draw, decided from the same "deep" predicate draw_settings used
+ // to compute inline.
+ void panel_audio_draw(LauncherModel* m, const LauncherTheme* th) {
+-    const bool deep_audio = m->has_spu_hq || m->num_languages > 0 || m->num_audio_devices > 0;   /* deadzone moved to controller card */
++    const bool deep_audio = m->has_arcade_settings || m->has_spu_hq || m->num_languages > 0 || m->num_audio_devices > 0;   /* deadzone moved to controller card */
+     if (deep_audio || !g_settings_two_col) {
+         if (begin_panel("audio", 0, false)) draw_audio_controls(m, *th);
+         end_panel();
+@@ -5055,7 +5125,7 @@ void draw_settings(LauncherModel* m, const LauncherTheme& th) {
+     g_settings_two_col = two_col;   // read by panel_video_draw/panel_audio_draw
+ 
+     const bool deep_display = video_card_grows(m);   // superset of any_deep_display: folds in NES + widescreen (N64 covered too)
+-    const bool deep_audio   = m->has_spu_hq || m->num_languages > 0 || m->num_audio_devices > 0;   /* deadzone moved to controller card */
++    const bool deep_audio   = m->has_arcade_settings || m->has_spu_hq || m->num_languages > 0 || m->num_audio_devices > 0;   /* deadzone moved to controller card */
+ 
+     const LauncherPanel* video_p   = find_composed(prof->panels_settings, "video", m);
+     const LauncherPanel* audio_p   = find_composed(prof->panels_settings, "audio", m);
+@@ -5377,23 +5447,23 @@ void draw_assist_binding_editor(LauncherModel* m, const LauncherTheme& th,
+ void draw_controller_assist_shortcuts(LauncherModel* m,
+                                       const LauncherTheme& th) {
+     ImGui::PushStyleColor(ImGuiCol_Text, col(th.accent2));
+-    ImGui::TextUnformatted(m->has_assist_tools ? "ASSIST SHORTCUTS" : "HOST SHORTCUTS");
++    ImGui::TextUnformatted(m->has_assist_tools ? ui_text("ASSIST SHORTCUTS") : ui_text("HOST SHORTCUTS"));
+     ImGui::PopStyleColor();
+     ImGui::SameLine();
+     ImGui::TextColored(col(th.text_muted),
+                        m->has_assist_tools
+                            ? "(global; requires Assist Tools)"
+-                           : "(keyboard and controller)");
++                           : ui_text("(keyboard and controller)"));
+     const bool pad_col = assist_pad_column_available(m);
+     if (ImGui::BeginTable("controller_assist_binds", pad_col ? 3 : 2,
+                           ImGuiTableFlags_SizingStretchProp |
+                               ImGuiTableFlags_RowBg)) {
+-        ImGui::TableSetupColumn("Action", ImGuiTableColumnFlags_WidthStretch,
++        ImGui::TableSetupColumn(ui_text("Action"), ImGuiTableColumnFlags_WidthStretch,
+                                 1.1f);
+-        ImGui::TableSetupColumn("Keyboard", ImGuiTableColumnFlags_WidthStretch,
++        ImGui::TableSetupColumn(ui_text("Keyboard"), ImGuiTableColumnFlags_WidthStretch,
+                                 1.0f);
+         if (pad_col)
+-            ImGui::TableSetupColumn("Controller", ImGuiTableColumnFlags_WidthStretch,
++            ImGui::TableSetupColumn(ui_text("Controller"), ImGuiTableColumnFlags_WidthStretch,
+                                     1.0f);
+         ImGui::TableHeadersRow();
+         for (int action = 0; action < m->assist_binding_count; ++action) {
+@@ -12524,12 +12594,7 @@ void draw_footer(LauncherModel* m, const LauncherTheme& th, float footer_h) {
+     const float cta_y  = band_y + (band_h - play_h) * 0.5f;
+ 
+     const ImVec2 win = ImGui::GetWindowPos();
+-    if (m->view == LNG_VIEW_DASHBOARD) {
+-        bool skip = m->s.skip_launcher != 0;
+-        ImGui::SetCursorScreenPos(ImVec2(origin.x, cta_y + (play_h - ImGui::GetFrameHeight()) * 0.5f));
+-        if (ImGui::Checkbox(ui_text("Skip launcher on boot"), &skip))
+-            launcher_model_request_skip_toggle(m);
+-    } else if (m->view == LNG_VIEW_SETTINGS &&
++    if (m->view == LNG_VIEW_SETTINGS &&
+                launcher_model_can_restore_defaults(m)) {
+         ImGui::SetCursorScreenPos(
+             ImVec2(origin.x, cta_y + (play_h - px(34.0f)) * 0.5f));
+@@ -14026,6 +14091,36 @@ void draw_ui(LauncherModel* m, const LauncherTheme& th, int logical_w, int logic
+                  ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoCollapse |
+                  ImGuiWindowFlags_NoBringToFrontOnFocus);
+     ImGui::PopStyleColor();
++    /* ARCADE_LAUNCHER_BORDER_V060 */
++    {
++        ImDrawList* draw = ImGui::GetWindowDrawList();
++        const ImVec2 p = ImGui::GetWindowPos();
++        const ImVec2 s = ImGui::GetWindowSize();
++
++        /* Borde celeste rectangular */
++        draw->AddRect(
++            ImVec2(p.x + 8.0f, p.y + 8.0f),
++            ImVec2(p.x + s.x - 8.0f, p.y + s.y - 8.0f),
++            IM_COL32(75, 195, 250, 255),
++            0.0f, 0, 2.0f
++        );
++
++        /* Bloques decorativos de 8 bits */
++        for (int i = 0; i < 12; ++i) {
++            const float x = p.x + 24.0f + i * 12.0f;
++            const float y = p.y + s.y - 23.0f;
++
++            const ImU32 color = (i % 3 == 0)
++                ? IM_COL32(240, 85, 45, 255)
++                : IM_COL32(55, 165, 245, 255);
++
++            draw->AddRectFilled(
++                ImVec2(x, y),
++                ImVec2(x + 7.0f, y + 7.0f),
++                color
++            );
++        }
++    }
+ 
+     /* The lobby room is a full-screen view keyed to seat state: seated in a
+      * lobby means the room, whatever view was up before (join from the
+@@ -14110,7 +14205,7 @@ void draw_ui(LauncherModel* m, const LauncherTheme& th, int logical_w, int logic
+             const int count = 1 + (m->mods ? 1 : 0) +
+                               (m->has_assist_tools ? 1 : 0) +
+                               ((m->credits_text && m->credits_text[0]) ? 1 : 0);
+-            const float w = px(110.0f);
++            const float w = std::max(px(110.0f), ImGui::CalcTextSize(ui_text("Settings")).x + px(32.0f));
+             const float total = w * count + gap * (count - 1);
+             ImGui::SetCursorPos(ImVec2(right - total, y));
+             if (ImGui::Button(ui_text("Settings"), ImVec2(w, px(34))))
+@@ -14755,7 +14850,13 @@ extern "C" LngAction launcher_backend_run(LauncherPlatform* p,
+                              "flags fall back to the emoji provider\n");
+     launcher_boot_timing_mark("rui:textures_loaded");
+ 
+-    std::string font_path = asset("assets/fonts/LatoLatin-Regular.ttf");
++    /* ARCADE_LAUNCHER_VISUAL_V060 */
++    std::string font_path = asset("assets/fonts/PixelifySans.ttf");
++
++    /* Fuente de respaldo si falta Pixelify Sans */
++    if (!std::filesystem::exists(font_path)) {
++        font_path = asset("assets/fonts/LatoLatin-Regular.ttf");
++    }
+     // Optional Japanese subset, merged over the Latin base when present (PMS-J).
+     // Games that don't ship it stay Latin-only (fopen in apply_scale fails
+     // silently), so this path is inert for every other console.
+diff --git a/src/common/backends/imgui/runtime_ui_imgui.cpp b/src/common/backends/imgui/runtime_ui_imgui.cpp
+index 9828773b8489e214f11a748de934438fe15fabe0..a0c54b4e667424191b551e5d5d3c23c9635e3e8e 100644
+--- a/src/common/backends/imgui/runtime_ui_imgui.cpp
++++ b/src/common/backends/imgui/runtime_ui_imgui.cpp
+@@ -36,7 +36,12 @@ void value_text(RecompRuntimeUi *ui, const RecompRuntimeUiItem *item,
+     if (!recomp_runtime_ui_current_value(ui, item, &value)) {
+         std::snprintf(out, out_size, "Unavailable");
+     } else if (item->type == RECOMP_RUNTIME_UI_BOOL) {
+-        std::snprintf(out, out_size, "%s", value ? "On" : "Off");
++        std::snprintf(
++            out, out_size, "%s",
++            (ui->config.theme &&
++             std::strcmp(ui->config.theme, "nes") == 0)
++                ? (value ? u8"Sí" : "No")
++                : (value ? "On" : "Off"));
+     } else if (item->type == RECOMP_RUNTIME_UI_CHOICE && item->choices) {
+         size_t index = item->choice_count;
+         if (item->choice_values) {
+@@ -79,6 +84,8 @@ void draw_sections(RecompRuntimeUi *ui, const LauncherTheme &theme,
+ 
+ void draw_items(RecompRuntimeUi *ui, const LauncherTheme &theme,
+                 bool touch_friendly) {
++    const bool proportional = !touch_friendly && ui->config.theme &&
++        std::strcmp(ui->config.theme, "nes") == 0;
+     const size_t count = recomp_runtime_ui_page_entry_count(ui);
+     for (size_t index = 0; index < count; ++index) {
+         char folder[96];
+@@ -118,16 +125,34 @@ void draw_items(RecompRuntimeUi *ui, const LauncherTheme &theme,
+         ImGui::PushID(static_cast<int>(index));
+         if (!enabled) ImGui::BeginDisabled();
+         const ImVec2 start = ImGui::GetCursorScreenPos();
+-        const float row_h = item->description && item->description[0]
++        float row_h = item->description && item->description[0]
+                                 ? theme.row_height + theme.spacing_sm
+                                 : theme.row_height;
+         const float step_button_w =
+-            touch_friendly ? std::max(76.0f, row_h * 0.90f) : 38.0f;
++            touch_friendly ? std::max(76.0f, row_h * 0.90f) :
++                (proportional ? std::max(ImGui::GetFrameHeight(), theme.row_height * 0.75f) : 38.0f);
+         const float step_gap = touch_friendly ? 12.0f : 6.0f;
+         const float step_controls_w =
+             item->type == RECOMP_RUNTIME_UI_INT
+                 ? step_button_w * 2.0f + step_gap + theme.spacing_sm
+                 : 0.0f;
++        const float description_width = std::max(24.0f,
++            ImGui::GetContentRegionAvail().x - theme.spacing_md * 2.0f);
++        const float label_width = std::max(24.0f,
++            description_width - ImGui::CalcTextSize(value).x -
++            step_controls_w - theme.spacing_md);
++        const float label_height = proportional
++            ? ImGui::CalcTextSize(item->label ? item->label : "", nullptr, false, label_width).y
++            : ImGui::GetTextLineHeight();
++        const float header_height = proportional && item->type == RECOMP_RUNTIME_UI_INT
++            ? std::max(label_height, ImGui::GetFrameHeight()) : label_height;
++        if (proportional) {
++            float needed = theme.spacing_sm * 2.0f + header_height;
++            if (item->description && item->description[0])
++                needed += 2.0f + ImGui::CalcTextSize(
++                    item->description, nullptr, false, description_width).y;
++            row_h = std::max(row_h, needed);
++        }
+         // INT rows carry -/+ buttons and TEXT rows an edit field, both drawn on
+         // top of the row selectable; without AllowOverlap the selectable would
+         // swallow the clicks meant for them.
+@@ -152,9 +177,10 @@ void draw_items(RecompRuntimeUi *ui, const LauncherTheme &theme,
+         const ImVec2 next = ImGui::GetCursorScreenPos();
+         const ImU32 label_color = u32(enabled ? theme.text : theme.text_muted,
+                                       enabled ? 1.0f : 0.65f);
+-        draw->AddText(ImVec2(start.x + theme.spacing_md,
+-                            start.y + theme.spacing_sm),
+-                      label_color, item->label ? item->label : "");
++        draw->AddText(ImGui::GetFont(), ImGui::GetFontSize(),
++                      ImVec2(start.x + theme.spacing_md, start.y + theme.spacing_sm),
++                      label_color, item->label ? item->label : "", nullptr,
++                      proportional ? label_width : 0.0f);
+         const bool stepped_value = item->type == RECOMP_RUNTIME_UI_INT;
+         const bool editing_this = item->type == RECOMP_RUNTIME_UI_TEXT &&
+                                   ui->editing_text && selected;
+@@ -168,10 +194,12 @@ void draw_items(RecompRuntimeUi *ui, const LauncherTheme &theme,
+                           value);
+         }
+         if (item->description && item->description[0]) {
+-            draw->AddText(ImVec2(start.x + theme.spacing_md,
++            draw->AddText(ImGui::GetFont(), ImGui::GetFontSize(),
++                          ImVec2(start.x + theme.spacing_md,
+                                 start.y + theme.spacing_sm +
+-                                    ImGui::GetTextLineHeight() + 2.0f),
+-                          u32(theme.text_muted), item->description);
++                                    header_height + 2.0f),
++                          u32(theme.text_muted), item->description, nullptr,
++                          proportional ? description_width : 0.0f);
+         }
+         if (editing_this && enabled) {
+             const float field_w = touch_friendly
+@@ -211,7 +239,8 @@ void draw_items(RecompRuntimeUi *ui, const LauncherTheme &theme,
+             ImGui::SetCursorScreenPos(
+                 ImVec2(end.x - theme.spacing_sm -
+                            step_button_w * 2.0f - step_gap,
+-                       start.y + (row_h - button_h) * 0.5f));
++                       proportional ? start.y + theme.spacing_sm :
++                           start.y + (row_h - button_h) * 0.5f));
+             if (ImGui::Button("-", ImVec2(step_button_w, button_h))) {
+                 ui->row_index = index;
+                 ui->in_section = 1;
+@@ -230,10 +259,35 @@ void draw_items(RecompRuntimeUi *ui, const LauncherTheme &theme,
+     }
+ }
+ 
++/* ARCADE_8BIT_MENU_V050 */
++void arcade_runtime_8bit_theme(LauncherTheme &theme)
++{
++    theme.background = lng_rgba(0.025f, 0.027f, 0.039f, 1.0f);
++    theme.panel = lng_rgba(0.055f, 0.070f, 0.105f, 1.0f);
++    theme.panel_hovered = lng_rgba(0.105f, 0.160f, 0.250f, 1.0f);
++
++    theme.control = lng_rgba(0.070f, 0.100f, 0.155f, 1.0f);
++    theme.control_hovered = lng_rgba(0.500f, 0.160f, 0.100f, 1.0f);
++
++    theme.border = lng_rgba(0.310f, 0.760f, 0.970f, 1.0f);
++    theme.accent = lng_rgba(0.960f, 0.320f, 0.170f, 1.0f);
++    theme.accent_dim = lng_rgba(0.650f, 0.180f, 0.100f, 1.0f);
++    theme.accent2 = lng_rgba(0.310f, 0.760f, 0.970f, 1.0f);
++
++    theme.text = lng_rgba(1.0f, 1.0f, 1.0f, 1.0f);
++    theme.text_muted = lng_rgba(0.730f, 0.760f, 0.810f, 1.0f);
++
++    /* Sin esquinas redondeadas */
++    theme.radius_sm = 0.0f;
++    theme.radius_lg = 0.0f;
++
++    theme.row_height = std::max(theme.row_height, 44.0f);
++}
+ void push_runtime_style(const LauncherTheme &theme, bool touch_friendly,
+                         float opacity) {
+     ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, theme.radius_lg);
+     ImGui::PushStyleVar(ImGuiStyleVar_ChildRounding, theme.radius_sm);
++    ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 3.0f);
+     ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, theme.radius_sm);
+     ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding,
+                         ImVec2(theme.spacing_lg, theme.spacing_lg));
+@@ -262,7 +316,7 @@ void push_runtime_style(const LauncherTheme &theme, bool touch_friendly,
+ 
+ void pop_runtime_style() {
+     ImGui::PopStyleColor(11);
+-    ImGui::PopStyleVar(7);
++    ImGui::PopStyleVar(8);
+ }
+ 
+ // The toast: a borderless panel centred near the top of the display, drawn
+@@ -313,12 +367,28 @@ extern "C" void recomp_runtime_ui_render_imgui(RecompRuntimeUi *ui) {
+     }
+ 
+     LauncherTheme theme = launcher_theme_by_name(ui->config.theme);
++    /* ARCADE_MENU_COMPACTO_V050 */
++    const bool arcade_nes = ui->config.theme &&
++        std::strcmp(ui->config.theme, "nes") == 0;
++    if (ui->config.theme && std::strcmp(ui->config.theme, "nes") == 0)
++        arcade_runtime_8bit_theme(theme);
+     ImGuiIO &io = ImGui::GetIO();
+     const ImVec2 display = io.DisplaySize;
+     if (display.x <= 0.0f || display.y <= 0.0f) return;
+     const bool touch_friendly =
+         (ui->config.presentation_flags &
+          RECOMP_RUNTIME_UI_PRESENTATION_TOUCH_FRIENDLY) != 0;
++    /* ARCADE_FIXED_MENU_V070: fixed geometry, scaled with the available window. */
++    const bool arcade_desktop = arcade_nes && !touch_friendly;
++    const float desktop_scale = arcade_desktop
++        ? std::clamp(std::min(display.x / 960.0f, display.y / 720.0f), 0.75f, 1.25f)
++        : 1.0f;
++    if (arcade_desktop) {
++        theme.row_height *= desktop_scale;
++        theme.spacing_sm *= desktop_scale;
++        theme.spacing_md *= desktop_scale;
++        theme.spacing_lg *= desktop_scale;
++    }
+ 
+     ImGui::GetBackgroundDrawList()->AddRectFilled(
+         ImVec2(0.0f, 0.0f), display,
+@@ -339,16 +409,15 @@ extern "C" void recomp_runtime_ui_render_imgui(RecompRuntimeUi *ui) {
+     }
+     const float margin = touch_friendly
+         ? std::max(20.0f, short_axis * 0.025f)
+-        : 24.0f;
+-    const float max_width = touch_friendly ? display.x : 780.0f;
+-    const float max_height = touch_friendly ? display.y : 680.0f;
+-    const float width = display.x - margin * 2.0f < max_width
++        : (arcade_desktop ? std::clamp(short_axis * 0.025f, 8.0f, 24.0f) : 24.0f);
++    const float max_width = touch_friendly ? display.x : (arcade_desktop ? 900.0f * desktop_scale : 780.0f);
++    const float max_height = touch_friendly ? display.y : (arcade_desktop ? 640.0f * desktop_scale : 680.0f);
++    const float width = std::max(1.0f, display.x - margin * 2.0f < max_width
+                             ? display.x - margin * 2.0f
+-                            : max_width;
+-    const float height = display.y - margin * 2.0f < max_height
++                            : max_width);
++    const float height = std::max(1.0f, display.y - margin * 2.0f < max_height
+                              ? display.y - margin * 2.0f
+-                             : max_height;
+-    const bool wide = width >= (touch_friendly ? 900.0f : 640.0f);
++                             : max_height);
+     ImGui::SetNextWindowPos(ImVec2(display.x * 0.5f, display.y * 0.5f),
+                             ImGuiCond_Always, ImVec2(0.5f, 0.5f));
+     ImGui::SetNextWindowSize(ImVec2(width, height), ImGuiCond_Always);
+@@ -359,10 +428,42 @@ extern "C" void recomp_runtime_ui_render_imgui(RecompRuntimeUi *ui) {
+     // the same rows, and Enter / A would activate whichever row that one is
+     // on. A text row being edited still needs the keyboard.
+     const ImGuiWindowFlags flags = ImGuiWindowFlags_NoDecoration |
+-                                   ImGuiWindowFlags_NoMove |
+-                                   ImGuiWindowFlags_NoSavedSettings |
+-                                   (ui->editing_text ? 0 : ImGuiWindowFlags_NoNavInputs);
++        ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoSavedSettings |
++        (ui->editing_text ? 0 : ImGuiWindowFlags_NoNavInputs);
+     if (ImGui::Begin("##recomp-runtime-ui", nullptr, flags)) {
++        const float actual_width = ImGui::GetWindowWidth();
++        const bool wide = actual_width >= (touch_friendly ? 900.0f : 640.0f * desktop_scale);
++        if (arcade_desktop) ImGui::SetWindowFontScale(desktop_scale);
++        if (ui->config.theme &&
++            std::strcmp(ui->config.theme, "nes") == 0) {
++
++            ImDrawList *draw = ImGui::GetWindowDrawList();
++            ImVec2 p = ImGui::GetWindowPos();
++            ImVec2 s = ImGui::GetWindowSize();
++
++            draw->AddRect(
++                ImVec2(p.x + 4, p.y + 4),
++                ImVec2(p.x + s.x - 4, p.y + s.y - 4),
++                IM_COL32(75, 195, 250, 255),
++                0.0f, 0, 2.0f
++            );
++
++            /* Pequenos bloques de color en el borde inferior */
++            for (int i = 0; i < 12; ++i) {
++                float x = p.x + 18.0f + i * 12.0f;
++                float y = p.y + s.y - 13.0f;
++
++                ImU32 color = (i % 3 == 0)
++                    ? IM_COL32(240, 85, 45, 255)
++                    : IM_COL32(55, 165, 245, 255);
++
++                draw->AddRectFilled(
++                    ImVec2(x, y),
++                    ImVec2(x + 7.0f, y + 7.0f),
++                    color
++                );
++            }
++        }
+         if (touch_friendly) {
+             // Scale toward a phone-readable physical size regardless of any
+             // host-wide DPI scale already applied to the ImGui context.
+@@ -378,7 +479,9 @@ extern "C" void recomp_runtime_ui_render_imgui(RecompRuntimeUi *ui) {
+         ImGui::PushStyleColor(ImGuiCol_Text, col(theme.accent2));
+         ImGui::TextUnformatted(ui->config.title ? ui->config.title : "Settings");
+         ImGui::PopStyleColor();
+-        if (ui->config.subtitle && ui->config.subtitle[0]) {
++        if (ui->config.subtitle && ui->config.subtitle[0] &&
++            ImGui::CalcTextSize(ui->config.title ? ui->config.title : "Settings").x +
++                ImGui::CalcTextSize(ui->config.subtitle).x + theme.spacing_lg * 3.0f < actual_width) {
+             ImGui::SameLine();
+             const float subtitle_w = ImGui::CalcTextSize(ui->config.subtitle).x;
+             ImGui::SetCursorPosX(ImGui::GetWindowWidth() -
+@@ -393,11 +496,12 @@ extern "C" void recomp_runtime_ui_render_imgui(RecompRuntimeUi *ui) {
+         const float footer_h = touch_friendly
+             ? close_h + theme.spacing_sm * 2.0f
+             : ImGui::GetTextLineHeightWithSpacing() + theme.spacing_lg + 2.0f;
+-        const float content_h = ImGui::GetContentRegionAvail().y - footer_h;
++        const float content_h = std::max(1.0f, ImGui::GetContentRegionAvail().y - footer_h);
+         if (wide) {
+             const float sidebar_w = touch_friendly
+-                ? std::clamp(width * 0.20f, 280.0f, 520.0f)
+-                : 190.0f;
++                ? std::clamp(actual_width * 0.20f, 280.0f, 520.0f)
++                : (arcade_desktop ? std::clamp(actual_width * 0.23f,
++                    136.0f * desktop_scale, 190.0f * desktop_scale) : 190.0f);
+             ImGui::BeginChild("##sections", ImVec2(sidebar_w, content_h), true);
+             draw_sections(ui, theme, false);
+             ImGui::EndChild();
+@@ -441,9 +545,13 @@ extern "C" void recomp_runtime_ui_render_imgui(RecompRuntimeUi *ui) {
+                                      ? ui->config.accept_label : "Select";
+             const char *back = ui->config.back_label
+                                    ? ui->config.back_label : "Back";
+-            ImGui::TextDisabled(
+-                "%s  Select    %s  Back    D-pad / Arrows  Navigate",
+-                accept, back);
++            if (arcade_nes)
++                ImGui::TextDisabled(
++                    "ESC: CONTINUAR");
++            else
++                ImGui::TextDisabled(
++                    "%s  Select    %s  Back    D-pad / Arrows  Navigate",
++                    accept, back);
+         }
+         if (ui->status_frames) {
+             ImGui::SameLine();
+@@ -453,7 +561,7 @@ extern "C" void recomp_runtime_ui_render_imgui(RecompRuntimeUi *ui) {
+             recomp_runtime_ui_advance_status(ui, ImGui::GetIO().DeltaTime * 60.0f);
+         }
+         ImGui::SameLine();
+-        const char *close_label = "Resume";
++        const char *close_label = arcade_nes ? "CONTINUAR" : "Resume";
+         const float close_w = touch_friendly
+             ? std::max(320.0f, ImGui::CalcTextSize(close_label).x +
+                                    theme.spacing_lg * 2.0f)
+diff --git a/src/common/launcher_i18n.cpp b/src/common/launcher_i18n.cpp
+index 91a6c97a9584ca8ee8bbb920178d87351e1c883d..398ec1f21e789cd50a12764aa1efddea826e6235 100644
+--- a/src/common/launcher_i18n.cpp
++++ b/src/common/launcher_i18n.cpp
+@@ -205,6 +205,96 @@ static const LauncherI18nEntry kItalian[] = {
+     {"No patch selected", "Nessuna patch selezionata"},
+ };
+ 
++/* Traduccion espanola de Arcade Bros 1983 Recomp. */
++static const LauncherI18nEntry kSpanish[] = {
++    {"Settings", u8"Configuración"},
++    {"Credits", u8"Créditos"},
++    {"Display", u8"Pantalla"},
++    {"Graphics", u8"Gráficos"},
++    {"Controls", u8"Controles"},
++    {"System", u8"Sistema"},
++    {"Window scale", u8"Escala de ventana"},
++    {"Fullscreen", u8"Pantalla completa"},
++    {"Integer scaling", u8"Escalado entero"},
++    {"Linear filtering", u8"Filtrado lineal"},
++    {"Resume game", u8"Continuar partida"},
++    {"RESUME", u8"CONTINUAR"},
++    {"QUIT GAME", u8"SALIR DEL JUEGO"},
++    {"Off", u8"Desactivado"},
++    {"On", u8"Activado"},
++    {"Borderless", u8"Sin bordes"},
++    {"Exclusive", u8"Exclusiva"},
++    {"Default", u8"Predeterminado"},
++    {"Reset", u8"Restablecer"},
++    {"Pause", u8"Pausa"},
++    {"PLAYER", u8"JUGADOR"},
++    {"CONTROLLER", u8"CONTROLES"},
++    {"CONTROLLER - PLAYER", u8"CONTROLES - JUGADOR"},
++    {"Keyboard", u8"Teclado"},
++    {"Keyboard + Mouse", u8"Teclado y ratón"},
++    {"Controller", u8"Mando"},
++    {"None", u8"Ninguno"},
++    {"(disconnected)", u8"(desconectado)"},
++    {"(no gamepad connected)", u8"(ningún mando conectado)"},
++    {"(unbound)", u8"(sin asignar)"},
++    {"connected", u8"conectado"},
++    {"not assigned", u8"sin asignar"},
++    {"Input source", u8"Dispositivo de entrada"},
++    {"Deadzone", u8"Zona muerta"},
++    {"Configure", u8"Configurar"},
++    {"Configuration", u8"Configuración"},
++    {"Browse", u8"Examinar"},
++    {"Browse For", u8"Buscar"},
++    {"Browse...", u8"Examinar..."},
++    {"Change file", u8"Cambiar archivo"},
++    {"Change folder", u8"Cambiar carpeta"},
++    {"Select file", u8"Seleccionar archivo"},
++    {"Select folder", u8"Seleccionar carpeta"},
++    {"Not selected", u8"No seleccionado"},
++    {"Cancel", u8"Cancelar"},
++    {"Close", u8"Cerrar"},
++    {"Save", u8"Guardar"},
++    {"Clear", u8"Borrar"},
++    {"Edit", u8"Editar"},
++    {"PLAY", u8"JUGAR"},
++    {"DISPLAY", u8"PANTALLA"},
++    {"AUDIO", u8"AUDIO"},
++    {"SYSTEM", u8"SISTEMA"},
++    {"INPUT", u8"ENTRADA"},
++    {"CREDITS", u8"CRÉDITOS"},
++    {"HOTKEYS", u8"ATAJOS"},
++    {"NETPLAY", u8"JUEGO EN RED"},
++    {"HOST SHORTCUTS", u8"ATAJOS DEL SISTEMA"},
++    {"ASSIST SHORTCUTS", u8"ATAJOS DE ASISTENCIA"},
++    {"Action", u8"Acción"},
++    {"(keyboard and controller)", u8"(teclado y mando)"},
++    {"Restore Defaults", u8"Restaurar valores predeterminados"},
++    {"Enabled", u8"Activado"},
++    {"Enable", u8"Activar"},
++    {"Disable", u8"Desactivar"},
++    {"Window size", u8"Tamaño de ventana"},
++    {"Scaling filter", u8"Filtro de escalado"},
++    {"Volume", u8"Volumen"},
++    {"Language", u8"Idioma"},
++    {"General", u8"General"},
++    {"Features", u8"Funciones"},
++    {"From", u8"Desde"},
++    {"Source: ", u8"Origen:"},
++    {"Project page", u8"Página del proyecto"},
++    {"Files", u8"Archivos"},
++    {"Folder", u8"Carpeta"},
++    {"Rename Gamepad", u8"Renombrar mando"},
++    {"Delete Gamepad", u8"Eliminar mando"},
++    {"Save Profile", u8"Guardar perfil"},
++    {"Display name for this gamepad:", u8"Nombre del mando:"},
++    {"[ press... ]", u8"[ pulsa... ]"},
++    {"Select BIOS...", u8"Seleccionar BIOS..."},
++    {"Open folder", u8"Abrir carpeta"},
++    {"Refresh", u8"Actualizar"},
++    {"Back", u8"Volver"},
++    {"< Back", u8"< Volver"},
++};
++
+ static const char* lookup(const LauncherI18nEntry* entries, int count,
+                           const char* english) {
+     if (!english) return "";
+@@ -231,5 +321,10 @@ const char* launcher_i18n_text(const char* english) {
+         return lookup(kItalian, (int)(sizeof(kItalian) / sizeof(kItalian[0])),
+                       english);
+     }
++    if (std::strcmp(language, "es") == 0 ||
++        std::strcmp(language, "es-CL") == 0) {
++        return lookup(kSpanish, (int)(sizeof(kSpanish) / sizeof(kSpanish[0])),
++            english);
++    }
+     return english ? english : "";
+ }
+diff --git a/src/common/launcher_model.c b/src/common/launcher_model.c
+index eacae9a26424d0e08e9c86533001f3d9b4984925..7620c1bfde21a8002adc2abcb6551794dd2ab8bf 100644
+--- a/src/common/launcher_model.c
++++ b/src/common/launcher_model.c
+@@ -435,6 +435,7 @@ void launcher_model_init(LauncherModel* m,
+         m->has_spu_hq           = game->has_spu_hq != 0;
+         m->has_rewind_depth     = game->has_rewind_depth != 0;
+         m->has_vsync            = game->has_vsync != 0;
++        m->has_arcade_settings  = game->has_arcade_settings != 0;
+         m->has_skip_fmv         = game->has_skip_fmv != 0;
+         m->has_turbo_loads      = game->has_turbo_loads != 0;
+         m->has_geometry_precision = game->has_geometry_precision != 0;
+diff --git a/src/common/launcher_model.h b/src/common/launcher_model.h
+index 1e065a4e5d50a69cd01044a0698be9979114a38f..0274146d7be89aa397aad4fe331727986a7ac5ab 100644
+--- a/src/common/launcher_model.h
++++ b/src/common/launcher_model.h
+@@ -482,6 +482,7 @@ typedef struct {
+     bool     has_spu_hq;
+     bool     has_rewind_depth;
+     bool     has_vsync;
++    bool     has_arcade_settings;
+     bool     has_skip_fmv;
+     bool     has_turbo_loads;
+     // PSX geometry precision: sub-pixel vertices + perspective-correct UVs.
+diff --git a/src/common/launcher_theme.h b/src/common/launcher_theme.h
+index 317e92018d735120d211d03a38efe6321c7c3e51..9d001812180827a73292e583d776a1abc24ac6ad 100644
+--- a/src/common/launcher_theme.h
++++ b/src/common/launcher_theme.h
+@@ -189,22 +189,37 @@ static inline LauncherTheme launcher_theme_n64(void) {
+ // living-room-TV era). Same layout and design language as the default; only the
+ // palette differs (neutral greys instead of the default's violet-blue bias).
+ static inline LauncherTheme launcher_theme_nes(void) {
+-    LauncherTheme t = launcher_theme_default();   // inherit spacing/type/dims
+-    t.background      = lng_rgba(0.051f, 0.055f, 0.063f, 1.0f); // #0D0E10 graphite ink
+-    t.background2     = lng_rgba(0.086f, 0.094f, 0.106f, 1.0f); // #16181B lifted center
+-    t.panel           = lng_rgba(0.098f, 0.106f, 0.118f, 1.0f); // #191B1E card
+-    t.panel_hovered   = lng_rgba(0.149f, 0.161f, 0.180f, 1.0f); // #26292E
+-    t.control         = lng_rgba(0.125f, 0.137f, 0.153f, 1.0f); // #202327 button
+-    t.control_hovered = lng_rgba(0.173f, 0.188f, 0.212f, 1.0f); // #2C3036
+-    t.border          = lng_rgba(0.200f, 0.216f, 0.239f, 1.0f); // #33373D hairline
+-    t.accent          = lng_rgba(0.898f, 0.196f, 0.153f, 1.0f); // #E53227 NES red
+-    t.accent_dim      = lng_rgba(0.659f, 0.118f, 0.090f, 1.0f); // #A81E17 pressed/gradient
+-    t.accent_text     = lng_rgba(1.0f, 1.0f, 1.0f, 1.0f);
+-    t.accent2         = t.accent;                                // single-accent (red) — else headings inherit default violet
+-    t.text            = lng_rgba(0.925f, 0.925f, 0.933f, 1.0f); // #ECECEE
+-    t.text_muted      = lng_rgba(0.541f, 0.557f, 0.588f, 1.0f); // #8A8E96
+-    /* good/warn keep their semantic colors; focus stays cyan (reads on graphite). */
+-    t.scanlines       = 1;                        // cartridge/CRT era: scanlines ON
++    /* ARCADE_LAUNCHER_THEME_V060 */
++    LauncherTheme t = launcher_theme_default();
++
++    t.background = lng_rgba(0.025f, 0.027f, 0.039f, 1.0f);
++    t.background2 = lng_rgba(0.035f, 0.045f, 0.065f, 1.0f);
++
++    t.panel = lng_rgba(0.055f, 0.070f, 0.105f, 1.0f);
++    t.panel_hovered = lng_rgba(0.105f, 0.160f, 0.250f, 1.0f);
++
++    t.control = lng_rgba(0.070f, 0.100f, 0.155f, 1.0f);
++    t.control_hovered = lng_rgba(0.500f, 0.160f, 0.100f, 1.0f);
++
++    t.border = lng_rgba(0.310f, 0.760f, 0.970f, 1.0f);
++
++    t.accent = lng_rgba(0.960f, 0.320f, 0.170f, 1.0f);
++    t.accent_dim = lng_rgba(0.650f, 0.180f, 0.100f, 1.0f);
++    t.accent2 = lng_rgba(0.310f, 0.760f, 0.970f, 1.0f);
++
++    t.text = lng_rgba(1.0f, 1.0f, 1.0f, 1.0f);
++    t.text_muted = lng_rgba(0.730f, 0.760f, 0.810f, 1.0f);
++    t.accent_text = lng_rgba(1.0f, 1.0f, 1.0f, 1.0f);
++    t.focus_ring = t.accent2;
++
++    /* Estilo rectangular de 8 bits */
++    t.radius_sm = 0.0f;
++    t.radius_lg = 0.0f;
++
++    t.font_body = 17.0f;
++    t.row_height = 44.0f;
++    t.scanlines = 0;
++
+     return t;
+ }
+ 
+diff --git a/src/common/recomp_runtime_settings.c b/src/common/recomp_runtime_settings.c
+index 5358de4419b5c1b3142b2835355f96895d43309d..bfb75d501413c5469e34c58e56333216c8e56664 100644
+--- a/src/common/recomp_runtime_settings.c
++++ b/src/common/recomp_runtime_settings.c
+@@ -6,6 +6,9 @@
+ static const char *const kFullscreenChoices[] = {
+     "Windowed", "Borderless", "Exclusive"
+ };
++static const char *const kArcadeFullscreenChoices[] = {
++    "Ventana", "Sin bordes", "Exclusiva"
++};
+ static const char *const kTextureFilterChoices[] = { "Nearest", "Linear" };
+ /* Order matches RECOMP_LAUNCHER_FMV_FILTER_* minus one (choice indices are
+  * 0-based), least -> most smoothing. */
+@@ -94,12 +97,14 @@ RecompRuntimeUi *recomp_runtime_ui_create_standard(
+ 
+     size_t count = 0;
+     if (has(f, RECOMP_RUNTIME_UI_STANDARD_FULLSCREEN))
+-        add_item(items, &count, RECOMP_RUNTIME_UI_KEY_FULLSCREEN, "Display",
+-                 "Fullscreen", "Choose windowed or fullscreen output.",
+-                 RECOMP_RUNTIME_UI_CHOICE, 0, 2, 1, kFullscreenChoices, 3, NULL);
++    add_item(items, &count, RECOMP_RUNTIME_UI_KEY_FULLSCREEN, "Pantalla",
++             "Pantalla completa", "Cambiar entre ventana y pantalla completa.",
++             RECOMP_RUNTIME_UI_CHOICE, 0, 2, 1,
++             standard->menu.theme && strcmp(standard->menu.theme, "nes") == 0
++                 ? kArcadeFullscreenChoices : kFullscreenChoices, 3, NULL);
+     if (has(f, RECOMP_RUNTIME_UI_STANDARD_WINDOW_SCALE))
+-        add_item(items, &count, RECOMP_RUNTIME_UI_KEY_WINDOW_SCALE, "Display",
+-                 "Window scale", "Resize the window in native-size steps.",
++        add_item(items, &count, RECOMP_RUNTIME_UI_KEY_WINDOW_SCALE, "Pantalla",
++                 "Escala de ventana", "Cambiar el tamaño de la ventana.",
+                  RECOMP_RUNTIME_UI_INT, 1,
+                  standard->window_scale_max > 0 ? standard->window_scale_max : 8,
+                  1, NULL, 0, NULL);
+@@ -122,76 +127,76 @@ RecompRuntimeUi *recomp_runtime_ui_create_standard(
+                  RECOMP_RUNTIME_UI_INT, 0, 100, 10, NULL, 0, NULL);
+     }
+     if (has(f, RECOMP_RUNTIME_UI_STANDARD_INTEGER_SCALE))
+-        add_item(items, &count, RECOMP_RUNTIME_UI_KEY_INTEGER_SCALE, "Graphics",
+-                 "Integer scaling", "Snap output to whole native-pixel multiples.",
++        add_item(items, &count, RECOMP_RUNTIME_UI_KEY_INTEGER_SCALE, "Gráficos",
++                 "Escalado entero", "Ajusta la imagen a múltiplos enteros de píxeles.",
+                  RECOMP_RUNTIME_UI_BOOL, 0, 1, 1, NULL, 0, NULL);
+     if (has(f, RECOMP_RUNTIME_UI_STANDARD_LINEAR_FILTER))
+-        add_item(items, &count, RECOMP_RUNTIME_UI_KEY_LINEAR_FILTER, "Graphics",
+-                 "Linear filter", "Smooth the final game image.",
++        add_item(items, &count, RECOMP_RUNTIME_UI_KEY_LINEAR_FILTER, "Gráficos",
++                 "Filtro lineal", "Suaviza la imagen final del juego.",
+                  RECOMP_RUNTIME_UI_BOOL, 0, 1, 1, NULL, 0, NULL);
+     if (has(f, RECOMP_RUNTIME_UI_STANDARD_TEXTURE_FILTER))
+-        add_item(items, &count, RECOMP_RUNTIME_UI_KEY_TEXTURE_FILTER, "Graphics",
++        add_item(items, &count, RECOMP_RUNTIME_UI_KEY_TEXTURE_FILTER, "Gráficos",
+                  "Texture filtering", "Choose nearest or linear sampling.",
+                  RECOMP_RUNTIME_UI_CHOICE, 0, 1, 1, kTextureFilterChoices, 2, NULL);
+     if (has(f, RECOMP_RUNTIME_UI_STANDARD_FMV_FILTER))
+-        add_item(items, &count, RECOMP_RUNTIME_UI_KEY_FMV_FILTER, "Graphics",
++        add_item(items, &count, RECOMP_RUNTIME_UI_KEY_FMV_FILTER, "Gráficos",
+                  "FMV filtering", "Choose how full-motion video is scaled up.",
+                  RECOMP_RUNTIME_UI_CHOICE, 0, 3, 1, kFmvFilterChoices, 4, NULL);
+     if (has(f, RECOMP_RUNTIME_UI_STANDARD_RESOLUTION_SCALE))
+-        add_item(items, &count, RECOMP_RUNTIME_UI_KEY_RESOLUTION_SCALE, "Graphics",
++        add_item(items, &count, RECOMP_RUNTIME_UI_KEY_RESOLUTION_SCALE, "Gráficos",
+                  "Resolution scale", "Set the internal rendering resolution.",
+                  RECOMP_RUNTIME_UI_INT, 1,
+                  standard->resolution_scale_max > 0 ? standard->resolution_scale_max : 8,
+                  1, NULL, 0, NULL);
+     if (has(f, RECOMP_RUNTIME_UI_STANDARD_COLOR_CORRECTION))
+-        add_item(items, &count, RECOMP_RUNTIME_UI_KEY_COLOR_CORRECTION, "Graphics",
++        add_item(items, &count, RECOMP_RUNTIME_UI_KEY_COLOR_CORRECTION, "Gráficos",
+                  "Color correction", "Use display-aware handheld color correction.",
+                  RECOMP_RUNTIME_UI_BOOL, 0, 1, 1, NULL, 0, NULL);
+     if (has(f, RECOMP_RUNTIME_UI_STANDARD_LCD_GHOSTING))
+-        add_item(items, &count, RECOMP_RUNTIME_UI_KEY_LCD_GHOSTING, "Graphics",
++        add_item(items, &count, RECOMP_RUNTIME_UI_KEY_LCD_GHOSTING, "Gráficos",
+                  "LCD ghosting", "Simulate the original LCD response.",
+                  RECOMP_RUNTIME_UI_BOOL, 0, 1, 1, NULL, 0, NULL);
+     if (has(f, RECOMP_RUNTIME_UI_STANDARD_AUDIO))
+         add_item(items, &count, RECOMP_RUNTIME_UI_KEY_AUDIO, "Audio", "Audio",
+-                 "Enable or mute game audio output.", RECOMP_RUNTIME_UI_BOOL,
++                 "Activa o silencia el audio del juego.", RECOMP_RUNTIME_UI_BOOL,
+                  0, 1, 1, NULL, 0, NULL);
+     if (has(f, RECOMP_RUNTIME_UI_STANDARD_VOLUME))
+-        add_item(items, &count, RECOMP_RUNTIME_UI_KEY_VOLUME, "Audio", "Volume",
+-                 "Set the in-game mixer volume.", RECOMP_RUNTIME_UI_INT,
++        add_item(items, &count, RECOMP_RUNTIME_UI_KEY_VOLUME, "Audio", "Volumen",
++                 "Ajusta el volumen del juego.", RECOMP_RUNTIME_UI_INT,
+                  0, 100, 5, NULL, 0, NULL);
+     if (has(f, RECOMP_RUNTIME_UI_STANDARD_RESUME))
+-        add_item(items, &count, RECOMP_RUNTIME_UI_KEY_RESUME, "System", "Resume game",
+-                 "Close settings and return to the game.", RECOMP_RUNTIME_UI_ACTION,
++        add_item(items, &count, RECOMP_RUNTIME_UI_KEY_RESUME, "Sistema", "Continuar partida",
++                 "Cierra el menú y continúa la partida.", RECOMP_RUNTIME_UI_ACTION,
+                  0, 0, 0, NULL, 0, NULL);
+     if (has(f, RECOMP_RUNTIME_UI_STANDARD_STATE_SLOT))
+-        add_item(items, &count, RECOMP_RUNTIME_UI_KEY_STATE_SLOT, "System", "State slot",
++        add_item(items, &count, RECOMP_RUNTIME_UI_KEY_STATE_SLOT, "Sistema", "State slot",
+                  "The slot Save state and Load state use.", RECOMP_RUNTIME_UI_INT, 1,
+                  standard->state_slot_count > 0 ? standard->state_slot_count : 10,
+                  1, NULL, 0, NULL);
+     if (has(f, RECOMP_RUNTIME_UI_STANDARD_SAVE_STATE))
+-        add_item(items, &count, RECOMP_RUNTIME_UI_KEY_SAVE_STATE, "System", "Save state",
++        add_item(items, &count, RECOMP_RUNTIME_UI_KEY_SAVE_STATE, "Sistema", "Save state",
+                  "Save the current state.", RECOMP_RUNTIME_UI_ACTION,
+                  0, 0, 0, NULL, 0, NULL);
+     if (has(f, RECOMP_RUNTIME_UI_STANDARD_LOAD_STATE))
+-        add_item(items, &count, RECOMP_RUNTIME_UI_KEY_LOAD_STATE, "System", "Load state",
++        add_item(items, &count, RECOMP_RUNTIME_UI_KEY_LOAD_STATE, "Sistema", "Load state",
+                  "Load the current state slot.", RECOMP_RUNTIME_UI_ACTION,
+                  0, 0, 0, NULL, 0, NULL);
+     if (has(f, RECOMP_RUNTIME_UI_STANDARD_PAUSE_IN_MENU))
+-        add_item(items, &count, RECOMP_RUNTIME_UI_KEY_PAUSE_IN_MENU, "System",
+-                 "Pause in menu", "Hold the game while a menu is open.",
++        add_item(items, &count, RECOMP_RUNTIME_UI_KEY_PAUSE_IN_MENU, "Sistema",
++                 "Pausar en el menú", "Pausa el juego mientras el menú está abierto.",
+                  RECOMP_RUNTIME_UI_BOOL, 0, 1, 1, NULL, 0, NULL);
+     if (has(f, RECOMP_RUNTIME_UI_STANDARD_RESET))
+-        add_item(items, &count, RECOMP_RUNTIME_UI_KEY_RESET, "System", "Reset game",
+-                 "Reset the emulated machine.", RECOMP_RUNTIME_UI_ACTION,
++        add_item(items, &count, RECOMP_RUNTIME_UI_KEY_RESET, "Sistema", "Reiniciar juego",
++                 "Reinicia la consola emulada.", RECOMP_RUNTIME_UI_ACTION,
+                  0, 0, 0, NULL, 0, NULL);
+     if (has(f, RECOMP_RUNTIME_UI_STANDARD_RETURN_TO_LAUNCHER)) {
+-        add_item(items, &count, RECOMP_RUNTIME_UI_KEY_RETURN_TO_LAUNCHER, "System",
+-                 "Return to launcher", "Close the game, open the launcher. Press twice.",
++        add_item(items, &count, RECOMP_RUNTIME_UI_KEY_RETURN_TO_LAUNCHER, "Sistema",
++                 "Volver al launcher", "Close the game, open the launcher. Press twice.",
+                  RECOMP_RUNTIME_UI_ACTION, 0, 0, 0, NULL, 0, NULL);
+         confirm_prompts[count - 1] = "Press again for the launcher";
+     }
+     if (has(f, RECOMP_RUNTIME_UI_STANDARD_QUIT)) {
+-        add_item(items, &count, RECOMP_RUNTIME_UI_KEY_QUIT, "System", "Quit game",
++        add_item(items, &count, RECOMP_RUNTIME_UI_KEY_QUIT, "Sistema", "Quit game",
+                  "Close the game. Press twice.", RECOMP_RUNTIME_UI_ACTION,
+                  0, 0, 0, NULL, 0, NULL);
+         confirm_prompts[count - 1] = "Press again to quit";
+diff --git a/src/recomp_launcher.h b/src/recomp_launcher.h
+index b0bfa7472882b1a74974c9043fc14ff6fdb5278d..cc42067b00a705fc7c0ebea7d987994c26c19671 100644
+--- a/src/recomp_launcher.h
++++ b/src/recomp_launcher.h
+@@ -1573,6 +1573,12 @@ struct RecompLauncherCSettings {
+      * additively; a zero-initialized host reads as unset. */
+     int  quality_preset;
+     int  quality_base;
++    /* ARCADE_OPTIONS_V070: presentation only; no frame interpolation. */
++    int  arcade_show_fps;
++    int  arcade_target_fps; // 30, 60, 120 or 180
++    /* ARCADE_MUSIC_V080: optional project-owned PCM overlay. */
++    int  arcade_music_enabled;
++    int  arcade_music_volume;
+ };
+ #define RECOMP_LAUNCHER_HAS_ZAPPER_SETTINGS 1
+ 
+@@ -2414,6 +2420,7 @@ typedef struct RecompLauncherCGameInfo {
+     int (*rom_describe)(void* ctx, const uint8_t* image, size_t len,
+                         char* out, size_t out_size);
+     void*              rom_describe_ctx;
++    int                has_arcade_settings;
+ } RecompLauncherCGameInfo;
+ 
+ /* RecompLauncherCGameInfo carries texture_filter_labels / _values. */

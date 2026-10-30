@@ -5,7 +5,7 @@ project(ArcadeBros1983Recomp LANGUAGES C CXX)
 set(CMAKE_C_STANDARD 11)
 set(CMAKE_CXX_STANDARD 17)
 
-# Motor NESRecomp independiente con parche Arcade v0.7.0
+# Motor NESRecomp independiente con parche Arcade v0.8.0
 get_filename_component(NESRECOMP_ROOT
     "${CMAKE_CURRENT_SOURCE_DIR}/deps/nesrecomp-arcade"
     ABSOLUTE
@@ -23,13 +23,27 @@ nesrecomp_add_cycle_game(ArcadeBros1983Recomp
     PLAYERS 2
     REGION NTSC
     HOST_EXTRAS "${CMAKE_CURRENT_SOURCE_DIR}/src/records.c"
+                "${CMAKE_CURRENT_SOURCE_DIR}/src/music.cpp"
 )
 
 # Lanzador portable de Arcade Bros 1983 Recomp
 if(WIN32)
+    target_link_libraries(ArcadeBros1983Recomp PRIVATE mfplat mfreadwrite mfuuid ole32)
     add_executable(ArcadeBrosLauncher WIN32 src/launcher.cpp)
     target_compile_features(ArcadeBrosLauncher PRIVATE cxx_std_17)
     target_link_libraries(ArcadeBrosLauncher PRIVATE comdlg32 bcrypt)
+endif()
+
+# ARCADE_MUSIC_V080: local user audio is optional and never embedded.
+if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/assets/music/stage1.m4a")
+    add_custom_command(TARGET ArcadeBros1983Recomp POST_BUILD
+        COMMAND "${CMAKE_COMMAND}" -E make_directory
+            "$<TARGET_FILE_DIR:ArcadeBros1983Recomp>/assets/music"
+        COMMAND "${CMAKE_COMMAND}" -E copy_if_different
+            "${CMAKE_CURRENT_SOURCE_DIR}/assets/music/stage1.m4a"
+            "$<TARGET_FILE_DIR:ArcadeBros1983Recomp>/assets/music/stage1.m4a"
+        COMMENT "Copiando musica local del usuario"
+        VERBATIM)
 endif()
 # ARCADE_PIXEL_FONT_V050
 # Fuente pixelada exclusiva del menu de pausa.
