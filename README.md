@@ -5,7 +5,7 @@
 [![Estado](https://img.shields.io/badge/estado-%20Jugable-green)](https://github.com/JojitaGamerHD/ArcadeBros1983-Recomp)
 [![Plataforma](https://img.shields.io/badge/plataforma-Windows%20x64-blue)](https://github.com/JojitaGamerHD/ArcadeBros1983-Recomp)
 
-**Versión en desarrollo: v0.8.0** · Rama `desarrollo-v0.8.0`
+**Versión en desarrollo: v0.9.0** · Rama `desarrollo-v0.9.0`
 
 Arcade Bros 1983 Recomp es un proyecto independiente de aprendizaje y experimentación técnica. Su objetivo es ejecutar la versión de NES de **Mario Bros.** como un programa nativo de Windows, conservando el comportamiento del juego y añadiendo funciones propias orientadas a una experiencia arcade y portable.
 
@@ -30,7 +30,19 @@ Para la interfaz se integra [recomp-ui](https://github.com/RetroPortingToolKit/r
 - **Opciones de visualización** proporcionadas por el runtime, como pantalla completa, escalado y filtrado.
 - **Enfoque arcade**: desactivación de los atajos habituales de guardar/cargar estado y de avance rápido; las opciones de estados se ocultan del menú de pausa.
 
-Las funciones anteriores se han probado manualmente en el entorno de desarrollo. **v0.8.0 todavía está en desarrollo** y no implica una certificación de compatibilidad completa.
+Las funciones anteriores se han probado manualmente en el entorno de desarrollo. **v0.9.0 todavía está en desarrollo** y no implica una certificación de compatibilidad completa.
+
+### Novedades de v0.9.0
+
+- **Música continua al perder una vida:** la pista mantiene su posición durante la muerte y la espera en la plataforma de reaparición. Game Over sigue cortándola.
+- **Suavizado experimental a 120/180 FPS:** interpola posiciones de los grupos de sprites reconocidos durante las fases normales, conservando la lógica, la velocidad y el audio de NES.
+- **Presentación original como respaldo:** bonus, menús, introducciones y transiciones no validadas conservan la imagen original.
+- **Ventana y menús proporcionados:** el muestreo interno del suavizado conserva el tamaño lógico y las opciones de ventana existentes.
+- **Cuatro pruebas automatizadas:** geometría de sprites, mezcla de música, coordinación con el juego y preferencias.
+
+**60 FPS es la opción recomendada y el valor inicial de una configuración nueva.** Se conservan las preferencias ya guardadas. Los modos 120/180 siguen siendo experimentales: no se ha demostrado una mejora perceptible uniforme ni una entrega estable de 180 fotogramas por segundo en todos los equipos.
+
+Consulta [las notas de v0.9.0](docs/NOTAS-v0.9.0.md) para conocer el alcance de las pruebas y las limitaciones.
 
 ### Novedades de v0.8.0
 
@@ -65,16 +77,17 @@ Consulta los detalles y el alcance de las pruebas en [las notas de v0.7.0](docs/
 - **Controles:** configuración conservada en el launcher.
 - **Reproducibilidad:** parches acumulativos comprobados sobre las revisiones fijadas.
 
-**Importante:** los modos superiores a 60 FPS repiten
-fotogramas de presentación. No existe interpolación real.
+**Evolución de los FPS:** hasta v0.8.0, los modos 120/180 repetían la imagen de NES. v0.9.0 añade interpolación geométrica experimental en escenas compatibles. El contador `NES` mide los pasos de simulación y `FPS` las presentaciones; este último también cuenta imágenes repetidas y no mide directamente los refrescos físicos del monitor.
+
 ### Limitaciones y trabajo pendiente
 
 - Ampliar las pruebas de todas las fases, del modo de dos jugadores y de distintos mandos y equipos.
 - Verificar y restringir cualquier vía alternativa de uso de save states que permanezca disponible en el runtime.
 - Mejorar el proceso de compilación reproducible y las pruebas automatizadas.
-- Investigar interpolación real de fotogramas sin alterar la velocidad del juego.
+- Mejorar la cadencia y sincronización del suavizado experimental, ampliar su cobertura y comprobar su beneficio visual.
 - Validar el empaquetador portable con los recursos opcionales de música y ampliar las pruebas de transiciones durante partidas reales.
 - Incorporar en el futuro varias pistas o una selección de música por fase.
+- Investigar una preparación local automática del juego para un futuro ZIP público con ejecutable; esa distribución todavía no está implementada.
 
 ## Requisitos para compilar
 
@@ -96,11 +109,11 @@ El proyecto se ha desarrollado y probado principalmente en Windows 11 con el gen
 ```powershell
 git clone --recurse-submodules https://github.com/JojitaGamerHD/ArcadeBros1983-Recomp.git
 cd ArcadeBros1983-Recomp
-git switch desarrollo-v0.8.0
+git switch desarrollo-v0.9.0
 git submodule update --init --recursive
 ```
 
-Es importante inicializar los submódulos **después** de seleccionar `desarrollo-v0.8.0`, para preparar la revisión que utiliza esta rama. Si ya clonaste el proyecto sin sus submódulos, en una **copia limpia**, ejecuta `git submodule update --init --recursive` antes de continuar. No uses ese comando para restablecer un submódulo que tenga cambios locales sin respaldarlos.
+Es importante inicializar los submódulos **después** de seleccionar `desarrollo-v0.9.0`, para preparar la revisión que utiliza esta rama. Si ya clonaste el proyecto sin sus submódulos, en una **copia limpia**, ejecuta `git submodule update --init --recursive` antes de continuar. No uses ese comando para restablecer un submódulo que tenga cambios locales sin respaldarlos.
 
 ### 2. Preparar la ROM
 
@@ -120,14 +133,14 @@ powershell -ExecutionPolicy Bypass -File .\tools\preparar_dependencias.ps1
 
 El script prepara una copia local de NESRecomp en `deps/nesrecomp-arcade`, verifica revisiones fijadas, aplica los parches de este proyecto a NESRecomp y `recomp-ui` y compila la herramienta `NESRecomp.exe` si es necesario.
 
-Revisiones utilizadas para v0.8.0:
+Revisiones utilizadas para v0.9.0:
 
 | Componente | Revisión |
 | --- | --- |
 | NESRecomp | `5a2eddeecc646e9325bef53f3c711e119423f99c` |
 | recomp-ui | `7c635c6b366a6e0d5d3c913a7fce6ec04dd9f256` |
 
-Los parches se encuentran en `patches/nesrecomp/arcade-v0.8.patch` y `patches/recomp-ui/arcade-v0.8.patch`. Son acumulativos sobre las revisiones originales: no deben aplicarse encima de los parches de una versión anterior. El script detecta si ya están aplicados; no debe utilizarse para sobrescribir cambios manuales incompatibles.
+Los parches activos son `patches/nesrecomp/arcade-v0.9.patch` y `patches/recomp-ui/arcade-v0.8.patch`. La interfaz conserva el parche v0.8 porque no cambió en esta versión. Son acumulativos sobre las revisiones originales: no deben aplicarse encima de los parches de una versión anterior. El script detecta si ya están aplicados; no debe utilizarse para sobrescribir cambios manuales incompatibles.
 
 ### 4. Preparar la música opcional
 
@@ -158,21 +171,21 @@ cmake --build build/arcade-test --config Release --parallel 4
 
 La compilación genera archivos a partir de la ROM local; **no publiques la carpeta `build/`, `generated/` ni sus ejecutables**.
 
-### Pruebas aisladas de música
+### Pruebas aisladas de música y suavizado
 
 Las pruebas se configuran por separado y no necesitan recompilar el juego:
 
 ```powershell
-cmake -S tests -B build/tests-v080 -G "Visual Studio 17 2022" -A x64
-cmake --build build/tests-v080 --config Release --parallel 1
-ctest --test-dir build/tests-v080 -C Release --output-on-failure
+cmake -S tests -B build/tests-v090 -G "Visual Studio 17 2022" -A x64
+cmake --build build/tests-v090 --config Release --parallel 1
+ctest --test-dir build/tests-v090 -C Release --output-on-failure
 ```
 
-Comprueban las preferencias, la mezcla y la coordinación con los estados del juego. La prueba de decodificación con la pista real se omite si no existe el archivo local; las demás se ejecutan normalmente. Estas pruebas no sustituyen la escucha y las partidas de comprobación.
+Las cuatro pruebas comprueban las preferencias, la mezcla de música, su coordinación con los estados del juego y la geometría del suavizado. La prueba de decodificación con la pista real se omite si no existe el archivo local; las demás se ejecutan normalmente. Estas pruebas no sustituyen la escucha y las partidas de comprobación.
 
 ## Crear una versión portable personal
 
-**Estado v0.8.0:** compilación Release y prueba manual de la música confirmadas en el equipo de desarrollo. La generación y las pruebas específicas del portable mediante `crear_portable.ps1`, incluida la música opcional, siguen pendientes para esta versión.
+**Estado v0.9.0:** compilación Release, cuatro pruebas automatizadas y comprobación manual de la música continua confirmadas en el equipo de desarrollo. El suavizado conserva su estado experimental. La generación y las pruebas específicas del portable mediante `crear_portable.ps1`, incluida la música opcional, siguen pendientes para esta versión.
 
 Con el proyecto y sus dependencias preparados:
 
@@ -217,11 +230,13 @@ ArcadeBros1983-Recomp/
 │   └── recomp-ui/              # Traducciones y ajustes de interfaz
 ├── src/
 │   ├── launcher.cpp            # Lanzador portable propio
-│   ├── records.c               # Récords y conexión con la música
+│   ├── records.c               # Récords y conexión con música y presentación
 │   ├── music.cpp               # Decodificación y mezcla de la pista local
 │   ├── music.h                 # Interfaz de música
-│   └── music_gate.h            # Coordinación con las fases del juego
-├── tests/                      # Pruebas aisladas de música y preferencias
+│   ├── music_gate.h            # Coordinación con las fases del juego
+│   ├── smooth_host.c / .h      # Captura y continuidad de los sprites
+│   └── smooth_video.cpp / .h   # Composición geométrica experimental
+├── tests/                      # Pruebas de música, preferencias y geometría
 ├── tools/
 │   ├── preparar_dependencias.ps1
 │   └── crear_portable.ps1
@@ -237,7 +252,15 @@ Las carpetas ignoradas pueden no existir inmediatamente después de clonar el re
 
 ## Historial de versiones
 
-### v0.8.0 — Música opcional durante las fases (en desarrollo)
+### v0.9.0 — Música continua y suavizado experimental (en desarrollo)
+
+- Continuidad musical durante la muerte y reaparición, manteniendo el corte de Game Over.
+- Interpolación geométrica de sprites en fases normales con los modos 120/180; lógica NES conservada.
+- Respaldo nativo para escenas incompatibles y validación de la reconstrucción frente al PPU.
+- Cuatro pruebas automatizadas aprobadas y parche acumulativo del motor v0.9 comprobado.
+- Pendiente mejorar la sincronización y verificar el beneficio visual del suavizado.
+
+### v0.8.0 — Música opcional durante las fases (publicada)
 
 - Pista local en bucle, coordinada con la introducción, la pausa y los cambios de fase.
 - Controles compartidos de activación y volumen de música en launcher y pausa.

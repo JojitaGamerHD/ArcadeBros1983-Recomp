@@ -15,6 +15,7 @@
 #include "cyc_mod.h"
 #include "music.h"
 #include "music_gate.h"
+#include "smooth_host.h"
 #include "recomp_runtime_ui.h"
 #include <stdbool.h>
 #include <stdint.h>
@@ -49,6 +50,7 @@ static void actualizar_estado_musica(int antes_del_fotograma) {
         .complete = cyc_mod_peek(0x0051),
         .jingle = cyc_mod_peek(0x06A2),
         .pending = cyc_mod_peek(0x00FD),
+        .current_jingle = cyc_mod_peek(0x06F2),
         .mario_active = cyc_mod_peek(0x0300),
         .mario_state = cyc_mod_peek(0x0316),
         .luigi_active = cyc_mod_peek(0x0320),
@@ -159,6 +161,7 @@ static void restaurar_si_falta(void) {
 
 static void al_encender(void *ctx) {
     (void)ctx;
+    arcade_video_init();
     arcade_music_load_default();
     memset(&puerta_musica, 0, sizeof(puerta_musica));
     fotogramas = 0;
@@ -177,6 +180,7 @@ static void al_empezar_fotograma(void *ctx) {
 
 static void al_terminar_fotograma(void *ctx) {
     (void)ctx;
+    arcade_video_frame();
     actualizar_estado_musica(0);
     ++fotogramas;
 
@@ -246,6 +250,9 @@ static const RecompRuntimeUiCallbacks callbacks_creditos = {
     .run_action = mostrar_creditos
 };
 static const CycHostExtras extras = {
+    .present = arcade_video_present,
+    .present_phase = arcade_video_phase,
+    .present_scale = arcade_video_scale,
     .audio_rate = 48000,
     .audio_mix = mezclar_musica,
     .audio_mix_options = configurar_musica,
