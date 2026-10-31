@@ -2,7 +2,7 @@
 
 **Port no oficial de Mario Bros. (NES) para Windows x64 mediante recompilación estática local con NESRecomp.**
 
-[![Estado](https://img.shields.io/badge/estado-Jugable-green)](https://github.com/JojitaGamerHD/ArcadeBros1983-Recomp)
+[![Estado](https://img.shields.io/badge/estado-Completo-blue)](https://github.com/JojitaGamerHD/ArcadeBros1983-Recomp)
 [![Plataforma](https://img.shields.io/badge/plataforma-Windows%20x64-blue)](https://github.com/JojitaGamerHD/ArcadeBros1983-Recomp)
 
 **Versión: v1.0.0** · Desarrollo en `desarrollo-v1.0.0`
