@@ -157,6 +157,15 @@ extern "C" int arcade_music_load_default(void) {
     const DWORD n = GetModuleFileNameW(nullptr, file, 32768);
     if (!n || n >= 32768) { music.clear(); cursor = 0; return 0; }
     try {
+        // Portable user data lives in Datos/, the launcher's working directory.
+        // A privately supplied track stays outside the generic Bin/ package.
+        wchar_t local[32768];
+        const DWORD length = GetFullPathNameW(L"Music\\stage1.m4a", 32768, local, nullptr);
+        if (length && length < 32768) {
+            const DWORD attributes = GetFileAttributesW(local);
+            if (attributes != INVALID_FILE_ATTRIBUTES && !(attributes & FILE_ATTRIBUTE_DIRECTORY))
+                return load(local);
+        }
         std::wstring path(file, n);
         const size_t slash = path.find_last_of(L"\\/");
         if (slash == std::wstring::npos) return 0;

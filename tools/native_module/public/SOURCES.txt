@@ -1,0 +1,31 @@
+FUENTES Y COMPONENTES
+
+Arcade Bros 1983 Recomp
+https://github.com/JojitaGamerHD/ArcadeBros1983-Recomp
+Las fuentes de cada release se identifican por su etiqueta de versión.
+El repositorio incluye los parches de las dependencias utilizadas.
+
+NESRecomp, revisión 5a2eddeecc646e9325bef53f3c711e119423f99c
+https://github.com/mstan/nesrecomp
+Licencia PolyForm Noncommercial 1.0.0. Véase Bin/licenses.
+
+recomp-ui, revisión 7c635c6b366a6e0d5d3c913a7fce6ec04dd9f256
+https://github.com/RetroPortingToolKit/recomp-ui
+Interfaz adaptada por los parches del proyecto. Véase Bin/licenses.
+
+LLVM/Clang/LLD 23.1.4
+https://github.com/llvm/llvm-project/releases/tag/llvmorg-23.1.4
+Compiladores originales del paquete oficial Windows x64, sin modificaciones.
+SHA256 del archivo oficial .tar.zst utilizado:
+1a3f2f998e230b5791cc4e2bfe11a1f7c07fe42c96ff44f227c9db0bedfaf091
+El paquete conserva las herramientas y cabeceras necesarias para preparar
+localmente el módulo nativo. Avisos de LLVM y componentes en Bin/licenses.
+
+SDL2 2.30.0
+https://github.com/libsdl-org/SDL/releases/tag/release-2.30.0
+
+Los demás avisos de bibliotecas, fuentes e imágenes auxiliares están en
+Bin/licenses. Las cabeceras del SDK genérico conservan sus avisos originales.
+
+La ROM, su música y el código generado localmente pertenecen a los datos
+aportados por cada jugador y no se distribuyen dentro de este paquete.

@@ -1,338 +1,231 @@
 # Arcade Bros 1983 Recomp
 
-**Port no oficial de Mario Bros. (NES) para Windows x64 mediante recompilación estática con NESRecomp.**
+**Port no oficial de Mario Bros. (NES) para Windows x64 mediante recompilación estática local con NESRecomp.**
 
-[![Estado](https://img.shields.io/badge/estado-%20Jugable-green)](https://github.com/JojitaGamerHD/ArcadeBros1983-Recomp)
+[![Estado](https://img.shields.io/badge/estado-Jugable-green)](https://github.com/JojitaGamerHD/ArcadeBros1983-Recomp)
 [![Plataforma](https://img.shields.io/badge/plataforma-Windows%20x64-blue)](https://github.com/JojitaGamerHD/ArcadeBros1983-Recomp)
 
-**Versión en desarrollo: v0.9.0** · Rama `desarrollo-v0.9.0`
+**Versión: v1.0.0** · Desarrollo en `desarrollo-v1.0.0`
 
-Arcade Bros 1983 Recomp es un proyecto independiente de aprendizaje y experimentación técnica. Su objetivo es ejecutar la versión de NES de **Mario Bros.** como un programa nativo de Windows, conservando el comportamiento del juego y añadiendo funciones propias orientadas a una experiencia arcade y portable.
+v1.0.0 incorpora un ZIP con ejecutable y preparación automática desde la ROM del
+jugador. La primera apertura prepara un módulo nativo privado; las siguientes
+reutilizan la caché. El jugador puede descargar, extraer y abrir el launcher
+sin instalar Visual Studio, CMake ni Python.
 
-> **Importante:** este repositorio **no contiene la ROM**, código C generado a partir de ella ni ejecutables que incorporen contenido derivado del juego. Cada usuario debe proporcionar una copia compatible de la ROM conforme a la legislación aplicable. El proyecto no está afiliado a Nintendo.
+El repositorio contiene fuentes, scripts y parches. El ZIP contiene el motor
+y las herramientas genéricas. Cada jugador aporta su propia ROM compatible
+y, si quiere música de fondo, una pista local. El proyecto es independiente,
+sin fines comerciales y sin afiliación con Nintendo.
 
-## ¿Cómo funciona?
+## Descargar y jugar
 
-[NESRecomp](https://github.com/mstan/nesrecomp) traduce instrucciones de la CPU 6502 de una ROM de NES a código C. Después, el compilador de Visual Studio genera un ejecutable nativo para Windows x64.
+En [Releases](https://github.com/JojitaGamerHD/ArcadeBros1983-Recomp/releases),
+busca el archivo de Windows de esta versión:
 
-El resultado sigue utilizando el *runtime* de NESRecomp para reproducir los componentes de la consola, incluidos los gráficos, el sonido y la entrada. **No es una reescritura manual del juego ni una eliminación completa de la emulación del hardware.**
+```text
+ArcadeBros1983-Recomp-v1.0.0-Windows-x64.zip
+```
 
-Para la interfaz se integra [recomp-ui](https://github.com/RetroPortingToolKit/recomp-ui), adaptado al español mediante un parche mantenido en este repositorio.
+1. Extrae el ZIP completo en una carpeta con permiso de escritura.
+2. Abre `ArcadeBrosLauncher.exe` y selecciona tu ROM de Mario Bros. (NES).
+3. Espera a que termine la preparación inicial y pulsa **JUGAR**.
+4. En las siguientes aperturas se reutiliza el módulo preparado.
 
-## Características del proyecto
+Requisitos del paquete: **Windows 10 versión 1903 o posterior, o Windows 11,
+x64**, componentes multimedia de Windows y un controlador gráfico compatible
+con **OpenGL 3.3** para el launcher. Las ediciones Windows N necesitan Media
+Feature Pack para esta aplicación.
 
-- **Launcher gráfico** para iniciar el juego y acceder a su configuración.
-- **Menús en español**, incluidas las principales opciones del launcher y el menú de pausa.
-- **Volver al launcher** desde una partida sin cerrar el ejecutable y comenzar otra sesión.
-- **Versión portable para Windows**: importación de una ROM compatible en la primera ejecución y almacenamiento local de los datos.
-- **Récord permanente**: la puntuación máxima se guarda entre ejecuciones mediante un módulo propio, sin alterar la ROM.
-- **Compatibilidad comprobada con mando Xbox** y controles de teclado.
-- **Opciones de visualización** proporcionadas por el runtime, como pantalla completa, escalado y filtrado.
-- **Enfoque arcade**: desactivación de los atajos habituales de guardar/cargar estado y de avance rápido; las opciones de estados se ocultan del menú de pausa.
+La revisión de ROM admitida se identifica por su SHA256 completo:
 
-Las funciones anteriores se han probado manualmente en el entorno de desarrollo. **v0.9.0 todavía está en desarrollo** y no implica una certificación de compatibilidad completa.
+```text
+a2a0aa437a735cd36ed29a8e7c5b3dfa10590c6203e893f1668c7995bad2b309
+```
 
-### Novedades de v0.9.0
+Puedes elegir cualquier nombre de archivo para esa ROM. El selector verifica
+su contenido. El proyecto no proporciona archivos ni enlaces de descarga de ROMs.
 
-- **Música continua al perder una vida:** la pista mantiene su posición durante la muerte y la espera en la plataforma de reaparición. Game Over sigue cortándola.
-- **Suavizado experimental a 120/180 FPS:** interpola posiciones de los grupos de sprites reconocidos durante las fases normales, conservando la lógica, la velocidad y el audio de NES.
-- **Presentación original como respaldo:** bonus, menús, introducciones y transiciones no validadas conservan la imagen original.
-- **Ventana y menús proporcionados:** el muestreo interno del suavizado conserva el tamaño lógico y las opciones de ventana existentes.
-- **Cuatro pruebas automatizadas:** geometría de sprites, mezcla de música, coordinación con el juego y preferencias.
+La release incluye un archivo `.zip.sha256` y el paquete lleva
+`MANIFIESTO-SHA256.txt`, con las huellas de sus archivos originales.
 
-**60 FPS es la opción recomendada y el valor inicial de una configuración nueva.** Se conservan las preferencias ya guardadas. Los modos 120/180 siguen siendo experimentales: no se ha demostrado una mejora perceptible uniforme ni una entrega estable de 180 fotogramas por segundo en todos los equipos.
+## Novedades de v1.0.0
 
-Consulta [las notas de v0.9.0](docs/NOTAS-v0.9.0.md) para conocer el alcance de las pruebas y las limitaciones.
+- **Ejecutable descargable:** motor, importador y compilador portátil incluidos.
+- **Preparación local automática:** verificación de ROM, generación de código
+  y compilación del módulo privado durante la primera importación.
+- **Caché verificada:** se comprueban ROM, módulo y versión del kit para
+  reutilizar una preparación; los cambios de kit reciben una caché nueva.
+- **Progreso y cancelación:** la preparación muestra su avance y permite
+  cancelar el importador y sus procesos propios.
+- **Interfaz conservada:** launcher, configuración compartida y menú Esc fijo,
+  centrado y proporcionado, con regreso al launcher desde la partida.
+- **Datos locales:** ajustes, récords, ROM y módulo quedan en `Datos`.
+- **Música opcional:** mantiene su coordinación con las fases y la pérdida de vidas.
+- **Encabezados con acentos:** corregida la separación de caracteres en
+  títulos como «GRÁFICOS».
+- **Empaquetado desde fuentes:** lista explícita de archivos, avisos de
+  componentes, manifiesto SHA256 y verificación del ZIP y su extracción.
 
-### Novedades de v0.8.0
+Consulta el alcance de la validación y las limitaciones en
+[NOTAS-v1.0.0](docs/NOTAS-v1.0.0.md).
 
-- **Música de fondo opcional:** reproduce una pista local durante las fases, después de que termine la introducción original del juego.
-- **Inicio y pausa coordinados:** no suena en la portada, las demostraciones ni Game Over; al abrir el menú se pausa y al continuar retoma su posición.
-- **Reinicio por fase:** la misma pista vuelve al inicio en cada fase y se repite en bucle mientras se juega. Esta versión no incluye una lista de canciones.
-- **Ajustes compartidos:** Música de fondo y Volumen de música están disponibles en Audio tanto en el launcher como en el menú de pausa.
-- **Audio original conservado:** los efectos de NES siguen activos; el interruptor y el volumen generales se aplican también a la música.
-- **Archivo privado:** cada usuario aporta `assets/music/stage1.m4a`. La música empieza desactivada y su volumen independiente predeterminado es 35 %.
+## Controles y ajustes
 
-Consulta la preparación de la pista más abajo y el alcance de las pruebas en [las notas de v0.8.0](docs/NOTAS-v0.8.0.md).
+El launcher permite configurar teclado y mandos. Se ha comprobado el uso de
+un mando Xbox en el entorno de desarrollo. **Esc** abre la pausa y **F11**
+cambia la pantalla completa con los atajos predeterminados.
 
-### Novedades de v0.7.0
+Pantalla, Gráficos y Audio comparten sus ajustes entre el launcher y la pausa.
+El menú de pausa permanece fijo; la ventana del juego se puede redimensionar.
+Los cambios de FPS, filtro o volumen conservan su tamaño.
 
-- **Configuración consistente:** Pantalla, Gráficos y Audio comparten los ajustes entre el launcher y el menú de pausa.
-- **Launcher:** incorpora Mostrar FPS, Límite de FPS y el interruptor de Audio.
-- **Escala de ventana:** los dos menús ofrecen de 1× a 8×; el control se habilita en modo ventana.
-- **VSync:** disponible en ambos menús con el límite de 60 FPS; a otras frecuencias se conserva la preferencia, pero no se aplica.
-- **Menú de pausa fijo:** centrado y adaptado al espacio disponible, con texto que se ajusta al ancho. No se arrastra ni se redimensiona manualmente.
-- **Ventana del juego:** cambiar FPS, audio o filtro ya no vuelve a imponer su tamaño configurado. Los cambios explícitos de escala o pantalla completa siguen disponibles.
+**60 FPS es la opción inicial y recomendada.** Los modos 120/180 conservan su
+suavizado visual experimental en escenas compatibles. La lógica, velocidad
+y audio de NES mantienen su ritmo original. El contador de presentación
+también cuenta imágenes repetidas y no mide los refrescos físicos del monitor.
+VSync se aplica con el límite de 60 FPS. No se garantiza una entrega estable
+de 180 imágenes diferentes por segundo.
 
-Consulta los detalles y el alcance de las pruebas en [las notas de v0.7.0](docs/NOTAS-v0.7.0.md).
+## Música de fondo opcional
 
-### Funciones de v0.5.0 y v0.6.0
+Coloca una pista M4A/MP4 compatible con Media Foundation en la ruta recomendada:
 
-- **FPS configurables:** 30, 60, 120 y 180 FPS.
-- **Contador de FPS:** simulación NES y presentación.
-- **HUD de FPS v0.6.0:** indicador discreto, de tamaño reducido y sin recuadro.
-- **Portada v0.6.0:** imagen pixel art personalizada integrada al launcher.
-- **Menú NES:** diseño compacto con fuente Pixelify Sans.
-- **Gráficos:** ajustes de FPS en una sola sección.
-- **Controles:** configuración conservada en el launcher.
-- **Reproducibilidad:** parches acumulativos comprobados sobre las revisiones fijadas.
+```text
+Datos/Music/stage1.m4a
+```
 
-**Evolución de los FPS:** hasta v0.8.0, los modos 120/180 repetían la imagen de NES. v0.9.0 añade interpolación geométrica experimental en escenas compatibles. El contador `NES` mide los pasos de simulación y `FPS` las presentaciones; este último también cuenta imágenes repetidas y no mide directamente los refrescos físicos del monitor.
+También se conserva esta alternativa, comprobada durante la prueba del ZIP:
 
-### Limitaciones y trabajo pendiente
+```text
+Bin/assets/music/stage1.m4a
+```
 
-- Ampliar las pruebas de todas las fases, del modo de dos jugadores y de distintos mandos y equipos.
-- Verificar y restringir cualquier vía alternativa de uso de save states que permanezca disponible en el runtime.
-- Mejorar el proceso de compilación reproducible y las pruebas automatizadas.
-- Mejorar la cadencia y sincronización del suavizado experimental, ampliar su cobertura y comprobar su beneficio visual.
-- Validar el empaquetador portable con los recursos opcionales de música y ampliar las pruebas de transiciones durante partidas reales.
-- Incorporar en el futuro varias pistas o una selección de música por fase.
-- Investigar una preparación local automática del juego para un futuro ZIP público con ejecutable; esa distribución todavía no está implementada.
+Se busca primero `Datos/Music`. Después de añadir la pista, activa
+**Audio → Música de fondo** y ajusta **Volumen de música**. Una configuración
+nueva inicia la música desactivada, con volumen independiente de 35 %.
 
-## Requisitos para compilar
+La pista empieza después de la introducción original de cada fase y se repite
+en bucle. Continúa al perder una vida y durante la espera de reaparición.
+Game Over la detiene; el menú de pausa conserva su posición. Los efectos y
+volúmenes de NES se mantienen. Si la pista falta o no puede decodificarse,
+se conserva el audio original.
 
-- Windows 10 u 11 de **64 bits**.
-- Componentes multimedia de Windows (Media Foundation) para la música opcional. En las ediciones Windows N puede ser necesario instalar Media Feature Pack.
-- Git y PowerShell.
-- CMake **3.20 o posterior**.
-- Python **3.11 o posterior**, disponible en `PATH`.
-- Visual Studio 2022 o Build Tools 2022 con las herramientas de **Desarrollo de escritorio con C++**.
-- Las dependencias utilizadas por NESRecomp, incluidas las que prepara el proceso de compilación.
-- Una **ROM compatible de Mario Bros. para NES**, proporcionada por el usuario. La configuración espera el nombre exacto `Mario Bros..nes` (con dos puntos antes de `nes`).
+El ZIP público no incluye la pista. Para compartir el programa utiliza el ZIP
+original de la release; los archivos añadidos para jugar quedan en tu copia local.
 
-El proyecto se ha desarrollado y probado principalmente en Windows 11 con el generador `Visual Studio 17 2022` para arquitectura x64.
+## Carpetas del portable
 
-## Compilación desde el código fuente
+```text
+ArcadeBros1983Recomp/
+├── ArcadeBrosLauncher.exe
+├── Bin/                         motor, herramientas, recursos y avisos
+└── Datos/                       creado al usar el programa
+    ├── Cache/                   ROM, código generado y módulo privados
+    ├── ROM/                     copia de ROM para futuras versiones
+    ├── config.ini               ajustes compartidos
+    ├── Records/                 récord personal
+    ├── Music/                   pista opcional aportada por el usuario
+    └── Logs/                    registros de preparación
+```
 
-### 1. Clonar el proyecto
+Conserva `Datos` para mantener ajustes y récords. Si la preparación falla,
+el mensaje indica dónde encontrar su registro. El importador conserva las
+preparaciones anteriores y reserva una carpeta nueva para cada intento.
+
+## Cómo funciona
+
+[NESRecomp](https://github.com/mstan/nesrecomp) traduce instrucciones 6502 de la
+ROM a C. El importador ejecuta ese recompilador y Clang/LLD en el equipo del
+jugador, y guarda una DLL privada. El motor genérico carga ese módulo y
+comparte con él el estado de la máquina.
+
+Las instrucciones traducidas utilizan código nativo. Se mantiene el fallback
+normal de NESRecomp para las instrucciones no cubiertas, además del runtime
+que reproduce PPU, APU, entrada y otros componentes de NES. El juego conserva
+su velocidad y sus reglas originales.
+
+La interfaz usa [recomp-ui](https://github.com/RetroPortingToolKit/recomp-ui),
+adaptado al español mediante parches del proyecto.
+
+## Construir desde fuentes
+
+El desarrollador necesita Git, CMake **3.21 o posterior**, Visual Studio 2022
+o Build Tools 2022 con C++ y Windows SDK, y Python **3.11 o posterior** para
+preparar el SDK genérico. La extracción automática del archivo LLVM requiere
+Python **3.14 o posterior**; también se admite un compilador ya preparado.
+
+Después de clonar y seleccionar la revisión deseada, en una copia limpia:
 
 ```powershell
-git clone --recurse-submodules https://github.com/JojitaGamerHD/ArcadeBros1983-Recomp.git
-cd ArcadeBros1983-Recomp
-git switch desarrollo-v0.9.0
 git submodule update --init --recursive
+powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\preparar_dependencias.ps1
+powershell -NoProfile -ExecutionPolicy Bypass `
+    -File .\tools\native_module\crear_publico.ps1 `
+    -Python "C:\ruta\a\python.exe"
 ```
 
-Es importante inicializar los submódulos **después** de seleccionar `desarrollo-v0.9.0`, para preparar la revisión que utiliza esta rama. Si ya clonaste el proyecto sin sus submódulos, en una **copia limpia**, ejecuta `git submodule update --init --recursive` antes de continuar. No uses ese comando para restablecer un submódulo que tenga cambios locales sin respaldarlos.
+El empaquetador construye el motor y las herramientas genéricas sin consultar
+una ROM. Genera el ZIP, su `.sha256` y una copia limpia de comprobación en
+una carpeta nueva `build/r100-...`.
 
-### 2. Preparar la ROM
+Consulta [COMPILAR-PORTABLE-v1.0.0](docs/COMPILAR-PORTABLE-v1.0.0.md) para los
+parámetros de LLVM, el proceso de empaquetado y las comprobaciones de distribución.
 
-Crea la carpeta `roms` si es necesario y coloca tu ROM compatible en:
+### Dependencias fijadas
 
-```text
-roms/Mario Bros..nes
-```
+| Componente | Revisión o versión | Parche activo |
+| --- | --- | --- |
+| NESRecomp | `5a2eddeecc646e9325bef53f3c711e119423f99c` | `patches/nesrecomp/arcade-v0.9.patch` |
+| recomp-ui | `7c635c6b366a6e0d5d3c913a7fce6ec04dd9f256` | `patches/recomp-ui/arcade-v1.0.patch` |
+| LLVM/Clang/LLD | `23.1.4`, archivo oficial Windows x64 verificado | — |
 
-**No añadas la ROM a Git y no la subas a GitHub.** Una revisión distinta puede no ser compatible con la recompilación configurada o con la comprobación de la versión portable.
+Los parches son acumulativos sobre las revisiones originales. El preparador
+identifica los cambios aplicados y conserva las revisiones fijadas. El gitlink
+de `recomp-ui` permanece en su revisión original; las adaptaciones se guardan
+en el parche del proyecto.
 
-### 3. Preparar las dependencias
+### Pruebas de desarrollo
+
+Las pruebas de música y geometría se ejecutan por separado:
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File .\tools\preparar_dependencias.ps1
+cmake -S tests -B build/tests-v100 -G "Visual Studio 17 2022" -A x64
+cmake --build build/tests-v100 --config Release --parallel 1
+ctest --test-dir build/tests-v100 -C Release --output-on-failure
 ```
 
-El script prepara una copia local de NESRecomp en `deps/nesrecomp-arcade`, verifica revisiones fijadas, aplica los parches de este proyecto a NESRecomp y `recomp-ui` y compila la herramienta `NESRecomp.exe` si es necesario.
+Los experimentos del módulo nativo, importador y launcher se conservan en
+[tools/native_module](tools/native_module/README.md). Incluyen comparaciones
+de estado y audio, rechazos de entradas incompatibles, reutilización de caché
+y comprobaciones de interfaz. El empaquetador público funciona de forma
+independiente de esas carpetas de experimentos.
 
-Revisiones utilizadas para v0.9.0:
+## Alcance y trabajo pendiente
 
-| Componente | Revisión |
-| --- | --- |
-| NESRecomp | `5a2eddeecc646e9325bef53f3c711e119423f99c` |
-| recomp-ui | `7c635c6b366a6e0d5d3c913a7fce6ec04dd9f256` |
+La versión se ha comprobado en el equipo de desarrollo, incluida la primera
+apertura desde el ZIP, importación, partida, menú Esc, nueva apertura y música
+opcional. Queda ampliar las pruebas a otros equipos, más fases, dos jugadores
+y distintos mandos. No se ha certificado el comportamiento en todos los
+equipos ni en una instalación independiente sin herramientas de desarrollo.
 
-Los parches activos son `patches/nesrecomp/arcade-v0.9.patch` y `patches/recomp-ui/arcade-v0.8.patch`. La interfaz conserva el parche v0.8 porque no cambió en esta versión. Son acumulativos sobre las revisiones originales: no deben aplicarse encima de los parches de una versión anterior. El script detecta si ya están aplicados; no debe utilizarse para sobrescribir cambios manuales incompatibles.
+El suavizado 120/180 sigue siendo experimental. La sincronización, su cobertura
+y su mejora perceptible necesitan más trabajo. Android queda para una etapa
+posterior al paquete Windows.
 
-### 4. Preparar la música opcional
+## Créditos y avisos
 
-Antes de configurar CMake, coloca una pista propia en:
+- **Juego original:** Nintendo, titular de Mario Bros. y sus elementos originales.
+- **Proyecto y adaptaciones:** [JojitaGamerHD](https://github.com/JojitaGamerHD).
+- **Recompilador y runtime:** [Matthew Stanley y colaboradores de NESRecomp](https://github.com/mstan/nesrecomp).
+- **Interfaz:** [RetroPortingToolKit y colaboradores de recomp-ui](https://github.com/RetroPortingToolKit/recomp-ui).
+- **Compilación local:** LLVM/Clang/LLD y sus componentes.
 
-```text
-assets/music/stage1.m4a
-```
+Los avisos de bibliotecas, fuentes y recursos están en `Bin/licenses` dentro
+del ZIP y en el [índice de componentes del repositorio](tools/native_module/public/licenses/README-NOTICES.md).
+NESRecomp se distribuye bajo PolyForm Noncommercial 1.0.0; los demás componentes
+conservan sus licencias y atribuciones. El reconocimiento de sus autores no
+implica afiliación ni aprobación oficial.
 
-Debe ser un archivo de audio M4A/MP4 válido compatible con Media Foundation. **Cambiar la extensión de un MP3 a `.m4a` no convierte el audio.** Si tu pista está realmente en MP3, conviértela primero a M4A con una herramienta de audio.
-
-La carpeta `assets/music/` está excluida de Git. La pista no se incluye en el repositorio ni se incorpora dentro del ejecutable. Durante la compilación, si estaba presente al configurar CMake, se copia a `assets/music/stage1.m4a` junto al juego. Si la añades después, vuelve a ejecutar la configuración de CMake y la compilación del paso siguiente.
-
-Si no aportas música o no puede decodificarse, el juego conserva su audio NES. Para escucharla, activa una vez **Audio → Música de fondo** en el launcher o en la pausa y ajusta **Volumen de música**. Los ajustes se guardan entre sesiones.
-
-### 5. Compilar
-
-```powershell
-cmake -S . -B build/arcade-test -G "Visual Studio 17 2022" -A x64
-cmake --build build/arcade-test --config Release --parallel 4
-```
-
-### 6. Ejecutar
-
-```powershell
-.\build\arcade-test\Release\ArcadeBros1983Recomp.exe
-```
-
-La compilación genera archivos a partir de la ROM local; **no publiques la carpeta `build/`, `generated/` ni sus ejecutables**.
-
-### Pruebas aisladas de música y suavizado
-
-Las pruebas se configuran por separado y no necesitan recompilar el juego:
-
-```powershell
-cmake -S tests -B build/tests-v090 -G "Visual Studio 17 2022" -A x64
-cmake --build build/tests-v090 --config Release --parallel 1
-ctest --test-dir build/tests-v090 -C Release --output-on-failure
-```
-
-Las cuatro pruebas comprueban las preferencias, la mezcla de música, su coordinación con los estados del juego y la geometría del suavizado. La prueba de decodificación con la pista real se omite si no existe el archivo local; las demás se ejecutan normalmente. Estas pruebas no sustituyen la escucha y las partidas de comprobación.
-
-## Crear una versión portable personal
-
-**Estado v0.9.0:** compilación Release, cuatro pruebas automatizadas y comprobación manual de la música continua confirmadas en el equipo de desarrollo. El suavizado conserva su estado experimental. La generación y las pruebas específicas del portable mediante `crear_portable.ps1`, incluida la música opcional, siguen pendientes para esta versión.
-
-Con el proyecto y sus dependencias preparados:
-
-```powershell
-powershell -ExecutionPolicy Bypass -File .\tools\crear_portable.ps1
-```
-
-El script genera una instalación **para uso personal** dentro de:
-
-```text
-dist/
-└── Arcade Bros 1983 Recomp/
-    ├── ArcadeBros1983Recomp.exe     # Lanzador portable
-    ├── Bin/
-    │   ├── ArcadeBros1983Recomp.exe # Juego recompilado
-    │   ├── assets/                  # Recursos de recomp-ui
-    │   ├── config.ini
-    │   └── ...                      # DLL y otros recursos
-    └── Datos/
-        ├── ROM/                     # ROM importada por el usuario
-        └── Records/                 # Récords permanentes
-```
-
-Abre el ejecutable situado en la **carpeta principal** de la instalación portable. El lanzador solicita una ROM compatible cuando todavía no existe una copia válida en `Datos/ROM`. En las siguientes ejecuciones la reutiliza.
-
-La carpeta portable puede moverse a otra ubicación o unidad de almacenamiento, conservando los datos que contenga. Al regenerarla, el script está diseñado para respetar la ROM importada y los récords existentes.
-
-> **No distribuyas `dist/`:** contiene ejecutables derivados de la ROM y puede contener una copia privada del juego y de la música. La publicación pública de esta versión se limita a código fuente, scripts y parches; cada usuario aporta su ROM y su pista.
-
-## Organización del repositorio
-
-```text
-ArcadeBros1983-Recomp/
-├── CMakeLists.txt
-├── game.toml
-├── .gitmodules
-├── assets/music/               # Música privada opcional: ignorada por Git
-├── config/                     # Plantillas de configuración
-├── docs/                       # Documentación técnica
-├── patches/
-│   ├── nesrecomp/              # Adaptaciones del motor
-│   └── recomp-ui/              # Traducciones y ajustes de interfaz
-├── src/
-│   ├── launcher.cpp            # Lanzador portable propio
-│   ├── records.c               # Récords y conexión con música y presentación
-│   ├── music.cpp               # Decodificación y mezcla de la pista local
-│   ├── music.h                 # Interfaz de música
-│   ├── music_gate.h            # Coordinación con las fases del juego
-│   ├── smooth_host.c / .h      # Captura y continuidad de los sprites
-│   └── smooth_video.cpp / .h   # Composición geométrica experimental
-├── tests/                      # Pruebas de música, preferencias y geometría
-├── tools/
-│   ├── preparar_dependencias.ps1
-│   └── crear_portable.ps1
-├── recomp-ui/                  # Submódulo Git
-├── deps/                       # NESRecomp local: ignorado por Git
-├── roms/                       # ROM privada: ignorada por Git
-├── build/                      # Compilación: ignorada por Git
-├── generated/                  # Código derivado: ignorado por Git
-└── dist/                       # Instalación privada: ignorada por Git
-```
-
-Las carpetas ignoradas pueden no existir inmediatamente después de clonar el repositorio.
-
-## Historial de versiones
-
-### v0.9.0 — Música continua y suavizado experimental (en desarrollo)
-
-- Continuidad musical durante la muerte y reaparición, manteniendo el corte de Game Over.
-- Interpolación geométrica de sprites en fases normales con los modos 120/180; lógica NES conservada.
-- Respaldo nativo para escenas incompatibles y validación de la reconstrucción frente al PPU.
-- Cuatro pruebas automatizadas aprobadas y parche acumulativo del motor v0.9 comprobado.
-- Pendiente mejorar la sincronización y verificar el beneficio visual del suavizado.
-
-### v0.8.0 — Música opcional durante las fases (publicada)
-
-- Pista local en bucle, coordinada con la introducción, la pausa y los cambios de fase.
-- Controles compartidos de activación y volumen de música en launcher y pausa.
-- Decodificación con Media Foundation y mezcla con los efectos originales de NES.
-- Pruebas aisladas de preferencias, mezcla y estados del juego; revisión manual de la música en el equipo de desarrollo.
-- Parches acumulativos v0.8.0 con reconstrucción comprobada de las fuentes afectadas.
-- Pendiente validar el portable y ampliar las partidas de prueba en otros equipos.
-
-### v0.7.0 — Configuración compartida y menú de pausa adaptable (en desarrollo)
-
-- Mismas opciones de pantalla, gráficos y audio en launcher y pausa.
-- Contador y límite de FPS configurables también desde el launcher.
-- Menú fijo, centrado y proporcional, con descripciones que se ajustan al ancho.
-- Corrección del redimensionado involuntario al cambiar opciones ajenas al tamaño de ventana.
-- Parches acumulativos v0.7.0 y comprobación de reconstrucción de las fuentes.
-- Pendiente ampliar pruebas en otros equipos y validar el empaquetador portable.
-
-### v0.6.0 — Launcher, HUD y reconstrucción limpia (en desarrollo)
-
-- Nueva portada pixel art personalizada para el launcher.
-- Contador de FPS compacto, sin recuadro y menos invasivo.
-- Parches de NESRecomp y recomp-ui verificados sobre las revisiones originales.
-- Compilación limpia del juego y del launcher en Release x64.
-- Recursos visuales y tipografía integrados correctamente.
-- Instalación portable de prueba con 8 de 8 comprobaciones funcionales satisfactorias.
-- Pendiente: validar nuevamente crear_portable.ps1 y probar en otros equipos.
-
-### v0.5.0 — FPS configurables y menú NES (en desarrollo)
-
-- Presentación configurable a 30, 60, 120 y 180 FPS.
-- Contador de FPS NES y FPS de pantalla.
-- Menú de pausa con estética NES de 8 bits.
-- Tipografía Pixelify Sans compatible con español.
-- Controles configurables desde el launcher.
-- Parches reproducibles y reconstrucción limpia verificada.
-### v0.4.0 — Interfaz en español y regreso al launcher (en desarrollo)
-
-- Integración de `recomp-ui` y traducción de las opciones principales.
-- Nuevo menú de pausa en español y acción para regresar al launcher.
-- Empaquetado portable actualizado con sus recursos gráficos.
-- Motor NESRecomp aislado en `deps/` con parche reproducible.
-- Script para preparar y verificar las dependencias.
-
-### v0.3.0 — Edición arcade y récords
-
-- Sistema de puntuación máxima persistente.
-- Ajustes para evitar el uso habitual de save states desde atajos y menú.
-- Mejoras en el lanzador y la instalación portable.
-
-### v0.1.0 — Primera compilación funcional
-
-- Traducción inicial de **1.235 instrucciones** de CPU 6502 a código C, según las pruebas del proyecto.
-- Ejecutable para Windows x64 integrado con el runtime de NESRecomp.
-- Prueba manual hasta la fase 10 y reconocimiento de un mando Xbox.
-
-## Créditos
-
-- **Juego original:** [Nintendo](https://www.nintendo.com/) — creadora y titular de los derechos correspondientes sobre Mario Bros. y sus elementos originales.
-- **Port y modificaciones de Arcade Bros 1983 Recomp:** [JojitaGamerHD](https://github.com/JojitaGamerHD).
-- **Herramienta de recompilación y runtime:** [NESRecomp](https://github.com/mstan/nesrecomp), de [Matthew Stanley (@mstan)](https://github.com/mstan), y colaboradores.
-- **Interfaz gráfica:** [recomp-ui](https://github.com/RetroPortingToolKit/recomp-ui), de [RetroPortingToolKit](https://github.com/RetroPortingToolKit) y colaboradores.
-
-El reconocimiento de estos proyectos no implica afiliación ni aprobación oficial de sus autores.
-
-## Aviso legal y licencias
-
-**Arcade Bros 1983 Recomp es un proyecto no oficial, experimental y sin fines comerciales.** No está afiliado, patrocinado ni respaldado por Nintendo.
-
-Este repositorio no proporciona archivos ROM, recursos extraídos del juego ni código compilado o generado a partir de ellos. El usuario es responsable de obtener y utilizar su copia del juego conforme a la legislación aplicable.
-
-NESRecomp y recomp-ui son proyectos de terceros sujetos a sus respectivas licencias. Consulta sus repositorios y archivos de licencia antes de utilizar, modificar o redistribuir sus componentes. Las condiciones aplicables al código original de este proyecto deben comprobarse en el archivo de licencia correspondiente, si se incorpora uno; **no se presume que una licencia propia cubra derechos de terceros o de Nintendo**.
-
----
-
-*Arcade Bros 1983 Recomp — Un experimento de recompilación nativa y preservación técnica de videojuegos clásicos.*
+El proyecto no proporciona ROMs, música del juego ni módulos ya preparados
+desde una ROM. Cada usuario aporta su copia compatible conforme a las
+condiciones aplicables.
