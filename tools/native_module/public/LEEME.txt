@@ -1,0 +1,59 @@
+ARCADE BROS 1983 RECOMP — WINDOWS X64
+
+1. Extrae el ZIP completo en una carpeta donde puedas guardar archivos.
+2. Abre ArcadeBrosLauncher.exe.
+3. Elige tu propia ROM compatible de Mario Bros. (NES).
+4. Espera a que termine la preparación inicial y pulsa JUGAR en el launcher.
+
+La preparación se realiza en tu equipo y se guarda para las siguientes
+aperturas. El paquete contiene las herramientas necesarias: el jugador no
+necesita instalar Visual Studio, CMake ni Python.
+
+Este ZIP no incluye ROM ni música. Está preparado para la revisión de ROM
+identificada por el SHA256 completo:
+a2a0aa437a735cd36ed29a8e7c5b3dfa10590c6203e893f1668c7995bad2b309
+No se proporcionan enlaces de descarga de ROMs.
+
+SISTEMA Y CONTROLES
+
+Windows 10 versión 1903 o posterior, o Windows 11, de 64 bits (x64), con los
+componentes multimedia de Windows. Las ediciones Windows N necesitan Media
+Feature Pack para esta aplicación.
+Controlador gráfico con OpenGL 3.3 para el launcher.
+La configuración y los controles se ajustan desde el launcher.
+Esc abre el menú de pausa. F11 cambia la pantalla completa.
+60 FPS es la opción recomendada. Los modos 120/180 son experimentales:
+la lógica y la velocidad de NES permanecen aproximadamente a 60 FPS.
+
+DATOS PRIVADOS
+
+Datos/Cache: ROM y módulo nativo preparados a partir de ella.
+Datos/ROM: copia local de la ROM para futuras versiones del paquete.
+Datos/config.ini: configuración.
+Datos/Records: récord personal.
+Datos/Logs: registros de preparación.
+
+Conserva la carpeta Datos para mantener tus preferencias y récords. Para
+compartir el programa, comparte el ZIP original de la release. Datos contiene
+material privado y no forma parte de ese ZIP.
+
+MÚSICA OPCIONAL
+
+Puedes aportar una pista M4A/MP4 compatible con Media Foundation en:
+Datos/Music/stage1.m4a
+Activa Música de fondo en Audio y ajusta su volumen. La pista empieza después
+de la introducción de cada fase, continúa durante la pérdida de una vida y
+se detiene en Game Over.
+
+AYUDA Y FUENTES
+
+Si la preparación falla, el mensaje indica dónde encontrar su registro en
+Datos/Logs. Comprueba que extrajiste todos los archivos y que la ROM coincide
+con la revisión admitida.
+
+Proyecto, fuentes, cambios y avisos de componentes:
+https://github.com/JojitaGamerHD/ArcadeBros1983-Recomp
+Consulta también SOURCES.txt y Bin/licenses.
+
+Proyecto no oficial, sin afiliación con Nintendo. Mario Bros. y Nintendo son
+marcas de sus respectivos titulares.

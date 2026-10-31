@@ -1,0 +1,34 @@
+=== LatoLatin-Bold.ttf ===
+NameID 0: Copyright (c) 2011-2015 by tyPoland Lukasz Dziedzic (http://www.typoland.com/) with Reserved Font Name "Lato". Licensed under the SIL Open Font License, Version 1.1 (http://scripts.sil.org/OFL). 
+NameID 8: tyPoland Lukasz Dziedzic
+NameID 9: Lukasz Dziedzic with Adam Twardoch and Botio Nikoltchev
+NameID 13: Copyright (c) 2011-2015 by tyPoland Lukasz Dziedzic (http://www.typoland.com/) with Reserved Font Name "Lato". Licensed under the SIL Open Font License, Version 1.1 (http://scripts.sil.org/OFL). 
+NameID 14: http://scripts.sil.org/OFL
+
+=== LatoLatin-Regular.ttf ===
+NameID 0: Copyright (c) 2011-2015 by tyPoland Lukasz Dziedzic (http://www.typoland.com/) with Reserved Font Name "Lato". Licensed under the SIL Open Font License, Version 1.1 (http://scripts.sil.org/OFL). 
+NameID 8: tyPoland Lukasz Dziedzic
+NameID 9: Lukasz Dziedzic with Adam Twardoch and Botio Nikoltchev
+NameID 13: Copyright (c) 2011-2015 by tyPoland Lukasz Dziedzic (http://www.typoland.com/) with Reserved Font Name "Lato". Licensed under the SIL Open Font License, Version 1.1 (http://scripts.sil.org/OFL). 
+NameID 14: http://scripts.sil.org/OFL
+
+=== NotoSansSymbols2-Regular.ttf ===
+NameID 0: Copyright 2022 The Noto Project Authors (https://github.com/notofonts/symbols)
+NameID 8: Monotype Imaging Inc.
+NameID 9: Monotype Design Team
+NameID 13: This Font Software is licensed under the SIL Open Font License, Version 1.1. This license is available with a FAQ at: https://scripts.sil.org/OFL
+NameID 14: https://scripts.sil.org/OFL
+
+=== OpenMoji-black-glyf.ttf ===
+NameID 0: OpenMoji © HfG Schwäbisch Gmünd CC-BY-SA-4.0
+NameID 8: Hochschule für Gestaltung Schwäbisch Gmünd
+NameID 9: Daniel Utz & Benedikt Groß with students of the HfG Schwäbisch Gmünd and other contributors
+NameID 13: Creative Commons Share Alike 4.0
+NameID 14: https://creativecommons.org/licenses/by-sa/4.0/
+
+=== PixelifySans.ttf ===
+NameID 0: Copyright 2021 The Pixelify Sans Project Authors (https://github.com/eifetx/Pixelify-Sans)
+NameID 8: Typecalism Foundryline
+NameID 9: Stefie Justprince
+NameID 13: This Font Software is licensed under the SIL Open Font License, Version 1.1. This license is available with a FAQ at: https://scripts.sil.org/OFL
+NameID 14: https://scripts.sil.org/OFL

@@ -1,0 +1,32 @@
+EXPORTS
+    cpu_interrupt
+    cpu_jam
+    cyc_trace_instruction
+    hw_cycle_finish
+    hw_cycle_start
+    hw_irq_line
+    hw_prg_bank4
+    hw_prg_is_rom
+    hw_prg_is_stable
+    hw_read
+    hw_read_rom
+    hw_write
+    cpu DATA
+    cyc_cpu_rts_observer DATA
+    cyc_cpu_ram_read_policy DATA
+    cpu6502_op_length DATA
+    cyc_trace_enabled DATA
+    cyc_trace_hash DATA
+    cyc_trace_file DATA
+    cyc_trace_cycle_hook DATA
+    cyc_trace_cycle DATA
+    hw_dma_stalls DATA
+    hw_frame_done DATA
+    hw_observe_line DATA
+    hw_observe_hit DATA
+    hw_frame_end_hit DATA
+    hw_prg_modified DATA
+    cyc_hooks_armed DATA
+    cyc_hook_passed DATA
+    cyc_hook_hit DATA
+    cyc_ram_code_dirty DATA

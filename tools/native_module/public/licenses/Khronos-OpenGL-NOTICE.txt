@@ -1,0 +1,12 @@
+Portions of the generated OpenGL declarations in Dear ImGui's
+backends/imgui_impl_opengl3_loader.h:
+
+Copyright 2013-2020 The Khronos Group Inc.
+SPDX-License-Identifier: MIT
+
+Generated from the Khronos OpenGL / OpenGL ES XML API Registry:
+https://github.com/KhronosGroup/OpenGL-Registry
+
+The complete MIT permission and disclaimer are retained in
+Khronos-platform-MIT.txt, together with the Khronos platform declarations'
+copyright notice.
