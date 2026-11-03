@@ -17,7 +17,7 @@ el kit LLVM de ese paquete.
 Si ese PC ya se utilizaba para compilar el proyecto, quizá tenga estas
 herramientas. La construcción inicial necesita Internet para las dependencias.
 
-## Si ya probaste la primera candidata
+## Si ya probaste una candidata anterior
 
 Dentro de tu carpeta `ArcadeBros-Prueba-v101`, actualiza y vuelve a compilar:
 
@@ -28,7 +28,8 @@ cmake -S . -B build/prueba-v101 -G "Visual Studio 17 2022" -A x64 "-DNESRECOMP_G
 cmake --build build/prueba-v101 --config Release --target ArcadeBros1983Recomp --parallel 1
 ```
 
-El preparador reconoce los parches de la primera candidata. No borres `deps`,
+El preparador reconoce tanto la primera candidata como la prueba con rueda y
+triángulo. No borres `deps`,
 `recomp-ui`, `config.ini` ni tus presets para actualizar. Si Git o el preparador
 informan de un conflicto con cambios tuyos, conserva esos cambios y comparte
 el mensaje antes de reemplazar archivos. Después abre el ejecutable como en
@@ -111,10 +112,15 @@ espera otra distribución de carpetas y no se necesita en este procedimiento.
    activar A. Cierra todo y vuelve a abrir: la asignación debe conservarse.
 2. Repite con mando: botones, cruceta, un gatillo y reconexión. Comprueba
    conflictos, Esc para cancelar, Retroceso para borrar y restaurar valores.
-3. En pausa → **Colores**, activa **Personalizar personajes** y abre una muestra
-   de Mario. Elige con la rueda y el triángulo de brillo/saturación: el personaje
-   de referencia debe cambiar inmediatamente. Prueba **Listo**, **Cancelar** y Esc.
-   La referencia aparece después de haber visto al personaje en una partida.
+3. En pausa → **Colores**, activa **Personalizar personajes** y abre **Mario**.
+   Dentro del editor, cambia entre sus tres muestras y elige con el disco de
+   color: tono alrededor de la rueda y saturación desde el centro hacia el borde.
+   Ajusta **Brillo** con la barra separada; el personaje de referencia debe cambiar
+   inmediatamente. No hay triángulo ni hace falta escribir códigos.
+   Prueba **Listo** y después edita los tres tonos y pulsa **Cancelar** o Esc:
+   deben restaurarse los tres colores de Mario, sin cambiar los de Luigi.
+   Repite con **Luigi**. La referencia aparece después de haber visto al personaje
+   en una partida.
 4. Asigna colores distintos a Mario y Luigi. Guarda en las ranuras 1 y 8,
    cambia los colores, reinicia el juego y carga ambos presets.
 5. Comprueba caminar, saltar, girarse y morir a 60, 120 y 180 FPS: un cambio

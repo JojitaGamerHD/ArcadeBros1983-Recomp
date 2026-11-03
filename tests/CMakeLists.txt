@@ -35,13 +35,13 @@ if(MSVC)
     target_compile_options(native_colors_test PRIVATE /utf-8)
 endif()
 add_test(NAME native_colors_provenance COMMAND native_colors_test)
-add_executable(colors_editor_test colors_editor_test.cpp "${ARCADE_ROOT}/src/player_colors.c"
+add_executable(colors_editor_test colors_editor_test.cpp color_menu_fixture.c "${ARCADE_ROOT}/src/player_colors.c"
     "${UI_ROOT}/common/recomp_runtime_ui.c" "${UI_ROOT}/common/recomp_runtime_settings.c"
     "${UI_ROOT}/third_party/imgui/imgui.cpp" "${UI_ROOT}/third_party/imgui/imgui_draw.cpp"
     "${UI_ROOT}/third_party/imgui/imgui_tables.cpp" "${UI_ROOT}/third_party/imgui/imgui_widgets.cpp")
 target_include_directories(colors_editor_test PRIVATE "${ARCADE_ROOT}/src" "${UI_ROOT}"
     "${UI_ROOT}/common" "${UI_ROOT}/third_party/imgui" "${CYC_ROOT}" "${SDL_ROOT}/include")
-target_compile_features(colors_editor_test PRIVATE cxx_std_17)
+target_compile_features(colors_editor_test PRIVATE c_std_11 cxx_std_17)
 target_compile_definitions(colors_editor_test PRIVATE SDL_MAIN_HANDLED _CRT_SECURE_NO_WARNINGS)
 if(MSVC)
     target_compile_options(colors_editor_test PRIVATE /utf-8)

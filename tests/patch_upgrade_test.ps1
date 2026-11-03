@@ -26,8 +26,9 @@ foreach ($case in @(
     git -C $fixture init --quiet
     Verificar-Comando 'No se pudo aislar la copia de prueba.'
     $patchRoot = Join-Path $Root $case[2]
-    $current = Join-Path $patchRoot 'arcade-v1.0.1-colores.patch'
-    $previous = @((Join-Path $patchRoot 'arcade-v1.0.1.patch'), (Join-Path $patchRoot $case[3]))
+    $current = Join-Path $patchRoot 'arcade-v1.0.1-editor.patch'
+    $previous = @((Join-Path $patchRoot 'arcade-v1.0.1-colores.patch'),
+                  (Join-Path $patchRoot 'arcade-v1.0.1.patch'), (Join-Path $patchRoot $case[3]))
     $sentinel = Join-Path $fixture 'mis-cambios-locales.txt'
     [IO.File]::WriteAllText($sentinel, 'conservar')
 
@@ -45,5 +46,5 @@ foreach ($case in @(
         Verificar-Comando 'No se pudo restablecer la copia de prueba.'
     }
     if ([IO.File]::ReadAllText($sentinel) -ne 'conservar') { throw 'Se altero un archivo ajeno al parche.' }
-    Write-Output ("PASS $($case[0]): limpio, idempotente, v1.0.0 y primera prueba v1.0.1.")
+    Write-Output ("PASS $($case[0]): limpio, idempotente, v1.0.0 y ambas pruebas anteriores v1.0.1.")
 }

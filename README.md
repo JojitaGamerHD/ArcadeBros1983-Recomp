@@ -53,7 +53,7 @@ La release incluye un archivo `.zip.sha256` y el paquete lleva
 - Remapeo de teclado, botones y ejes de mando dirigido al mismo almacén que usa el juego.
 - Conflictos visibles, borrar con Retroceso, cancelar con Esc y restaurar asignaciones.
 - Atajos ocultos dejan de consumir entradas; los ejes personalizados tienen prioridad sobre el stick automático.
-- Rueda visual de colores con vista previa de Mario y Luigi y ocho presets persistentes.
+- Un botón Mario y otro Luigi: cada editor reúne su vista previa y tres tonos, con disco de color y brillo separado. Ocho presets persistentes.
 - Colores independientes del suavizado: se aplican a los píxeles identificados del personaje, incluidas sus animaciones de muerte.
 - Motor y launcher compilados en Windows x64; pruebas automáticas de captura, aplicación, persistencia y renderizado.
 
@@ -188,8 +188,8 @@ parámetros de LLVM, el proceso de empaquetado y las comprobaciones de distribuc
 
 | Componente | Revisión o versión | Parche activo |
 | --- | --- | --- |
-| NESRecomp | `5a2eddeecc646e9325bef53f3c711e119423f99c` | `patches/nesrecomp/arcade-v1.0.1-colores.patch` |
-| recomp-ui | `7c635c6b366a6e0d5d3c913a7fce6ec04dd9f256` | `patches/recomp-ui/arcade-v1.0.1-colores.patch` |
+| NESRecomp | `5a2eddeecc646e9325bef53f3c711e119423f99c` | `patches/nesrecomp/arcade-v1.0.1-editor.patch` |
+| recomp-ui | `7c635c6b366a6e0d5d3c913a7fce6ec04dd9f256` | `patches/recomp-ui/arcade-v1.0.1-editor.patch` |
 | LLVM/Clang/LLD | `23.1.4`, archivo oficial Windows x64 verificado | — |
 
 Los parches son acumulativos sobre las revisiones originales. El preparador

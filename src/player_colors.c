@@ -29,6 +29,26 @@ static int color_index(const char *key) {
     for (int i = 0; i < 6; ++i) if (!strcmp(key, keys[i])) return i;
     return -1;
 }
+static int palette_player(const char *key) {
+    if (!strcmp(key,"arcade.color.mario")) return 0;
+    if (!strcmp(key,"arcade.color.luigi")) return 1;
+    return -1;
+}
+int arcade_colors_get_palette(void *ctx, const RecompRuntimeUiItem *it, uint32_t rgb[3]) {
+    (void)ctx;
+    int player=palette_player(it->key);
+    if (player<0 || !rgb) return 0;
+    memcpy(rgb,active[player],sizeof active[player]);
+    return 1;
+}
+int arcade_colors_set_palette(void *ctx, const RecompRuntimeUiItem *it, const uint32_t rgb[3]) {
+    (void)ctx;
+    int player=palette_player(it->key);
+    if (player<0 || !rgb) return 0;
+    for (int i=0;i<3;++i) if (rgb[i]>0xFFFFFFu) return 0;
+    memcpy(active[player],rgb,sizeof active[player]);
+    return 1;
+}
 unsigned arcade_colors_current(uint32_t out[2][3]) {
     for (int p = 0; p < 2; ++p) for (int c = 0; c < 3; ++c)
         out[p][c] = 0xFF000000u | active[p][c];
@@ -69,10 +89,11 @@ void arcade_colors_capture_preview(unsigned player, const uint8_t *indices, int 
 int arcade_colors_preview(void *ctx, const RecompRuntimeUiItem *it, RecompRuntimeUiColorPreview *out) {
     (void)ctx;
     int color = color_index(it->key);
-    if (color < 0 || !out || !preview[color/3].width) return 0;
-    *out = preview[color/3];
-    for (int i = 0; i < 3; ++i) out->palette[i] = 0xFF000000u | active[color/3][i];
-    out->selected_index = color%3;
+    int player=color<0?palette_player(it->key):color/3;
+    if (player < 0 || !out || !preview[player].width) return 0;
+    *out = preview[player];
+    for (int i = 0; i < 3; ++i) out->palette[i] = 0xFF000000u | active[player][i];
+    out->selected_index = color<0?0:color%3;
     return 1;
 }
 int arcade_colors_get_text(void *ctx, const RecompRuntimeUiItem *it, char *out, size_t n) {

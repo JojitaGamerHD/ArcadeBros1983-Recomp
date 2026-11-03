@@ -40,11 +40,16 @@ no se añadió un segundo editor de controles dentro de la pausa.
 
 ## Colores y presets
 
-Pausa → **Colores** ofrece seis muestras: Mario y Luigi, tonos 1, 2 y 3.
-Activa **Personalizar personajes** y abre una muestra con el ratón o Enter.
-Se abre una rueda de tono y un triángulo de saturación/brillo. La vista previa
-cambia mientras eliges el color; ya no es necesario escribir códigos.
-**Listo** conserva ese tono; **Cancelar** o Esc lo devuelve al valor anterior.
+Pausa → **Colores** ofrece un botón **Mario** y otro **Luigi**. Activa
+**Personalizar personajes** y abre el personaje con el ratón o Enter.
+Dentro del editor se reúnen su vista previa y las tres muestras de tono:
+selecciona una muestra y elige su color en el disco, sin triángulo ni códigos.
+El ángulo elige el tono; la distancia al centro ajusta la saturación. Una barra
+**Brillo** separada permite aclarar u oscurecer el color.
+
+La vista previa cambia mientras editas cualquiera de los tres tonos.
+**Listo** conserva los tres colores del personaje; **Cancelar** o Esc restaura
+los tres valores que tenía al abrir el editor. No modifica al otro personaje.
 La edición no activa los atajos de pausa ni pantalla completa.
 
 La referencia se extrae de los tiles y OAM de la ROM que estás ejecutando.
@@ -61,7 +66,7 @@ y activa la personalización; una ranura vacía se rechaza con un mensaje.
 Se conserva el formato de la primera prueba: `[Game]`, `ColorsEnabled`,
 `ColorsSlot`, `ColorsActive` y `ColorsPreset1`…`ColorsPreset8`. Cada lista contiene
 seis RGB de seis dígitos separados por comas. Tus presets anteriores siguen
-siendo compatibles. La rueda convierte automáticamente a ese formato al guardar.
+siendo compatibles. El editor convierte automáticamente a ese formato al guardar.
 
 ### Corrección de animaciones y muerte
 
@@ -96,7 +101,7 @@ y enemigos, y queda repetir la prueba con tu copia real.
   selección de mando y ejes, aplicación de entradas, guardado/carga, reinicio
   en un proceso nuevo, presets, RGB inválidos y aislamiento de colores por
   personaje; también geometría y pruebas existentes de música.
-- La rueda real de ImGui se prueba con clic de ratón, vista previa inmediata,
+- El selector visual se prueba con clic de ratón, vista previa inmediata,
   confirmación/cancelación y ventanas de 800×600 y 640×480. El editor de texto
   genérico anterior conserva sus pruebas de compatibilidad.
 - La PPU LLE real se prueba con una máquina sintética: carga OAM, estados de
@@ -104,7 +109,8 @@ y enemigos, y queda repetir la prueba con tu copia real.
   recorte. El hash lógico de PPU y sus índices originales no cambian al activar
   la captura auxiliar.
 - El preparador se comprueba en copias limpias, en actualizaciones desde v1.0.0
-  y desde la primera candidata v1.0.1, e incluyendo su idempotencia.
+  desde la primera candidata v1.0.1 y desde la prueba con rueda/triángulo,
+  incluyendo su idempotencia.
 - La reproducción aislada de la llamada usada en v1.0.0 confirma que escribe
   otro almacén y deja la asignación del host en Z. Código de salida esperado: 42.
 - Revisión de cambios y comprobación de parches acumulativos sobre las
@@ -162,7 +168,7 @@ Prueba manual en una copia nueva del portable y con tu ROM compatible:
    Repite con dos jugadores y dos mandos, cruceta, botones, gatillos y reconexión.
 3. Intenta duplicar una tecla y asignar el botón de pausa a una acción: debe
    rechazarse. Prueba Esc, Retroceso, Auto Map y restaurar predeterminados.
-4. Activa los colores en pausa, abre una muestra y elige con la rueda; comprueba
+4. Activa los colores en pausa, abre Mario o Luigi y cambia sus tres tonos; comprueba
    la vista previa, **Listo**, **Cancelar** y Esc. Usa tonos distintos para Mario
    y Luigi y comprueba que fondo y enemigos conservan su aspecto al solaparse.
 5. Guarda en ranuras 1 y 8, cambia los colores, cierra todo, reinicia y carga cada
@@ -181,4 +187,4 @@ limpio situado en `v1.0.0`, aplica `git apply --check` y después `git apply` co
 ese archivo; luego ejecuta el preparador. La actualización reconoce los parches
 anteriores; si encuentra conflictos, conserva los cambios locales y se detiene.
 No cambies el gitlink de recomp-ui al publicar estos cambios: las adaptaciones
-de esta dependencia siguen entregándose en `patches/recomp-ui/arcade-v1.0.1-colores.patch`.
+de esta dependencia siguen entregándose en `patches/recomp-ui/arcade-v1.0.1-editor.patch`.

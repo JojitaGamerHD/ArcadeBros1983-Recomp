@@ -18,6 +18,8 @@ int arcade_colors_set_text(void *ctx, const RecompRuntimeUiItem *it, const char 
  * frame keeps the last valid pose for the pause-menu reference. */
 void arcade_colors_capture_preview(unsigned player, const uint8_t *indices, int width, int height);
 int arcade_colors_preview(void *ctx, const RecompRuntimeUiItem *it, RecompRuntimeUiColorPreview *out);
+int arcade_colors_get_palette(void *ctx, const RecompRuntimeUiItem *it, uint32_t rgb[3]);
+int arcade_colors_set_palette(void *ctx, const RecompRuntimeUiItem *it, const uint32_t rgb[3]);
 #ifdef __cplusplus
 }
 #endif

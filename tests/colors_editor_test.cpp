@@ -7,6 +7,8 @@
 #include "../recomp-ui/src/common/backends/imgui/runtime_ui_imgui.cpp"
 #include <cstdio>
 #include <cstring>
+#include <cmath>
+extern "C" const RecompRuntimeUiItem *test_color_menu(size_t *count);
 
 #define CHECK(x) do { if (!(x)) { std::fprintf(stderr,"FAIL line %d: %s\n",__LINE__,#x); return 1; } } while(0)
 
@@ -55,12 +57,12 @@ static int wheel_editor() {
     frame(ui);
     CHECK(ui->editing_color && !ui->editing_text && recomp_runtime_ui_wants_text_input(ui));
     io.AddKeyEvent(ImGuiKey_Enter,false); frame(ui); frame(ui);
-    ImGuiWindow *popup=ImGui::FindWindowByName("Elegir color##recomp-runtime-color");
+    ImGuiWindow *popup=ImGui::FindWindowByName("Colores del personaje##recomp-runtime-color");
     CHECK(popup && popup->Active && popup->Pos.x>=0 && popup->Pos.y>=0);
     CHECK(popup->Pos.x+popup->Size.x<=800 && popup->Pos.y+popup->Size.y<=600);
     CHECK(popup->ContentSize.y<=popup->Size.y-popup->TitleBarHeight-ImGui::GetStyle().WindowPadding.y*2);
 
-    /* Click the actual hue wheel/triangle: the test is independent of the
+    /* Click the actual color disc: the test is independent of the
      * font's precise line height, so try points inside its left-hand region. */
     int chosen=original;
     for (int y=100;y<=300 && chosen==original;y+=25)
@@ -83,7 +85,7 @@ static int wheel_editor() {
     io.DisplaySize=ImVec2(640,480);
     CHECK(recomp_runtime_ui_handle_input(ui,RECOMP_RUNTIME_UI_INPUT_ACCEPT,1,0));
     frame(ui); frame(ui); frame(ui);
-    popup=ImGui::FindWindowByName("Elegir color##recomp-runtime-color");
+    popup=ImGui::FindWindowByName("Colores del personaje##recomp-runtime-color");
     CHECK(popup && popup->Pos.x>=0 && popup->Pos.y>=0);
     CHECK(popup->Pos.x+popup->Size.x<=640 && popup->Pos.y+popup->Size.y<=480);
     CHECK(popup->ContentSize.y<=popup->Size.y-popup->TitleBarHeight-ImGui::GetStyle().WindowPadding.y*2);
@@ -94,6 +96,109 @@ static int wheel_editor() {
     CHECK(!ui->editing_color && recomp_runtime_ui_is_open(ui));
     CHECK(arcade_colors_get(nullptr,&items[0],&chosen) && chosen==0x2288EE);
     io.AddKeyEvent(ImGuiKey_Enter,false); frame(ui);
+    recomp_runtime_ui_destroy(ui);
+    return 0;
+}
+
+static int disc_controls() {
+    ImGuiIO &io=ImGui::GetIO(); io.DisplaySize=ImVec2(800,600);
+    float hue=0.6f,saturation=0.8f; int dragging=0,selected=0;
+    ImVec2 lo,hi; bool tones=false;
+    const uint32_t colors[3]={0xFF0000,0x00FF00,0x0000FF};
+    auto draw_frame=[&]() {
+        ImGui::NewFrame();
+        ImGui::SetNextWindowPos(ImVec2(20,20)); ImGui::SetNextWindowSize(ImVec2(400,350));
+        ImGui::Begin("Disc controls",nullptr,ImGuiWindowFlags_NoSavedSettings);
+        if (tones) palette_tone_buttons(colors,selected);
+        else color_disc("##disc-test",hue,saturation,200,dragging);
+        lo=ImGui::GetItemRectMin(); hi=ImGui::GetItemRectMax();
+        ImGui::End(); ImGui::Render();
+    };
+    draw_frame(); draw_frame();
+    const ImVec2 center((lo.x+hi.x)/2,(lo.y+hi.y)/2); const float radius=96;
+    io.AddMousePosEvent(center.x+radius*0.5f,center.y);
+    io.AddMouseButtonEvent(0,true); draw_frame();
+    CHECK(std::fabs(hue)<0.01f && std::fabs(saturation-0.5f)<0.02f);
+    io.AddMousePosEvent(center.x,center.y+radius*0.8f); draw_frame();
+    CHECK(std::fabs(hue-0.25f)<0.01f && std::fabs(saturation-0.8f)<0.02f);
+    io.AddMousePosEvent(center.x+radius*2,center.y); draw_frame();
+    CHECK(std::fabs(saturation-1.0f)<0.01f); // dragging clamps at the rim
+    io.AddMouseButtonEvent(0,false); draw_frame();
+    io.AddMousePosEvent(center.x,center.y); io.AddMouseButtonEvent(0,true); draw_frame();
+    CHECK(saturation<0.01f); // center is a neutral tone
+    io.AddMouseButtonEvent(0,false); draw_frame();
+    const float before_h=hue,before_s=saturation;
+    io.AddMousePosEvent(lo.x+1,lo.y+1); io.AddMouseButtonEvent(0,true); draw_frame();
+    CHECK(hue==before_h && saturation==before_s); // corners outside the disc do nothing
+    io.AddMouseButtonEvent(0,false); draw_frame();
+    tones=true; draw_frame(); draw_frame();
+    io.AddMousePosEvent((lo.x+hi.x)/2,(lo.y+hi.y)/2); // last button, tone 3
+    io.AddMouseButtonEvent(0,true); draw_frame();
+    io.AddMouseButtonEvent(0,false); draw_frame();
+    CHECK(selected==2);
+    return 0;
+}
+
+static int grouped_editor() {
+    size_t item_count=0;
+    const RecompRuntimeUiItem *items=test_color_menu(&item_count);
+    size_t mario=0,luigi=0; int groups=0;
+    for (size_t i=0;i<item_count;++i) {
+        if (!std::strcmp(items[i].key,"arcade.color.mario")) mario=i;
+        if (!std::strcmp(items[i].key,"arcade.color.luigi")) luigi=i;
+        CHECK(items[i].type!=RECOMP_RUNTIME_UI_COLOR); // no six separate tone entries
+        groups+=items[i].type==RECOMP_RUNTIME_UI_PALETTE;
+    }
+    CHECK(groups==2 && mario && luigi && !std::strcmp(items[mario].label,"Mario"));
+    RecompRuntimeUiConfig config{}; config.title="Colores"; config.theme="nes";
+    config.items=items; config.item_count=item_count;
+    config.callbacks.get_value=arcade_colors_get; config.callbacks.set_value=arcade_colors_set;
+    config.callbacks.get_palette=arcade_colors_get_palette; config.callbacks.set_palette=arcade_colors_set_palette;
+    config.callbacks.get_color_preview=arcade_colors_preview; config.callbacks.save=saved;
+    RecompRuntimeUi *ui=recomp_runtime_ui_create(&config);
+    CHECK(ui && recomp_runtime_ui_open_section(ui,"Colores"));
+    uint32_t original[3],other[3],actual[3];
+    CHECK(arcade_colors_get_palette(nullptr,&items[mario],original));
+    CHECK(arcade_colors_get_palette(nullptr,&items[luigi],other));
+    const uint32_t changed[3]={0x112233,0x778899,0xABCDEF};
+    const uint32_t invalid[3]={0x001122,0x1000000,0x8899AA};
+    ImGuiIO &io=ImGui::GetIO(); io.DisplaySize=ImVec2(800,600); frame(ui);
+    ui->row_index=mario;
+    CHECK(recomp_runtime_ui_handle_input(ui,RECOMP_RUNTIME_UI_INPUT_ACCEPT,1,0));
+    frame(ui); frame(ui); frame(ui);
+    CHECK(ui->editing_color && ui->color_item==&ui->config.items[mario]);
+    CHECK(!recomp_runtime_ui_commit_palette(ui,&items[mario],invalid));
+    CHECK(arcade_colors_get_palette(nullptr,&items[mario],actual) && !std::memcmp(actual,original,sizeof actual));
+    CHECK(recomp_runtime_ui_commit_palette(ui,&items[mario],changed));
+    RecompRuntimeUiColorPreview preview{};
+    CHECK(arcade_colors_preview(nullptr,&items[mario],&preview));
+    for (int i=0;i<3;++i) CHECK(preview.palette[i]==(0xFF000000u|changed[i]));
+    CHECK(arcade_colors_get_palette(nullptr,&items[luigi],actual) && !std::memcmp(actual,other,sizeof actual));
+    io.AddKeyEvent(ImGuiKey_Escape,true); frame(ui);
+    CHECK(!ui->editing_color && recomp_runtime_ui_is_open(ui));
+    CHECK(arcade_colors_get_palette(nullptr,&items[mario],actual) && !std::memcmp(actual,original,sizeof actual));
+    io.AddKeyEvent(ImGuiKey_Escape,false); frame(ui);
+
+    io.DisplaySize=ImVec2(640,480); ui->row_index=mario;
+    CHECK(recomp_runtime_ui_handle_input(ui,RECOMP_RUNTIME_UI_INPUT_ACCEPT,1,0));
+    frame(ui); frame(ui); frame(ui);
+    ImGuiWindow *popup=ImGui::FindWindowByName("Colores del personaje##recomp-runtime-color");
+    CHECK(popup && popup->Pos.x>=0 && popup->Pos.y>=0);
+    CHECK(popup->Pos.x+popup->Size.x<=640 && popup->Pos.y+popup->Size.y<=480);
+    CHECK(popup->ContentSize.y<=popup->Size.y-popup->TitleBarHeight-ImGui::GetStyle().WindowPadding.y*2);
+    CHECK(recomp_runtime_ui_commit_palette(ui,&items[mario],changed));
+    io.AddKeyEvent(ImGuiKey_Enter,true); frame(ui);
+    CHECK(!ui->editing_color);
+    CHECK(arcade_colors_get_palette(nullptr,&items[mario],actual) && !std::memcmp(actual,changed,sizeof actual));
+    io.AddKeyEvent(ImGuiKey_Enter,false); frame(ui);
+    ui->row_index=luigi;
+    CHECK(recomp_runtime_ui_handle_input(ui,RECOMP_RUNTIME_UI_INPUT_ACCEPT,1,0));
+    frame(ui); frame(ui); frame(ui);
+    CHECK(recomp_runtime_ui_commit_palette(ui,&items[luigi],changed));
+    io.AddKeyEvent(ImGuiKey_Escape,true); frame(ui);
+    CHECK(arcade_colors_get_palette(nullptr,&items[luigi],actual) && !std::memcmp(actual,other,sizeof actual));
+    CHECK(arcade_colors_get_palette(nullptr,&items[mario],actual) && !std::memcmp(actual,changed,sizeof actual));
+    io.AddKeyEvent(ImGuiKey_Escape,false); frame(ui);
     recomp_runtime_ui_destroy(ui);
     return 0;
 }
@@ -177,7 +282,9 @@ int main() {
     event=key_event(SDLK_RETURN,SDL_SCANCODE_RETURN); CHECK(!cyc_ui_text_owns_event(false,&event));
     recomp_runtime_ui_destroy(ui);
     CHECK(wheel_editor()==0);
+    CHECK(disc_controls()==0);
+    CHECK(grouped_editor()==0);
     ImGui::DestroyContext();
-    std::puts("PASS RGB text compatibility and visual wheel: real mouse selection, live sprite preview, cancel/save and 640x480 layout.");
+    std::puts("PASS grouped characters, three tones, hue/saturation disc, live preview, cancel/save and 640x480 layout.");
     return 0;
 }
