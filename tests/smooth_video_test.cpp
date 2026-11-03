@@ -128,6 +128,21 @@ int main() {
     a->native_valid = 1; a->native[0] = GREEN; *b = *a;
     p = arcade_smooth_render_pair(a.get(),b.get(),0,1,&w,&h);
     CHECK(p && p[0] == GREEN && p[SW*6+6] == BG && count(p,GREEN) == 36);
-    std::puts("PASS geometry, thirds/halves, composite identity, wrapping, discontinuities, OAM/BG priority, eight-sprite limit, clipping and flips.");
+    // Character identity, not palette/RGB equality, chooses replacements.
+    blank(*a); sprite(*a,0,20,40,1); sprite(*a,1,40,40,2); sprite(*a,2,60,40,3);
+    a->native_valid=1; a->color_enabled=3;
+    a->player_colors[0][0]=0xffaa00aau; a->player_colors[1][0]=0xff00aaaau;
+    *b=*a;
+    p=arcade_smooth_render_pair(a.get(),b.get(),0,1,&w,&h);
+    CHECK(p && p[40*6*SW+20*6]==0xffaa00aau && p[40*6*SW+40*6]==0xff00aaaau);
+    CHECK(p[40*6*SW+60*6]==RED && p[0]==BG); // same original RGB, enemy and background unchanged
+    for (unsigned d=2;d<=3;++d) {
+        p=arcade_smooth_render_pair(a.get(),b.get(),1,d,&w,&h);
+        CHECK(p && count(p,0xffaa00aau)==64u*36u && count(p,0xff00aaaau)==64u*36u);
+    }
+    a->oam[2]=0x20; a->bg_opaque[40*256+20]=1; *b=*a;
+    p=arcade_smooth_render_pair(a.get(),b.get(),0,1,&w,&h); CHECK(p && p[40*6*SW+20*6]==BG);
+    a->eligible=0; CHECK(!arcade_smooth_render_pair(a.get(),b.get(),0,1,&w,&h));
+    std::puts("PASS geometry, priority, clipping, flips, independent player colors and safe fallback.");
     return 0;
 }

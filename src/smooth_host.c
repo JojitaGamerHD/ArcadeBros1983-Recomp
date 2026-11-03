@@ -1,6 +1,7 @@
 /* ARCADE_SMOOTH_VIDEO_V090: observe the original game; never write its RAM. */
 #include "smooth_host.h"
 #include "smooth_video.h"
+#include "player_colors.h"
 #include "cyc_render.h"
 #include "cyc_mod.h"
 #include <string.h>
@@ -65,6 +66,7 @@ void arcade_video_init(void) {
 void arcade_video_frame(void) {
     ++stats.frames;
     from.eligible = to.eligible = 0;
+    from.color_enabled = to.color_enabled = 0;
     prepare_sprites(&prepared);
     const uint8_t *physical = cyc_render_oam();
     int coherent = previous.valid && prepared.valid && previous.scene == prepared.scene;
@@ -120,7 +122,9 @@ void arcade_video_phase(void *ctx, unsigned numerator, unsigned denominator) {
 unsigned arcade_video_scale(void *ctx) { (void)ctx; return current_scale; }
 const uint32_t *arcade_video_present(void *ctx, int *width, int *height) {
     (void)ctx; current_scale = 1;
-    if (parts != 2 && parts != 3) return NULL;
+    from.color_enabled = arcade_colors_current(from.player_colors);
+    to.color_enabled = arcade_colors_current(to.player_colors);
+    if (parts != 2 && parts != 3 && !(parts == 1 && from.color_enabled)) return NULL;
     const uint32_t *out = arcade_smooth_render_pair(&from, &to, part, parts, width, height);
     if (out) { current_scale = ARCADE_SMOOTH_SCALE; if (part) ++stats.rendered; }
     else ++stats.native_fallback;

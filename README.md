@@ -5,7 +5,7 @@
 [![Estado](https://img.shields.io/badge/estado-Jugable-green)](https://github.com/JojitaGamerHD/ArcadeBros1983-Recomp)
 [![Plataforma](https://img.shields.io/badge/plataforma-Windows%20x64-blue)](https://github.com/JojitaGamerHD/ArcadeBros1983-Recomp)
 
-**Versión: v1.0.0** · Desarrollo en `desarrollo-v1.0.0`
+**Versión de prueba: v1.0.1** · Rama `desarrollo-v1.0.1` · Sin release
 
 v1.0.0 incorpora un ZIP con ejecutable y preparación automática desde la ROM del
 jugador. La primera apertura prepara un módulo nativo privado; las siguientes
@@ -17,7 +17,7 @@ y las herramientas genéricas. Cada jugador aporta su propia ROM compatible
 y, si quiere música de fondo, una pista local. El proyecto es independiente,
 sin fines comerciales y sin afiliación con Nintendo.
 
-## Descargar y jugar
+## Descargar y jugar (última release publicada: v1.0.0)
 
 En [Releases](https://github.com/JojitaGamerHD/ArcadeBros1983-Recomp/releases),
 busca el archivo de Windows de esta versión:
@@ -47,6 +47,19 @@ su contenido. El proyecto no proporciona archivos ni enlaces de descarga de ROMs
 
 La release incluye un archivo `.zip.sha256` y el paquete lleva
 `MANIFIESTO-SHA256.txt`, con las huellas de sus archivos originales.
+
+## Cambios preparados para v1.0.1
+
+- Remapeo de teclado, botones y ejes de mando dirigido al mismo almacén que usa el juego.
+- Conflictos visibles, borrar con Retroceso, cancelar con Esc y restaurar asignaciones.
+- Atajos ocultos dejan de consumir entradas; los ejes personalizados tienen prioridad sobre el stick automático.
+- Colores RGB independientes de Mario y Luigi desde pausa → Colores, con ocho presets persistentes.
+- Colores experimentales y desactivados inicialmente: solo escenas verificadas; el resto conserva la imagen original.
+- Motor y launcher compilados en Windows x64; pruebas automáticas de captura, aplicación, persistencia y renderizado.
+
+Consulta [NOTAS-v1.0.1](docs/NOTAS-v1.0.1.md) para compilar, probar y conocer las limitaciones.
+Para probar en otro PC, sigue [PROBAR-v1.0.1-WINDOWS](docs/PROBAR-v1.0.1-WINDOWS.md).
+La rama contiene fuentes para compilar; todavía no hay una release ni un tag v1.0.1.
 
 ## Novedades de v1.0.0
 
@@ -175,8 +188,8 @@ parámetros de LLVM, el proceso de empaquetado y las comprobaciones de distribuc
 
 | Componente | Revisión o versión | Parche activo |
 | --- | --- | --- |
-| NESRecomp | `5a2eddeecc646e9325bef53f3c711e119423f99c` | `patches/nesrecomp/arcade-v0.9.patch` |
-| recomp-ui | `7c635c6b366a6e0d5d3c913a7fce6ec04dd9f256` | `patches/recomp-ui/arcade-v1.0.patch` |
+| NESRecomp | `5a2eddeecc646e9325bef53f3c711e119423f99c` | `patches/nesrecomp/arcade-v1.0.1.patch` |
+| recomp-ui | `7c635c6b366a6e0d5d3c913a7fce6ec04dd9f256` | `patches/recomp-ui/arcade-v1.0.1.patch` |
 | LLVM/Clang/LLD | `23.1.4`, archivo oficial Windows x64 verificado | — |
 
 Los parches son acumulativos sobre las revisiones originales. El preparador
@@ -189,9 +202,9 @@ en el parche del proyecto.
 Las pruebas de música y geometría se ejecutan por separado:
 
 ```powershell
-cmake -S tests -B build/tests-v100 -G "Visual Studio 17 2022" -A x64
-cmake --build build/tests-v100 --config Release --parallel 1
-ctest --test-dir build/tests-v100 -C Release --output-on-failure
+cmake -S tests -B build/tests-v101 -G "Visual Studio 17 2022" -A x64
+cmake --build build/tests-v101 --config Release --parallel 1
+ctest --test-dir build/tests-v101 -C Release --output-on-failure
 ```
 
 Los experimentos del módulo nativo, importador y launcher se conservan en

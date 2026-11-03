@@ -45,6 +45,8 @@ typedef struct ArcadeSmoothFrame {
     uint32_t scene;
     int eligible;
     int native_valid;
+    unsigned color_enabled; /* bits 0/1: Mario/Luigi, presentation only */
+    uint32_t player_colors[2][3];
 } ArcadeSmoothFrame;
 
 /* Returns an opaque 1536x1440 ARGB8888 canvas owned by this module, valid

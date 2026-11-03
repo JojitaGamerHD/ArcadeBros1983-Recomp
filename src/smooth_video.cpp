@@ -117,7 +117,10 @@ void draw_sprites(const ArcadeSmoothFrame &f, const int dx[G + 1],
                 const int bit = (attr & 0x40) ? column : 7 - column;
                 const unsigned color = ((lo >> bit) & 1u) | (((hi >> bit) & 1u) << 1u);
                 if (!color) continue;
-                const uint32_t argb = f.palette[16u + unsigned(attr & 3u) * 4u + color];
+                const bool custom = group >= 1 && group <= 2 &&
+                    (f.color_enabled & (1u << (group - 1)));
+                const uint32_t argb = custom ? f.player_colors[group - 1][color - 1] :
+                    f.palette[16u + unsigned(attr & 3u) * 4u + color];
                 const int x6 = left6 + column * S;
                 const int y6 = top6 + row * S;
                 for (int sy = 0; sy < S; ++sy) {
@@ -152,7 +155,7 @@ extern "C" const uint32_t *arcade_smooth_render_pair(const ArcadeSmoothFrame *fr
     int dx[G + 1] = {};
     int dy[G + 1] = {};
     if (!displacement(*from, *to, dx, dy)) return nullptr;
-    if (!numerator && from->native_valid) {
+    if (!numerator && from->native_valid && !from->color_enabled) {
         enlarge(from->native);
     } else {
         enlarge(from->background);

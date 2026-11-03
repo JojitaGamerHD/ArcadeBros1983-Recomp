@@ -52,6 +52,13 @@ Datos/Logs. Comprueba que extrajiste todos los archivos y que la ROM coincide
 con la revisión admitida.
 
 Proyecto, fuentes, cambios y avisos de componentes:
+En v1.0.1, configura teclado y mandos desde el launcher. Esc cancela una
+asignacion; Retroceso la borra. Los conflictos se indican en pantalla.
+Pausa > Colores permite editar RGB y guardar/cargar ocho presets. Es una
+opcion experimental, desactivada al principio: las escenas no compatibles
+conservan sus colores originales. Los ajustes y presets quedan en Datos/config.ini.
+
+Proyecto, fuentes, cambios y avisos de componentes:
 https://github.com/JojitaGamerHD/ArcadeBros1983-Recomp
 Consulta también SOURCES.txt y Bin/licenses.
 

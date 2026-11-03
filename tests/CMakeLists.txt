@@ -14,6 +14,52 @@ endif()
 
 enable_testing()
 
+set(UI_ROOT "${ARCADE_ROOT}/recomp-ui/src")
+add_executable(colors_editor_test colors_editor_test.cpp "${ARCADE_ROOT}/src/player_colors.c"
+    "${UI_ROOT}/common/recomp_runtime_ui.c" "${UI_ROOT}/common/recomp_runtime_settings.c"
+    "${UI_ROOT}/third_party/imgui/imgui.cpp" "${UI_ROOT}/third_party/imgui/imgui_draw.cpp"
+    "${UI_ROOT}/third_party/imgui/imgui_tables.cpp" "${UI_ROOT}/third_party/imgui/imgui_widgets.cpp")
+target_include_directories(colors_editor_test PRIVATE "${ARCADE_ROOT}/src" "${UI_ROOT}"
+    "${UI_ROOT}/common" "${UI_ROOT}/third_party/imgui" "${CYC_ROOT}" "${SDL_ROOT}/include")
+target_compile_features(colors_editor_test PRIVATE cxx_std_17)
+target_compile_definitions(colors_editor_test PRIVATE SDL_MAIN_HANDLED _CRT_SECURE_NO_WARNINGS)
+if(MSVC)
+    target_compile_options(colors_editor_test PRIVATE /utf-8)
+endif()
+add_test(NAME colors_editor_input COMMAND colors_editor_test)
+
+set(CAPTURE_SOURCES common/launcher_model.c common/launcher_binds.c common/keybinds.c
+    common/pad_binds.c consoles/nes/nes_binds.c consoles/psx/psx_binds.c
+    consoles/psx/psx_pad_binds.c consoles/snes/snes_pad_binds.c consoles/n64/n64_binds.c
+    consoles/n64/n64_pad_binds.c consoles/genesis/genesis_binds.c consoles/gb/gb_binds.c
+    consoles/psx/memcard_format.c common/crc32.c common/sha1.c common/sha256.c common/ips_patch.c)
+list(TRANSFORM CAPTURE_SOURCES PREPEND "${UI_ROOT}/")
+add_executable(controls_capture_test "${ARCADE_ROOT}/recomp-ui/tests/nes_host_bindings_test.c" ${CAPTURE_SOURCES})
+target_include_directories(controls_capture_test PRIVATE "${UI_ROOT}" "${UI_ROOT}/common" "${UI_ROOT}/consoles/psx" "${SDL_ROOT}/include")
+target_compile_definitions(controls_capture_test PRIVATE SDL_MAIN_HANDLED _CRT_SECURE_NO_WARNINGS)
+target_link_libraries(controls_capture_test PRIVATE "${SDL_ROOT}/lib/x64/SDL2.lib")
+if(MSVC)
+    target_compile_options(controls_capture_test PRIVATE /utf-8)
+endif()
+add_custom_command(TARGET controls_capture_test POST_BUILD COMMAND "${CMAKE_COMMAND}" -E copy_if_different
+    "${SDL_ROOT}/lib/x64/SDL2.dll" "$<TARGET_FILE_DIR:controls_capture_test>")
+add_test(NAME controls_capture COMMAND controls_capture_test "${CMAKE_CURRENT_BINARY_DIR}")
+
+add_executable(controls_colors_test controls_colors_test.c
+    "${ARCADE_ROOT}/src/player_colors.c" "${CYC_ROOT}/cyc_settings.c" "${CYC_ROOT}/cyc_input.c")
+target_include_directories(controls_colors_test PRIVATE "${ARCADE_ROOT}/src" "${ARCADE_ROOT}/recomp-ui/src" "${CYC_ROOT}" "${SDL_ROOT}/include")
+target_compile_definitions(controls_colors_test PRIVATE SDL_MAIN_HANDLED _CRT_SECURE_NO_WARNINGS)
+if(MSVC)
+    target_compile_options(controls_colors_test PRIVATE /utf-8)
+endif()
+target_link_libraries(controls_colors_test PRIVATE "${SDL_ROOT}/lib/x64/SDL2.lib")
+add_custom_command(TARGET controls_colors_test POST_BUILD COMMAND "${CMAKE_COMMAND}" -E copy_if_different
+    "${SDL_ROOT}/lib/x64/SDL2.dll" "$<TARGET_FILE_DIR:controls_colors_test>")
+add_test(NAME controls_colors_persistence COMMAND controls_colors_test)
+set_tests_properties(controls_colors_persistence PROPERTIES FIXTURES_SETUP controls_colors_file)
+add_test(NAME controls_colors_restart COMMAND controls_colors_test reload)
+set_tests_properties(controls_colors_restart PROPERTIES FIXTURES_REQUIRED controls_colors_file)
+
 add_executable(smooth_video_test smooth_video_test.cpp "${ARCADE_ROOT}/src/smooth_video.cpp")
 target_compile_features(smooth_video_test PRIVATE cxx_std_17)
 target_include_directories(smooth_video_test PRIVATE "${ARCADE_ROOT}/src")

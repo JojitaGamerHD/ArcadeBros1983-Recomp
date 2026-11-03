@@ -1,0 +1,12 @@
+/* Three NES pixel indices per character, independent RGB values. */
+{.key="arcade.color.enabled",.section="Colores",.label="Colores experimentales",.description="Solo escenas verificadas. Transiciones y escenas no compatibles conservan los colores originales.",.type=RECOMP_RUNTIME_UI_BOOL,.minimum=0,.maximum=1,.step=1},
+{.key="arcade.color.m1",.section="Colores",.label="Mario - color 1",.description="RGB hexadecimal: #RRGGBB. Enter confirma; Esc cancela.",.type=RECOMP_RUNTIME_UI_TEXT},
+{.key="arcade.color.m2",.section="Colores",.label="Mario - color 2",.description="RGB hexadecimal: #RRGGBB.",.type=RECOMP_RUNTIME_UI_TEXT},
+{.key="arcade.color.m3",.section="Colores",.label="Mario - color 3",.description="RGB hexadecimal: #RRGGBB.",.type=RECOMP_RUNTIME_UI_TEXT},
+{.key="arcade.color.l1",.section="Colores",.label="Luigi - color 1",.description="RGB hexadecimal: #RRGGBB.",.type=RECOMP_RUNTIME_UI_TEXT},
+{.key="arcade.color.l2",.section="Colores",.label="Luigi - color 2",.description="RGB hexadecimal: #RRGGBB.",.type=RECOMP_RUNTIME_UI_TEXT},
+{.key="arcade.color.l3",.section="Colores",.label="Luigi - color 3",.description="RGB hexadecimal: #RRGGBB.",.type=RECOMP_RUNTIME_UI_TEXT},
+{.key="arcade.color.slot",.section="Colores",.label="Preset (1-8)",.description="Selecciona una ranura antes de guardar o cargar.",.type=RECOMP_RUNTIME_UI_INT,.minimum=1,.maximum=8,.step=1},
+{.key="arcade.color.store",.section="Colores",.label="Guardar preset",.description="Reemplaza los seis colores de la ranura seleccionada.",.type=RECOMP_RUNTIME_UI_ACTION},
+{.key="arcade.color.load",.section="Colores",.label="Cargar preset",.description="Carga los seis colores y activa la personalizacion. Una ranura vacia se rechaza.",.type=RECOMP_RUNTIME_UI_ACTION},
+{.key="arcade.color.reset",.section="Colores",.label="Restaurar colores originales",.description="Desactiva la personalizacion y conserva tus presets.",.type=RECOMP_RUNTIME_UI_ACTION},
