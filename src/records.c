@@ -253,7 +253,8 @@ static const RecompRuntimeUiCallbacks callbacks_creditos = {
     .get_value = arcade_colors_get,
     .set_value = arcade_colors_set,
     .get_text = arcade_colors_get_text,
-    .set_text = arcade_colors_set_text
+    .set_text = arcade_colors_set_text,
+    .get_color_preview = arcade_colors_preview
 };
 static const CycHostExtras extras = {
     .present = arcade_video_present,

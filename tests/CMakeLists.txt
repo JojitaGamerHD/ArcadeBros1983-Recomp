@@ -13,8 +13,28 @@ if(NOT EXISTS "${CYC_ROOT}/cyc_settings.c" OR NOT EXISTS "${SDL_ROOT}/lib/x64/SD
 endif()
 
 enable_testing()
+add_test(NAME dependencies_patch_upgrade COMMAND powershell -NoProfile -ExecutionPolicy Bypass
+    -File "${CMAKE_CURRENT_SOURCE_DIR}/patch_upgrade_test.ps1"
+    -Root "${ARCADE_ROOT}" -Scratch "${CMAKE_CURRENT_BINARY_DIR}")
 
 set(UI_ROOT "${ARCADE_ROOT}/recomp-ui/src")
+include("${CYC_ROOT}/cyc.cmake")
+add_executable(native_colors_test native_colors_test.cpp
+    "${CYC_ROOT}/cpu6502.c" "${CYC_ROOT}/cpu6502_interp.c" "${CYC_ROOT}/hw_machine.c"
+    "${CYC_ROOT}/hw_mapper.c" "${CYC_ROOT}/hw_fds.c" "${CYC_ROOT}/hw_fds_audio.c"
+    "${CYC_ROOT}/hw_fds_hle.c" "${CYC_ROOT}/vendor/emu2413/emu2413.c"
+    "${CYC_ROOT}/hw_ppu.c" "${CYC_ROOT}/hw_apu.c" "${CYC_ROOT}/hw_palette.c"
+    "${CYC_ROOT}/cyc_trace.c" "${CYC_ROOT}/cyc_ring.c"
+    ${NESRECOMP_CYC_SCHEDULER_SOURCES} "${CYC_ROOT}/cyc_native_none.c"
+    "${CYC_ROOT}/cyc_video.c" "${CYC_ROOT}/cyc_render.c")
+target_include_directories(native_colors_test PRIVATE "${ARCADE_ROOT}/src" ${NESRECOMP_CYC_INCLUDE_DIRS})
+target_link_libraries(native_colors_test PRIVATE ${NESRECOMP_CYC_LIBRARIES})
+target_compile_features(native_colors_test PRIVATE c_std_11 cxx_std_17)
+target_compile_definitions(native_colors_test PRIVATE _CRT_SECURE_NO_WARNINGS)
+if(MSVC)
+    target_compile_options(native_colors_test PRIVATE /utf-8)
+endif()
+add_test(NAME native_colors_provenance COMMAND native_colors_test)
 add_executable(colors_editor_test colors_editor_test.cpp "${ARCADE_ROOT}/src/player_colors.c"
     "${UI_ROOT}/common/recomp_runtime_ui.c" "${UI_ROOT}/common/recomp_runtime_settings.c"
     "${UI_ROOT}/third_party/imgui/imgui.cpp" "${UI_ROOT}/third_party/imgui/imgui_draw.cpp"

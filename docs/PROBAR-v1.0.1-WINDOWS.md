@@ -17,6 +17,23 @@ el kit LLVM de ese paquete.
 Si ese PC ya se utilizaba para compilar el proyecto, quizá tenga estas
 herramientas. La construcción inicial necesita Internet para las dependencias.
 
+## Si ya probaste la primera candidata
+
+Dentro de tu carpeta `ArcadeBros-Prueba-v101`, actualiza y vuelve a compilar:
+
+```powershell
+git pull --ff-only origin desarrollo-v1.0.1
+powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\preparar_dependencias.ps1
+cmake -S . -B build/prueba-v101 -G "Visual Studio 17 2022" -A x64 "-DNESRECOMP_GAME_VERSION=1.0.1"
+cmake --build build/prueba-v101 --config Release --target ArcadeBros1983Recomp --parallel 1
+```
+
+El preparador reconoce los parches de la primera candidata. No borres `deps`,
+`recomp-ui`, `config.ini` ni tus presets para actualizar. Si Git o el preparador
+informan de un conflicto con cambios tuyos, conserva esos cambios y comparte
+el mensaje antes de reemplazar archivos. Después abre el ejecutable como en
+el paso 4 de esta guía.
+
 ## 2. Descargar una copia separada
 
 Abre PowerShell en la carpeta donde quieras guardar la prueba y ejecuta:
@@ -94,13 +111,17 @@ espera otra distribución de carpetas y no se necesita en este procedimiento.
    activar A. Cierra todo y vuelve a abrir: la asignación debe conservarse.
 2. Repite con mando: botones, cruceta, un gatillo y reconexión. Comprueba
    conflictos, Esc para cancelar, Retroceso para borrar y restaurar valores.
-3. En pausa → **Colores**, activa el efecto y edita un campo `#RRGGBB`.
-   Comprueba Enter, Esc y Retroceso dentro del campo.
+3. En pausa → **Colores**, activa **Personalizar personajes** y abre una muestra
+   de Mario. Elige con la rueda y el triángulo de brillo/saturación: el personaje
+   de referencia debe cambiar inmediatamente. Prueba **Listo**, **Cancelar** y Esc.
+   La referencia aparece después de haber visto al personaje en una partida.
 4. Asigna colores distintos a Mario y Luigi. Guarda en las ranuras 1 y 8,
    cambia los colores, reinicia el juego y carga ambos presets.
-5. Comprueba fondo, enemigos, pérdida de vida, cambios de fase y dos jugadores.
-   Los colores son experimentales: las escenas que no pasan la comprobación
-   de reconstrucción conservan los colores originales.
+5. Comprueba caminar, saltar, girarse y morir a 60, 120 y 180 FPS: un cambio
+   de animación no debe volver al color original por fallar la interpolación.
+   Comprueba también fondo, enemigos, pérdida de vida, cambios de fase y dos
+   jugadores. Los sprites no identificados en pantallas fuera del mapa conocido
+   conservan su color original.
 
 Anota qué hiciste, qué esperabas y qué ocurrió. Para un problema de mando,
 incluye su modelo; para un problema visual, incluye la fase y el límite de FPS.

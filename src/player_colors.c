@@ -8,6 +8,7 @@ static uint32_t active[2][3] = {{0xF83800,0xFFB8B0,0x0078F8},{0x00B800,0xFFB8B0,
 static uint32_t presets[SLOTS][2][3];
 static unsigned enabled, valid;
 static int selected;
+static RecompRuntimeUiColorPreview preview[2];
 
 static int hex6(const char *s, uint32_t *out) {
     if (*s == '#') ++s;
@@ -35,16 +36,43 @@ unsigned arcade_colors_current(uint32_t out[2][3]) {
 }
 int arcade_colors_get(void *ctx, const RecompRuntimeUiItem *it, int *v) {
     (void)ctx;
-    if (!strcmp(it->key,"arcade.color.enabled")) *v = (int)enabled;
+    int color = color_index(it->key);
+    if (color >= 0) *v = (int)active[color/3][color%3];
+    else if (!strcmp(it->key,"arcade.color.enabled")) *v = (int)enabled;
     else if (!strcmp(it->key,"arcade.color.slot")) *v = selected + 1;
     else return 0;
     return 1;
 }
 int arcade_colors_set(void *ctx, const RecompRuntimeUiItem *it, int v) {
     (void)ctx;
-    if (!strcmp(it->key,"arcade.color.enabled") && (v == 0 || v == 1)) enabled = (unsigned)v;
+    int color = color_index(it->key);
+    if (color >= 0 && v >= 0 && v <= 0xFFFFFF) active[color/3][color%3] = (uint32_t)v;
+    else if (!strcmp(it->key,"arcade.color.enabled") && (v == 0 || v == 1)) enabled = (unsigned)v;
     else if (!strcmp(it->key,"arcade.color.slot") && v >= 1 && v <= SLOTS) selected = v - 1;
     else return 0;
+    return 1;
+}
+
+void arcade_colors_capture_preview(unsigned player, const uint8_t *indices, int width, int height) {
+    if (player >= 2 || !indices || width < 1 || height < 1 ||
+        width > RECOMP_RUNTIME_UI_PREVIEW_MAX || height > RECOMP_RUNTIME_UI_PREVIEW_MAX) return;
+    int visible = 0;
+    for (int i = 0; i < width * height; ++i) {
+        if (indices[i] > 3) return;
+        visible |= indices[i];
+    }
+    if (!visible) return;
+    preview[player].width = width;
+    preview[player].height = height;
+    memcpy(preview[player].pixels,indices,(size_t)(width * height));
+}
+int arcade_colors_preview(void *ctx, const RecompRuntimeUiItem *it, RecompRuntimeUiColorPreview *out) {
+    (void)ctx;
+    int color = color_index(it->key);
+    if (color < 0 || !out || !preview[color/3].width) return 0;
+    *out = preview[color/3];
+    for (int i = 0; i < 3; ++i) out->palette[i] = 0xFF000000u | active[color/3][i];
+    out->selected_index = color%3;
     return 1;
 }
 int arcade_colors_get_text(void *ctx, const RecompRuntimeUiItem *it, char *out, size_t n) {

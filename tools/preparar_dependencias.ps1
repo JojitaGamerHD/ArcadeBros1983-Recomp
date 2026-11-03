@@ -13,8 +13,8 @@ $ui = Join-Path $proyecto 'recomp-ui'
 $revisionMotor = '5a2eddeecc646e9325bef53f3c711e119423f99c'
 $revisionUI = '7c635c6b366a6e0d5d3c913a7fce6ec04dd9f256'
 
-$parcheMotor = Join-Path $proyecto 'patches\nesrecomp\arcade-v1.0.1.patch'
-$parcheUI = Join-Path $proyecto 'patches\recomp-ui\arcade-v1.0.1.patch'
+$parcheMotor = Join-Path $proyecto 'patches\nesrecomp\arcade-v1.0.1-colores.patch'
+$parcheUI = Join-Path $proyecto 'patches\recomp-ui\arcade-v1.0.1-colores.patch'
 
 function Verificar-Comando {
     param([string]$mensaje)
@@ -29,29 +29,25 @@ function Aplicar-Parche {
         [string]$carpeta,
         [string]$parche,
         [string]$nombre,
-        [string]$parcheAnterior
+        [string[]]$parchesAnteriores = @()
     )
 
-    # Comprobar si el parche ya esta aplicado.
-    # Esta comprobacion puede fallar normalmente
-# cuando el parche aun no esta aplicado.
-$preferenciaAnterior = $ErrorActionPreference
-
-try {
-    $ErrorActionPreference = 'SilentlyContinue'
-    git -C $carpeta apply --reverse --check $parche 2>$null
-}
-finally {
-    $ErrorActionPreference = $preferenciaAnterior
-}
+    # Una comprobacion inversa puede fallar si el parche aun no esta aplicado.
+    $preferenciaAnterior = $ErrorActionPreference
+    try {
+        $ErrorActionPreference = 'SilentlyContinue'
+        git -C $carpeta apply --reverse --check $parche 2>$null
+    } finally {
+        $ErrorActionPreference = $preferenciaAnterior
+    }
 
     if ($LASTEXITCODE -eq 0) {
         Write-Host "$nombre ya tiene el parche aplicado." -ForegroundColor Green
         return
     }
 
-    # Upgrade only a recognized previous patch, preserving unrelated edits.
-    if ($parcheAnterior) {
+    # Reconocer tambien la primera candidata v1.0.1, usada en el otro PC.
+    foreach ($parcheAnterior in $parchesAnteriores) {
         $preferenciaAnterior = $ErrorActionPreference
         try {
             $ErrorActionPreference = 'SilentlyContinue'
@@ -123,7 +119,9 @@ if ($actualMotor -ne $revisionMotor) {
     throw 'NESRecomp tiene una revision diferente. No se modificara automaticamente.'
 }
 
-Aplicar-Parche $motor $parcheMotor 'NESRecomp' (Join-Path $proyecto 'patches\nesrecomp\arcade-v0.9.patch')
+Aplicar-Parche $motor $parcheMotor 'NESRecomp' @(
+    (Join-Path $proyecto 'patches\nesrecomp\arcade-v1.0.1.patch'),
+    (Join-Path $proyecto 'patches\nesrecomp\arcade-v0.9.patch'))
 
 # 3. Preparar recomp-ui
 if (!(Test-Path (Join-Path $ui '.git'))) {
@@ -146,7 +144,9 @@ if ($actualUI -ne $revisionUI) {
     throw 'recomp-ui tiene una revision diferente. No se modificara automaticamente.'
 }
 
-Aplicar-Parche $ui $parcheUI 'recomp-ui' (Join-Path $proyecto 'patches\recomp-ui\arcade-v1.0.patch')
+Aplicar-Parche $ui $parcheUI 'recomp-ui' @(
+    (Join-Path $proyecto 'patches\recomp-ui\arcade-v1.0.1.patch'),
+    (Join-Path $proyecto 'patches\recomp-ui\arcade-v1.0.patch'))
 
 # 4. Compilar el recompilador de NES
 $carpetaBuild = Join-Path $motor 'build\recompiler'

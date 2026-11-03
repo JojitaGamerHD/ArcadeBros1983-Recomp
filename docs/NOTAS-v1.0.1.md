@@ -40,65 +40,71 @@ no se añadió un segundo editor de controles dentro de la pausa.
 
 ## Colores y presets
 
-Pausa → **Colores** ofrece seis campos `#RRGGBB`: tres índices de color de
-sprite para Mario y tres para Luigi. No corresponden siempre a prendas fijas:
-son los índices 1, 2 y 3 del patrón NES. Activa **Colores experimentales**,
-edita con teclado y confirma con Enter. Esc abandona la edición.
+Pausa → **Colores** ofrece seis muestras: Mario y Luigi, tonos 1, 2 y 3.
+Activa **Personalizar personajes** y abre una muestra con el ratón o Enter.
+Se abre una rueda de tono y un triángulo de saturación/brillo. La vista previa
+cambia mientras eliges el color; ya no es necesario escribir códigos.
+**Listo** conserva ese tono; **Cancelar** o Esc lo devuelve al valor anterior.
+La edición no activa los atajos de pausa ni pantalla completa.
+
+La referencia se extrae de los tiles y OAM de la ROM que estás ejecutando.
+No se incluyen imágenes de Mario/Luigi en las fuentes. Conserva la última pose
+válida de cada personaje; para obtenerla, entra en una partida con ese personaje
+antes de abrir su editor. Los tonos son los índices 1, 2 y 3 del patrón NES,
+no nombres de prendas que podrían variar según la animación.
 
 Hay ocho ranuras numeradas compartidas por ambos personajes. **Guardar preset**
 reemplaza los seis colores de la ranura elegida. **Cargar preset** los restaura
 y activa la personalización; una ranura vacía se rechaza con un mensaje.
 **Restaurar colores originales** desactiva el efecto sin borrar los presets.
-Los valores RGB inválidos se rechazan sin modificar el color anterior.
-Durante la edición, Enter confirma, Esc cancela y Retroceso borra texto sin
-activar la navegación del menú ni los atajos de pausa o pantalla completa.
 
-Se guardan en `[Game]`: `ColorsEnabled`, `ColorsSlot`, `ColorsActive` y
-`ColorsPreset1`…`ColorsPreset8`. Cada lista contiene seis RGB de seis dígitos
-separados por comas. Las ediciones y las acciones aceptadas se guardan mediante
-el escritor temporal y reemplazo de `config.ini` que ya usa el host.
-No hay un archivo de presets separado ni recursos gráficos de la ROM incluidos.
+Se conserva el formato de la primera prueba: `[Game]`, `ColorsEnabled`,
+`ColorsSlot`, `ColorsActive` y `ColorsPreset1`…`ColorsPreset8`. Cada lista contiene
+seis RGB de seis dígitos separados por comas. Tus presets anteriores siguen
+siendo compatibles. La rueda convierte automáticamente a ese formato al guardar.
 
-### Implementación y límites
+### Corrección de animaciones y muerte
 
-La sustitución global de RGB o de la paleta NES recolorearía también fondo,
-enemigos o texto que compartan colores. El renderizado normal de TriCNES
-(`PPU_Render_CalculatePixel` → `DrawToScreen`) resuelve la paleta y retrasa el
-color varios ciclos antes de escribir el framebuffer: allí ya no conserva la
-identidad del personaje. Cambiar esa ruta exigiría propagar metadatos de OAM a
-través de la tubería y ampliar la validación de compatibilidad.
+Los colores ya no dependen de un par de fotogramas válido para interpolación.
+El motor captura información adicional de presentación: el personaje que posee
+cada entrada OAM y el índice de color del sprite que realmente ganó cada píxel,
+respetando la tubería de la PPU y la prioridad del fondo. La imagen nativa se
+recolorea mediante esa procedencia, sin sustituir todos los píxeles del mismo RGB.
+Cambiar de animación o entrar en estado de muerte no desactiva por sí mismo los
+colores. Cuando el suavizado no puede interpolar, se utiliza la imagen nativa
+con sus colores personalizados.
 
-Se reutiliza la reconstrucción de sprites de `smooth_host.c`/`smooth_video.cpp`.
-El mapa de entidades existente distingue Mario (grupo 1), Luigi (grupo 2) y
-los demás objetos. Antes de permitir la personalización se reconstruye el frame
-sin colores personalizados y se compara cada píxel con la PPU. Si no coincide,
-se devuelve la imagen nativa. Solo después se sustituyen los tres colores de
-los grupos 1 y 2, conservando transparencia, prioridad OAM, oclusión por fondo,
-recorte, volteos y límite de ocho sprites por línea.
+La identificación se observa al completar las escrituras OAM, incluidas las de
+DMA, cotejando los rangos de las entidades Mario y Luigi y su shadow OAM. No se
+escriben RAM del juego, paleta, instrucciones recompiladas ni reglas de colisión.
+Los datos de procedencia son auxiliares de presentación, separados del estado
+lógico y de la interfaz del módulo privado.
 
-No se escriben RAM del juego, memoria de paleta, OAM ni instrucciones recompiladas.
-No cambia el protocolo del módulo privado ni sus exportaciones. La función
-presentadora admite el efecto a 30/60 FPS y en imágenes suavizadas a 120/180.
-
-**Es experimental y está desactivado por defecto.** Solo actúa en las escenas
-que el observador existente reconoce y verifica. Título, demostración, bonus,
-transiciones, cambios de actividad de entidades y cualquier reconstrucción
-rechazada mantienen los colores originales. Puede haber cambios visibles entre
-color personalizado y original. No promete una recoloración continua durante
-toda la partida. La comparación de píxeles es una protección de presentación,
-no sustituye la validación del mapa de entidades con una ROM real.
+El mapa de entidades sigue siendo específico de la ROM compatible. Los sprites
+no identificados se conservan originales; no se promete personalizar personajes
+dibujados fuera de ese mapa en todas las pantallas de título o bonus. Aquí no se
+dispone de una ROM privada para comprobar visualmente cada fase: las pruebas
+sintéticas cubren cambios de animación, muerte, prioridad y aislamiento de fondo
+y enemigos, y queda repetir la prueba con tu copia real.
 
 ## Validación realizada en Windows x64
 
 - Compilados con MSVC 19.44 / Visual Studio Build Tools 2022: NESRecomp,
   ArcadeNativeHost, ArcadeBrosLauncher y ArcadePrepare.
-- Siete pruebas pasan; una se omite porque requiere una pista musical privada.
+- Nueve pruebas pasan; una se omite porque requiere una pista musical privada.
   Captura SDL real de la ruta usada por ImGui, conflictos/cancelación/borrado,
   selección de mando y ejes, aplicación de entradas, guardado/carga, reinicio
   en un proceso nuevo, presets, RGB inválidos y aislamiento de colores por
   personaje; también geometría y pruebas existentes de música.
-- El widget RGB real de ImGui se prueba sin ventana ni ROM: escritura, borrado,
-  flechas, Enter y Esc, manteniendo los atajos suspendidos hasta soltar las teclas.
+- La rueda real de ImGui se prueba con clic de ratón, vista previa inmediata,
+  confirmación/cancelación y ventanas de 800×600 y 640×480. El editor de texto
+  genérico anterior conserva sus pruebas de compatibilidad.
+- La PPU LLE real se prueba con una máquina sintética: carga OAM, estados de
+  muerte, reasignación de slots, retraso de tres dots, oclusión por fondo y
+  recorte. El hash lógico de PPU y sus índices originales no cambian al activar
+  la captura auxiliar.
+- El preparador se comprueba en copias limpias, en actualizaciones desde v1.0.0
+  y desde la primera candidata v1.0.1, e incluyendo su idempotencia.
 - La reproducción aislada de la llamada usada en v1.0.0 confirma que escribe
   otro almacén y deja la asignación del host en Z. Código de salida esperado: 42.
 - Revisión de cambios y comprobación de parches acumulativos sobre las
@@ -156,12 +162,15 @@ Prueba manual en una copia nueva del portable y con tu ROM compatible:
    Repite con dos jugadores y dos mandos, cruceta, botones, gatillos y reconexión.
 3. Intenta duplicar una tecla y asignar el botón de pausa a una acción: debe
    rechazarse. Prueba Esc, Retroceso, Auto Map y restaurar predeterminados.
-4. Activa los colores en pausa, usa colores muy distintos para Mario y Luigi,
-   y comprueba que fondo y enemigos conservan su aspecto, incluso al solaparse.
+4. Activa los colores en pausa, abre una muestra y elige con la rueda; comprueba
+   la vista previa, **Listo**, **Cancelar** y Esc. Usa tonos distintos para Mario
+   y Luigi y comprueba que fondo y enemigos conservan su aspecto al solaparse.
 5. Guarda en ranuras 1 y 8, cambia los colores, cierra todo, reinicia y carga cada
    preset. Prueba un RGB inválido, una ranura vacía y restaurar originales.
-6. Repite colores a 60, 120 y 180 FPS; prueba pérdida de vida, cambios de fase,
-   bonus y título. En escenas no verificadas deben verse los colores originales.
+6. Repite colores a 60, 120 y 180 FPS; prueba caminar, saltar, girarse y morir.
+   Los cambios de animación no deben perder el color al fallar la interpolación.
+   Prueba cambios de fase, bonus y título; los sprites fuera del mapa reconocido
+   conservan sus colores originales.
    Comprueba que la velocidad, colisiones, audio y puntuación se mantienen.
 
 ## Aplicar la entrega como parche
@@ -172,4 +181,4 @@ limpio situado en `v1.0.0`, aplica `git apply --check` y después `git apply` co
 ese archivo; luego ejecuta el preparador. La actualización reconoce los parches
 anteriores; si encuentra conflictos, conserva los cambios locales y se detiene.
 No cambies el gitlink de recomp-ui al publicar estos cambios: las adaptaciones
-de esta dependencia siguen entregándose en `patches/recomp-ui/arcade-v1.0.1.patch`.
+de esta dependencia siguen entregándose en `patches/recomp-ui/arcade-v1.0.1-colores.patch`.
