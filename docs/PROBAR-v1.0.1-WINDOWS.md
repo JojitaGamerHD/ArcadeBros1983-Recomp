@@ -28,8 +28,8 @@ cmake -S . -B build/prueba-v101 -G "Visual Studio 17 2022" -A x64 "-DNESRECOMP_G
 cmake --build build/prueba-v101 --config Release --target ArcadeBros1983Recomp --parallel 1
 ```
 
-El preparador reconoce tanto la primera candidata como la prueba con rueda y
-triángulo. No borres `deps`,
+El preparador reconoce las candidatas anteriores, incluido el editor con un
+botón por personaje. No borres `deps`,
 `recomp-ui`, `config.ini` ni tus presets para actualizar. Si Git o el preparador
 informan de un conflicto con cambios tuyos, conserva esos cambios y comparte
 el mensaje antes de reemplazar archivos. Después abre el ejecutable como en
@@ -117,6 +117,9 @@ espera otra distribución de carpetas y no se necesita en este procedimiento.
    color: tono alrededor de la rueda y saturación desde el centro hacia el borde.
    Ajusta **Brillo** con la barra separada; el personaje de referencia debe cambiar
    inmediatamente. No hay triángulo ni hace falta escribir códigos.
+   Haz clic en un punto y suelta el ratón: el marcador debe quedarse ahí.
+   Arrástralo, prueba otro tamaño de ventana y pantalla completa; no debe saltar
+   entre la posición del ratón y otra parte de la rueda.
    Prueba **Listo** y después edita los tres tonos y pulsa **Cancelar** o Esc:
    deben restaurarse los tres colores de Mario, sin cambiar los de Luigi.
    Repite con **Luigi**. La referencia aparece después de haber visto al personaje
@@ -125,9 +128,10 @@ espera otra distribución de carpetas y no se necesita en este procedimiento.
    cambia los colores, reinicia el juego y carga ambos presets.
 5. Comprueba caminar, saltar, girarse y morir a 60, 120 y 180 FPS: un cambio
    de animación no debe volver al color original por fallar la interpolación.
-   Comprueba también fondo, enemigos, pérdida de vida, cambios de fase y dos
-   jugadores. Los sprites no identificados en pantallas fuera del mapa conocido
-   conservan su color original.
+   Comprueba también fondo, enemigos, pérdida de vida y dos jugadores. Termina
+   una fase y un bonus: los personajes deben mantener sus colores durante la
+   pausa entre fases y el recuento de monedas. Las monedas, los números y el
+   fondo conservan sus colores propios.
 
 Anota qué hiciste, qué esperabas y qué ocurrió. Para un problema de mando,
 incluye su modelo; para un problema visual, incluye la fase y el límite de FPS.

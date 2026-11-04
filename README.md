@@ -188,7 +188,7 @@ parámetros de LLVM, el proceso de empaquetado y las comprobaciones de distribuc
 
 | Componente | Revisión o versión | Parche activo |
 | --- | --- | --- |
-| NESRecomp | `5a2eddeecc646e9325bef53f3c711e119423f99c` | `patches/nesrecomp/arcade-v1.0.1-editor.patch` |
+| NESRecomp | `5a2eddeecc646e9325bef53f3c711e119423f99c` | `patches/nesrecomp/arcade-v1.0.1-estable.patch` |
 | recomp-ui | `7c635c6b366a6e0d5d3c913a7fce6ec04dd9f256` | `patches/recomp-ui/arcade-v1.0.1-editor.patch` |
 | LLVM/Clang/LLD | `23.1.4`, archivo oficial Windows x64 verificado | — |
 

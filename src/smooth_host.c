@@ -24,10 +24,11 @@ static unsigned observe_sprite_owner(unsigned slot, const uint8_t entry[4], void
     (void)ctx;
     ArcadeSpriteLayout layout;
     memset(&layout,0,sizeof layout);
-    /* Title and other layouts are outside the supported entity map. Do not
-     * infer their identity from shared colors or palette numbers. */
-    layout.gameplay=cyc_mod_peek(0x40)==4;
-    if (!layout.gameplay) return 0;
+    /* Identify the scene at upload time, including the retained phase-end
+     * picture and the bonus results' separate, fixed portrait table. */
+    arcade_sprite_scene(&layout,cyc_mod_peek(0x40),cyc_mod_peek(0x3B),cyc_mod_peek(0x4B4),
+                        cyc_mod_peek(0x30),cyc_mod_peek(0x51));
+    if (!layout.gameplay && !layout.bonus_results) return 0;
     for (unsigned e=0;e<ENTITIES;++e) {
         uint16_t base=(uint16_t)(0x300+0x20*e);
         layout.active[e]=cyc_mod_peek(base);
@@ -35,6 +36,8 @@ static unsigned observe_sprite_owner(unsigned slot, const uint8_t entry[4], void
         layout.offset[e]=cyc_mod_peek(base+10);
         if (e<2) layout.state[e]=cyc_mod_peek(base+22);
     }
+    if (layout.bonus_results)
+        for (unsigned i=0;i<12*4;++i) layout.shadow[i]=cyc_mod_peek((uint16_t)(0x200+i));
     for (unsigned i=0;i<4;++i) layout.shadow[slot*4+i]=cyc_mod_peek((uint16_t)(0x200+slot*4+i));
     return arcade_player_sprite_owner(&layout,slot,entry);
 }

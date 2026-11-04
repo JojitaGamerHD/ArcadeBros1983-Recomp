@@ -32,12 +32,88 @@ static void pixel_setup(bool behind,bool bg,bool clip) {
     cyc_sprite_capture.unit_owner[0]=1;
 }
 static void dots(unsigned count) {for(unsigned i=0;i<count;++i){ppu_dot();ppu_half_dot();}}
+static void bonus_portraits(ArcadeSpriteLayout &s) {
+    /* Independent fixture transcribed from E574 in the linked disassembly. */
+    static const uint8_t portraits[48]={
+        0x40,0x13,0x40,0x20, 0x40,0x12,0x40,0x28,
+        0x48,0x15,0x40,0x20, 0x48,0x14,0x40,0x28,
+        0x50,0x17,0x40,0x20, 0x50,0x16,0x40,0x28,
+        0x78,0x13,0x41,0x20, 0x78,0x12,0x41,0x28,
+        0x80,0x15,0x41,0x20, 0x80,0x14,0x41,0x28,
+        0x88,0x17,0x41,0x20, 0x88,0x16,0x41,0x28
+    };
+    std::memcpy(s.shadow,portraits,sizeof portraits);
+}
 
 int main() {
     std::vector<uint8_t> rom(16+16384+8192,0);
     std::memcpy(rom.data(),"NES\x1A",4); rom[4]=1; rom[5]=1;
     CHECK(cyc_load_ines(rom.data(),rom.size())); cyc_power_on(0);
     cyc_render_set_sprite_owners(owner,nullptr);
+
+    /* Phase-end waits use the unchanged entity OAM, even when a dying
+     * player's active flag is clear. No interpolation is involved. */
+    layout={}; arcade_sprite_scene(&layout,9,1,0,0,0);
+    layout.state[0]=3; layout.draw[0]=2; layout.offset[0]=16;
+    const uint8_t end_phase[4]={39,2,0,20}; std::memcpy(layout.shadow+16,end_phase,4);
+    upload(4,end_phase); CHECK(cyc_render_sprite_owner(4)==1);
+    arcade_sprite_scene(&layout,9,1,3,0,0); /* results pointer can remain stale on later phases */
+    upload(4,end_phase); CHECK(cyc_render_sprite_owner(4)==1);
+    arcade_sprite_scene(&layout,1,1,3,0,1); /* completed phase's final visible loading frame */
+    upload(4,end_phase); CHECK(cyc_render_sprite_owner(4)==1);
+    arcade_sprite_scene(&layout,1,1,3,0,0); /* initialization, not a completed phase */
+    upload(4,end_phase); CHECK(cyc_render_sprite_owner(4)==0);
+    arcade_sprite_scene(&layout,1,1,3,1,1); /* demo/title may have stale game flags */
+    upload(4,end_phase); CHECK(cyc_render_sprite_owner(4)==0);
+    arcade_sprite_scene(&layout,9,6,0,0,0); /* bonus play waiting for its results */
+    upload(4,end_phase); CHECK(cyc_render_sprite_owner(4)==1);
+    arcade_sprite_scene(&layout,6,6,0,0,0); /* first results frame before screen init */
+    upload(4,end_phase); CHECK(cyc_render_sprite_owner(4)==1);
+
+    /* Bonus results bypass entity RAM entirely. Both players can be inactive;
+     * only their exact, complete six-tile portraits receive their colors. */
+    layout={}; bonus_portraits(layout); arcade_sprite_scene(&layout,6,6,1,0,0);
+    for(unsigned slot=0;slot<12;++slot) {
+        upload(slot,layout.shadow+slot*4);
+        CHECK(cyc_render_sprite_owner(slot)==slot/6+1);
+    }
+    const uint8_t coin[4]={0x41,0x30,2,0x70}; std::memcpy(layout.shadow+48,coin,4);
+    layout.active[0]=1; layout.draw[0]=0; layout.offset[0]=48; /* stale entity range */
+    upload(12,coin); CHECK(cyc_render_sprite_owner(12)==0);
+    const uint8_t lookalike[4]={0x40,0x13,0x40,0x20}; std::memcpy(layout.shadow+200,lookalike,4);
+    upload(50,lookalike); CHECK(cyc_render_sprite_owner(50)==0); /* no palette/RGB inference */
+    uint8_t wrong[4]; std::memcpy(wrong,layout.shadow,4); ++wrong[1];
+    upload(0,wrong); CHECK(cyc_render_sprite_owner(0)==0); /* actual OAM disagrees with shadow */
+    ++layout.shadow[3]; /* incomplete/incorrect Mario table */
+    upload(1,layout.shadow+4); CHECK(cyc_render_sprite_owner(1)==0);
+    upload(6,layout.shadow+24); CHECK(cyc_render_sprite_owner(6)==2);
+    --layout.shadow[3];
+    for(unsigned mode: {5u,10u,9u}) {
+        arcade_sprite_scene(&layout,mode,mode==9?1:6,3,0,0);
+        upload(0,layout.shadow); CHECK(cyc_render_sprite_owner(0)==1);
+        upload(11,layout.shadow+44); CHECK(cyc_render_sprite_owner(11)==2);
+        upload(12,coin); CHECK(cyc_render_sprite_owner(12)==0);
+    }
+    arcade_sprite_scene(&layout,9,1,3,0,0);
+    /* A complete results portrait blocks stale entity claims elsewhere. */
+    upload(12,coin); CHECK(cyc_render_sprite_owner(12)==0);
+    arcade_sprite_scene(&layout,1,1,3,0,1); /* final visible frame after bonus results */
+    upload(0,layout.shadow); CHECK(cyc_render_sprite_owner(0)==1);
+    upload(11,layout.shadow+44); CHECK(cyc_render_sprite_owner(11)==2);
+    upload(12,coin); CHECK(cyc_render_sprite_owner(12)==0);
+    arcade_sprite_scene(&layout,1,1,3,1,1);
+    upload(0,layout.shadow); CHECK(cyc_render_sprite_owner(0)==0);
+    arcade_sprite_scene(&layout,1,1,3,0,0);
+    upload(11,layout.shadow+44); CHECK(cyc_render_sprite_owner(11)==0);
+    for(unsigned mode: {0u,1u,2u,3u,7u,8u,11u}) {
+        arcade_sprite_scene(&layout,mode,1,3,0,0);
+        upload(0,layout.shadow); CHECK(cyc_render_sprite_owner(0)==0);
+    }
+    arcade_sprite_scene(&layout,6,6,1,0,0); /* a one-player results screen */
+    std::memset(layout.shadow+24,0xEF,24);
+    upload(0,layout.shadow); CHECK(cyc_render_sprite_owner(0)==1);
+    upload(6,layout.shadow+24); CHECK(cyc_render_sprite_owner(6)==0);
+
     layout={}; layout.gameplay=1; layout.active[0]=1; layout.draw[0]=1; layout.offset[0]=8;
     const uint8_t body[4]={39,2,0,20}; std::memcpy(layout.shadow+8,body,4);
     upload(2,body); CHECK(cyc_render_sprite_owner(2)==1);
@@ -86,6 +162,6 @@ int main() {
     CHECK(arcade_recolor_native(recolored.get(),original.get(),cyc_render_sprite_pixels(),1,rgb)==0);
     CHECK(recolored[30*256]==original[30*256]);
     ppu_state_reloaded(); CHECK(cyc_render_sprite_owner(5)==0 && cyc_sprite_capture.frame[30*256]==0);
-    std::puts("PASS native sprite colors: upload ownership, death, reorder, actual PPU evaluation/pipeline, BG priority, clipping and inert state hash.");
+    std::puts("PASS native sprite colors: phase-end waits, exact bonus portraits and transitions, upload ownership, death, reorder, actual PPU evaluation/pipeline, BG priority, clipping and inert state hash.");
     return 0;
 }

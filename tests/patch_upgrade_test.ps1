@@ -13,8 +13,8 @@ foreach ($name in @('Verificar-Comando', 'Aplicar-Parche')) {
 $fixtureRoot = Join-Path $Scratch ('patch-upgrade-' + [guid]::NewGuid().ToString('N'))
 New-Item -ItemType Directory -Path $fixtureRoot | Out-Null
 foreach ($case in @(
-    @('ui', 'recomp-ui', 'patches/recomp-ui', 'arcade-v1.0.patch'),
-    @('engine', 'deps/nesrecomp-arcade', 'patches/nesrecomp', 'arcade-v0.9.patch'))) {
+    @('ui', 'recomp-ui', 'patches/recomp-ui', 'arcade-v1.0.patch', 'arcade-v1.0.1-editor.patch'),
+    @('engine', 'deps/nesrecomp-arcade', 'patches/nesrecomp', 'arcade-v0.9.patch', 'arcade-v1.0.1-estable.patch'))) {
     $source = Join-Path $Root $case[1]
     $fixture = Join-Path $fixtureRoot $case[0]
     $archive = Join-Path $fixtureRoot ($case[0] + '.tar')
@@ -26,9 +26,10 @@ foreach ($case in @(
     git -C $fixture init --quiet
     Verificar-Comando 'No se pudo aislar la copia de prueba.'
     $patchRoot = Join-Path $Root $case[2]
-    $current = Join-Path $patchRoot 'arcade-v1.0.1-editor.patch'
-    $previous = @((Join-Path $patchRoot 'arcade-v1.0.1-colores.patch'),
-                  (Join-Path $patchRoot 'arcade-v1.0.1.patch'), (Join-Path $patchRoot $case[3]))
+    $current = Join-Path $patchRoot $case[4]
+    $previous = @('arcade-v1.0.1-editor.patch', 'arcade-v1.0.1-colores.patch',
+                  'arcade-v1.0.1.patch', $case[3]) |
+        Where-Object { $_ -ne $case[4] } | ForEach-Object { Join-Path $patchRoot $_ }
     $sentinel = Join-Path $fixture 'mis-cambios-locales.txt'
     [IO.File]::WriteAllText($sentinel, 'conservar')
 
@@ -46,5 +47,5 @@ foreach ($case in @(
         Verificar-Comando 'No se pudo restablecer la copia de prueba.'
     }
     if ([IO.File]::ReadAllText($sentinel) -ne 'conservar') { throw 'Se altero un archivo ajeno al parche.' }
-    Write-Output ("PASS $($case[0]): limpio, idempotente, v1.0.0 y ambas pruebas anteriores v1.0.1.")
+    Write-Output ("PASS $($case[0]): limpio, idempotente y migracion desde $($previous.Count) parches anteriores.")
 }

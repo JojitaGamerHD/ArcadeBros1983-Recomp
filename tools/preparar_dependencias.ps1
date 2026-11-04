@@ -13,7 +13,7 @@ $ui = Join-Path $proyecto 'recomp-ui'
 $revisionMotor = '5a2eddeecc646e9325bef53f3c711e119423f99c'
 $revisionUI = '7c635c6b366a6e0d5d3c913a7fce6ec04dd9f256'
 
-$parcheMotor = Join-Path $proyecto 'patches\nesrecomp\arcade-v1.0.1-editor.patch'
+$parcheMotor = Join-Path $proyecto 'patches\nesrecomp\arcade-v1.0.1-estable.patch'
 $parcheUI = Join-Path $proyecto 'patches\recomp-ui\arcade-v1.0.1-editor.patch'
 
 function Verificar-Comando {
@@ -120,6 +120,7 @@ if ($actualMotor -ne $revisionMotor) {
 }
 
 Aplicar-Parche $motor $parcheMotor 'NESRecomp' @(
+    (Join-Path $proyecto 'patches\nesrecomp\arcade-v1.0.1-editor.patch'),
     (Join-Path $proyecto 'patches\nesrecomp\arcade-v1.0.1-colores.patch'),
     (Join-Path $proyecto 'patches\nesrecomp\arcade-v1.0.1.patch'),
     (Join-Path $proyecto 'patches\nesrecomp\arcade-v0.9.patch'))

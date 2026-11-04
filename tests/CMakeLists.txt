@@ -38,11 +38,20 @@ add_test(NAME native_colors_provenance COMMAND native_colors_test)
 add_executable(colors_editor_test colors_editor_test.cpp color_menu_fixture.c "${ARCADE_ROOT}/src/player_colors.c"
     "${UI_ROOT}/common/recomp_runtime_ui.c" "${UI_ROOT}/common/recomp_runtime_settings.c"
     "${UI_ROOT}/third_party/imgui/imgui.cpp" "${UI_ROOT}/third_party/imgui/imgui_draw.cpp"
-    "${UI_ROOT}/third_party/imgui/imgui_tables.cpp" "${UI_ROOT}/third_party/imgui/imgui_widgets.cpp")
+    "${UI_ROOT}/third_party/imgui/imgui_tables.cpp" "${UI_ROOT}/third_party/imgui/imgui_widgets.cpp"
+    "${UI_ROOT}/third_party/imgui/backends/imgui_impl_sdl2.cpp"
+    "${UI_ROOT}/third_party/imgui/backends/imgui_impl_sdlrenderer2.cpp")
 target_include_directories(colors_editor_test PRIVATE "${ARCADE_ROOT}/src" "${UI_ROOT}"
-    "${UI_ROOT}/common" "${UI_ROOT}/third_party/imgui" "${CYC_ROOT}" "${SDL_ROOT}/include")
+    "${UI_ROOT}/common" "${UI_ROOT}/third_party/imgui" "${UI_ROOT}/third_party/imgui/backends"
+    "${CYC_ROOT}" "${SDL_ROOT}/include")
 target_compile_features(colors_editor_test PRIVATE c_std_11 cxx_std_17)
 target_compile_definitions(colors_editor_test PRIVATE SDL_MAIN_HANDLED _CRT_SECURE_NO_WARNINGS)
+target_link_libraries(colors_editor_test PRIVATE "${SDL_ROOT}/lib/x64/SDL2.lib")
+add_custom_command(TARGET colors_editor_test POST_BUILD COMMAND "${CMAKE_COMMAND}" -E copy_if_different
+    "${SDL_ROOT}/lib/x64/SDL2.dll" "$<TARGET_FILE_DIR:colors_editor_test>"
+    COMMAND "${CMAKE_COMMAND}" -E make_directory "$<TARGET_FILE_DIR:colors_editor_test>/assets/fonts"
+    COMMAND "${CMAKE_COMMAND}" -E copy_if_different "${ARCADE_ROOT}/assets/fonts/PixelifySans.ttf"
+    "$<TARGET_FILE_DIR:colors_editor_test>/assets/fonts/PixelifySans.ttf")
 if(MSVC)
     target_compile_options(colors_editor_test PRIVATE /utf-8)
 endif()

@@ -47,6 +47,10 @@ selecciona una muestra y elige su color en el disco, sin triángulo ni códigos.
 El ángulo elige el tono; la distancia al centro ajusta la saturación. Una barra
 **Brillo** separada permite aclarar u oscurecer el color.
 
+Se corrige la conversión de la posición del ratón entre la imagen escalada del
+juego y el menú de la ventana. El marcador debe seguir el clic y el arrastre,
+y conservar su posición al soltar el botón, también al cambiar de resolución.
+
 La vista previa cambia mientras editas cualquiera de los tres tonos.
 **Listo** conserva los tres colores del personaje; **Cancelar** o Esc restaura
 los tres valores que tenía al abrir el editor. No modifica al otro personaje.
@@ -85,12 +89,19 @@ escriben RAM del juego, paleta, instrucciones recompiladas ni reglas de colisió
 Los datos de procedencia son auxiliares de presentación, separados del estado
 lógico y de la interfaz del módulo privado.
 
-El mapa de entidades sigue siendo específico de la ROM compatible. Los sprites
-no identificados se conservan originales; no se promete personalizar personajes
-dibujados fuera de ese mapa en todas las pantallas de título o bonus. Aquí no se
-dispone de una ROM privada para comprobar visualmente cada fase: las pruebas
-sintéticas cubren cambios de animación, muerte, prioridad y aislamiento de fondo
-y enemigos, y queda repetir la prueba con tu copia real.
+La identificación incluye la pausa al terminar la fase y los personajes del
+recuento de monedas del bonus. Este recuento usa una tabla de sprites distinta
+de las entidades de la partida; se reconocen sus entradas de Mario y Luigi sin
+recolorear las monedas, los números ni el resto de la pantalla. También se
+conservan al pausar/reanudar el recuento y durante su transición a la fase
+siguiente. Los mapas se contrastaron con el
+[desensamblado de la revisión compatible](https://github.com/RussianManSMWC/Mario-Bros.-Dis/blob/0b7ca4de3cac44fb30b579e50691a809f1129816/MarioBrosDisCA65.asm).
+
+El mapa sigue siendo específico de la ROM compatible. Los sprites no
+identificados conservan su aspecto original. Aquí no se dispone de una ROM
+privada para comprobar visualmente cada fase: las pruebas sintéticas cubren
+los mapas reconocidos, animación, muerte, prioridad y aislamiento de fondo y
+enemigos; queda repetir la prueba con tu copia real.
 
 ## Validación realizada en Windows x64
 
@@ -104,13 +115,18 @@ y enemigos, y queda repetir la prueba con tu copia real.
 - El selector visual se prueba con clic de ratón, vista previa inmediata,
   confirmación/cancelación y ventanas de 800×600 y 640×480. El editor de texto
   genérico anterior conserva sus pruebas de compatibilidad.
+  La ruta real SDL/ImGui se comprueba con eventos escalados, clic sin movimiento
+  previo, arrastre sostenido, liberación del botón y bandas laterales, usando
+  una ventana de prueba sin mostrarla en pantalla.
 - La PPU LLE real se prueba con una máquina sintética: carga OAM, estados de
   muerte, reasignación de slots, retraso de tres dots, oclusión por fondo y
   recorte. El hash lógico de PPU y sus índices originales no cambian al activar
-  la captura auxiliar.
+  la captura auxiliar. Se añaden los mapas de fin de fase, bonus para uno/dos
+  jugadores y sus pausas/transiciones; se rechazan retratos incompletos,
+  monedas, slots ajenos y entradas que no coinciden con la OAM enviada.
 - El preparador se comprueba en copias limpias, en actualizaciones desde v1.0.0
-  desde la primera candidata v1.0.1 y desde la prueba con rueda/triángulo,
-  incluyendo su idempotencia.
+  y desde las tres candidatas anteriores de v1.0.1, incluyendo el editor
+  agrupado por personaje y la idempotencia de la actualización.
 - La reproducción aislada de la llamada usada en v1.0.0 confirma que escribe
   otro almacén y deja la asignación del host en Z. Código de salida esperado: 42.
 - Revisión de cambios y comprobación de parches acumulativos sobre las
@@ -175,8 +191,10 @@ Prueba manual en una copia nueva del portable y con tu ROM compatible:
    preset. Prueba un RGB inválido, una ranura vacía y restaurar originales.
 6. Repite colores a 60, 120 y 180 FPS; prueba caminar, saltar, girarse y morir.
    Los cambios de animación no deben perder el color al fallar la interpolación.
-   Prueba cambios de fase, bonus y título; los sprites fuera del mapa reconocido
-   conservan sus colores originales.
+   Completa una fase y un bonus: comprueba los colores de ambos personajes
+   durante la pausa entre fases y el recuento de monedas. Las monedas y los
+   números deben conservar sus colores. El título y los sprites fuera del mapa
+   reconocido conservan su aspecto original.
    Comprueba que la velocidad, colisiones, audio y puntuación se mantienen.
 
 ## Aplicar la entrega como parche

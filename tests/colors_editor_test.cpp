@@ -1,14 +1,23 @@
-/* Exercise the shipping RGB editor and the host's event arbitration without
- * a window, ROM or physical input device. */
+/* Exercise the shipping palette editor and host event arbitration without
+ * showing a window or requiring a ROM or physical input device. */
 #include "cyc_ui_text_input.h"
 #include "player_colors.h"
 #include "imgui.h"
 #include "imgui_internal.h"
 #include "../recomp-ui/src/common/backends/imgui/runtime_ui_imgui.cpp"
+#include "../deps/nesrecomp-arcade/runner/cyc/cyc_ui_imgui.cpp"
 #include <cstdio>
 #include <cstring>
 #include <cmath>
 extern "C" const RecompRuntimeUiItem *test_color_menu(size_t *count);
+
+/* Exercise the shipping host/SDL/ImGui bridge, with only its menu provider
+ * replaced. There is no ROM or native game execution in this test. */
+static RecompRuntimeUi *bridge_ui;
+extern "C" RecompRuntimeUi *cyc_ui_menu_create(const CycUiHost *) { return bridge_ui; }
+extern "C" void cyc_ui_menu_destroy(void) {}
+extern "C" void cyc_ui_menu_refresh(void) {}
+extern "C" RecompRuntimeUi *cyc_ui_runtime(void) { return bridge_ui; }
 
 #define CHECK(x) do { if (!(x)) { std::fprintf(stderr,"FAIL line %d: %s\n",__LINE__,#x); return 1; } } while(0)
 
@@ -203,6 +212,124 @@ static int grouped_editor() {
     return 0;
 }
 
+static ImVec4 editor_disc_bounds() {
+    ImGuiWindow *popup=ImGui::FindWindowByName("Colores del personaje##recomp-runtime-color");
+    if (!popup) return ImVec4();
+    ImGuiTable *table=ImGui::TableFindByID(ImHashStr("##color_columns",0,popup->ID));
+    if (!table) return ImVec4();
+    return ImVec4(table->Columns[0].WorkMinX,table->RowPosY1+table->RowCellPaddingY,
+                  table->Columns[0].WidthGiven,table->Columns[0].WidthGiven);
+}
+
+static int sdl_pointer_bridge() {
+    ImGuiContext *previous=ImGui::GetCurrentContext();
+    CHECK(SDL_setenv("SDL_VIDEODRIVER","dummy",1)==0);
+    CHECK(SDL_Init(SDL_INIT_VIDEO)==0);
+    SDL_Window *window=SDL_CreateWindow("Pointer test",0,0,768,720,SDL_WINDOW_HIDDEN);
+    CHECK(window);
+    SDL_Renderer *renderer=SDL_CreateRenderer(window,-1,SDL_RENDERER_SOFTWARE);
+    CHECK(renderer);
+    const RecompRuntimeUiItem item={"arcade.color.mario","Colores","Mario","",RECOMP_RUNTIME_UI_PALETTE};
+    RecompRuntimeUiConfig config{}; config.title="Colores"; config.theme="nes";
+    config.items=&item; config.item_count=1;
+    config.callbacks.get_palette=arcade_colors_get_palette;
+    config.callbacks.set_palette=arcade_colors_set_palette;
+    config.callbacks.get_color_preview=arcade_colors_preview;
+    bridge_ui=recomp_runtime_ui_create(&config);
+    CHECK(bridge_ui && recomp_runtime_ui_open_section(bridge_ui,"Colores"));
+    CHECK(cyc_ui_init(window,renderer,nullptr));
+    ImGuiIO &io=ImGui::GetIO(); io.ConfigInputTrickleEventQueue=false;
+    CHECK(recomp_runtime_ui_handle_input(bridge_ui,RECOMP_RUNTIME_UI_INPUT_ACCEPT,1,0));
+    const int sizes[][2]={{768,720},{1080,720},{960,640}};
+    for (const auto &size:sizes) {
+        SDL_SetWindowSize(window,size[0],size[1]);
+        CHECK(SDL_RenderSetLogicalSize(renderer,256,240)==0);
+        SDL_Event pending; while (SDL_PollEvent(&pending)) {}
+        for (int f=0;f<4;++f) cyc_ui_render();
+        const ImVec4 rect=editor_disc_bounds();
+        CHECK(rect.z>=120 && rect.w==rect.z);
+        for (int f=0;f<10;++f) {
+            cyc_ui_render(); const ImVec4 stable=editor_disc_bounds();
+            CHECK(stable.x==rect.x && stable.y==rect.y && stable.z==rect.z);
+        }
+        const float radius=rect.z*0.5f-4;
+        const int mouse_x=int(std::lround(rect.x+rect.z*0.5f+radius*0.42f));
+        const int mouse_y=int(std::lround(rect.y+rect.z*0.5f+radius*0.42f));
+        /* Reproduce the old host's raw forwarding through the real backend:
+         * it puts ImGui's pointer in console coordinates, far from the disc
+         * point actually clicked in this full-window popup. */
+        SDL_Event event{}; event.type=SDL_MOUSEMOTION;
+        event.motion.windowID=SDL_GetWindowID(window); event.motion.x=mouse_x; event.motion.y=mouse_y;
+        CHECK(SDL_PushEvent(&event)==1);
+        CHECK(SDL_PeepEvents(&event,1,SDL_GETEVENT,SDL_MOUSEMOTION,SDL_MOUSEMOTION)==1);
+        ImGui_ImplSDL2_ProcessEvent(&event); cyc_ui_render();
+        CHECK(std::fabs(io.MousePos.x-mouse_x)>40 || std::fabs(io.MousePos.y-mouse_y)>40);
+        /* Real SDL filtering changes window positions into console positions.
+         * Send a button without motion first: the host must also use its
+         * coordinates, since the stock ImGui SDL backend ignores them. */
+        event={}; event.type=SDL_MOUSEBUTTONDOWN;
+        event.button.windowID=SDL_GetWindowID(window); event.button.button=SDL_BUTTON_LEFT;
+        event.button.x=mouse_x; event.button.y=mouse_y;
+        CHECK(SDL_PushEvent(&event)==1);
+        bool found=SDL_PeepEvents(&event,1,SDL_GETEVENT,SDL_MOUSEBUTTONDOWN,SDL_MOUSEBUTTONDOWN)==1;
+        CHECK(found && (event.button.x!=mouse_x || event.button.y!=mouse_y));
+        const SDL_Event original=event;
+        cyc_ui_process_event(&event); cyc_ui_render();
+        CHECK(event.button.x==original.button.x && event.button.y==original.button.y);
+        CHECK(std::fabs(io.MousePos.x-mouse_x)<=5 && std::fabs(io.MousePos.y-mouse_y)<=5);
+        CHECK(std::fabs(bridge_ui->color_hue[0]-0.125f)<0.02f);
+        CHECK(std::fabs(bridge_ui->color_saturation[0]-0.594f)<0.05f);
+        const float first_h=bridge_ui->color_hue[0],first_s=bridge_ui->color_saturation[0];
+        for (int f=0;f<8;++f) {
+            event={}; event.type=SDL_MOUSEMOTION; event.motion.windowID=SDL_GetWindowID(window);
+            event.motion.state=SDL_BUTTON_LMASK; event.motion.x=mouse_x; event.motion.y=mouse_y;
+            CHECK(SDL_PushEvent(&event)==1);
+            found=SDL_PeepEvents(&event,1,SDL_GETEVENT,SDL_MOUSEMOTION,SDL_MOUSEMOTION)==1;
+            CHECK(found); cyc_ui_process_event(&event); cyc_ui_render();
+            CHECK(std::fabs(io.MousePos.x-mouse_x)<=5 && std::fabs(io.MousePos.y-mouse_y)<=5);
+            CHECK(std::fabs(bridge_ui->color_hue[0]-first_h)<0.01f);
+            CHECK(std::fabs(bridge_ui->color_saturation[0]-first_s)<0.025f);
+        }
+        const float drags[][4]={{0,0.8f,0.25f,0.8f},{-0.8f,0,0.5f,0.8f},{2,0,0,1}};
+        int last_x=mouse_x,last_y=mouse_y;
+        for (const auto &point:drags) {
+            last_x=int(std::lround(rect.x+rect.z*0.5f+radius*point[0]));
+            last_y=int(std::lround(rect.y+rect.z*0.5f+radius*point[1]));
+            event={}; event.type=SDL_MOUSEMOTION; event.motion.windowID=SDL_GetWindowID(window);
+            event.motion.state=SDL_BUTTON_LMASK; event.motion.x=last_x; event.motion.y=last_y;
+            CHECK(SDL_PushEvent(&event)==1);
+            CHECK(SDL_PeepEvents(&event,1,SDL_GETEVENT,SDL_MOUSEMOTION,SDL_MOUSEMOTION)==1);
+            cyc_ui_process_event(&event); cyc_ui_render();
+            const float h=bridge_ui->color_hue[0];
+            CHECK(std::min(std::fabs(h-point[2]),1-std::fabs(h-point[2]))<0.02f);
+            CHECK(std::fabs(bridge_ui->color_saturation[0]-point[3])<0.05f);
+        }
+        const float end_h=bridge_ui->color_hue[0],end_s=bridge_ui->color_saturation[0];
+        event={}; event.type=SDL_MOUSEBUTTONUP; event.button.windowID=SDL_GetWindowID(window);
+        event.button.button=SDL_BUTTON_LEFT; event.button.x=last_x; event.button.y=last_y;
+        CHECK(SDL_PushEvent(&event)==1);
+        CHECK(SDL_PeepEvents(&event,1,SDL_GETEVENT,SDL_MOUSEBUTTONUP,SDL_MOUSEBUTTONUP)==1);
+        cyc_ui_process_event(&event);
+        cyc_ui_render();
+        CHECK(bridge_ui->color_hue[0]==end_h && bridge_ui->color_saturation[0]==end_s);
+        /* The original host event and other windows must remain untouched. */
+        event={}; event.type=SDL_MOUSEMOTION; event.motion.windowID=SDL_GetWindowID(window)+100;
+        event.motion.x=27; event.motion.y=81;
+        SDL_Event other=cyc_ui_pointer_window_event(renderer,&event);
+        CHECK(other.motion.x==27 && other.motion.y==81);
+        event.motion.windowID=SDL_GetWindowID(window);
+        CHECK(SDL_RenderSetLogicalSize(renderer,0,0)==0);
+        other=cyc_ui_pointer_window_event(renderer,&event);
+        CHECK(other.motion.x==27 && other.motion.y==81);
+        other=cyc_ui_pointer_window_event(nullptr,&event);
+        CHECK(other.motion.x==27 && other.motion.y==81);
+    }
+    cyc_ui_shutdown(); recomp_runtime_ui_destroy(bridge_ui); bridge_ui=nullptr;
+    SDL_DestroyRenderer(renderer); SDL_DestroyWindow(window); SDL_Quit();
+    ImGui::SetCurrentContext(previous);
+    return 0;
+}
+
 int main() {
     const RecompRuntimeUiItem color={"arcade.color.m1","Colores","Mario - color 1",
         "#RRGGBB",RECOMP_RUNTIME_UI_TEXT,0,0,0,nullptr,0,nullptr};
@@ -284,7 +411,8 @@ int main() {
     CHECK(wheel_editor()==0);
     CHECK(disc_controls()==0);
     CHECK(grouped_editor()==0);
+    CHECK(sdl_pointer_bridge()==0);
     ImGui::DestroyContext();
-    std::puts("PASS grouped characters, three tones, hue/saturation disc, live preview, cancel/save and 640x480 layout.");
+    std::puts("PASS grouped palettes, stable SDL-scaled mouse clicks/drags, letterboxing, live preview, cancel/save and compact layout.");
     return 0;
 }
