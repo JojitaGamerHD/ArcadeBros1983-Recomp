@@ -45,7 +45,7 @@ Para construir el ZIP, indica la ruta real de Python en tu equipo:
 ```powershell
 powershell -NoProfile -ExecutionPolicy Bypass `
     -File .\tools\native_module\crear_publico.ps1 `
-    -Python "C:\ruta\a\python.exe"
+    -Version 1.0.1 -Python "C:\ruta\a\python.exe"
 ```
 
 El script puede descargar y verificar LLVM. Si ya tienes el subconjunto de
@@ -60,10 +60,10 @@ ni requiere una ROM en el repositorio. Usa el proyecto de CMake de
 
 ## Resultado y comprobación
 
-Cada ejecución crea una carpeta nueva `build/r100-...` y conserva sus registros.
+Cada ejecución crea una carpeta nueva `build/r101-...` y conserva sus registros.
 Dentro aparecen:
 
-- `ArcadeBros1983-Recomp-v1.0.0-Windows-x64.zip`.
+- `ArcadeBros1983-Recomp-v1.0.1-Windows-x64.zip`.
 - El archivo `.zip.sha256` con su huella.
 - `resultado.json` con las rutas del artefacto y la copia limpia.
 - `prueba-limpia`, extraída desde el ZIP para comprobar su primera apertura.

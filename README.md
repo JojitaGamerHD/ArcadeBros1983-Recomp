@@ -5,7 +5,7 @@
 [![Estado](https://img.shields.io/badge/estado-Completo-blue)](https://github.com/JojitaGamerHD/ArcadeBros1983-Recomp)
 [![Plataforma](https://img.shields.io/badge/plataforma-Windows%20x64-blue)](https://github.com/JojitaGamerHD/ArcadeBros1983-Recomp)
 
-**Versión: v1.0.1** · Integrada en `main` · Release pendiente
+**Versión: v1.0.1** · [Descarga pública para Windows x64](https://github.com/JojitaGamerHD/ArcadeBros1983-Recomp/releases/tag/v1.0.1)
 
 v1.0.0 incorpora un ZIP con ejecutable y preparación automática desde la ROM del
 jugador. La primera apertura prepara un módulo nativo privado; las siguientes
@@ -17,13 +17,13 @@ y las herramientas genéricas. Cada jugador aporta su propia ROM compatible
 y, si quiere música de fondo, una pista local. El proyecto es independiente,
 sin fines comerciales y sin afiliación con Nintendo.
 
-## Descargar y jugar (última release publicada: v1.0.0)
+## Descargar y jugar (v1.0.1)
 
-En [Releases](https://github.com/JojitaGamerHD/ArcadeBros1983-Recomp/releases),
+En [la release v1.0.1](https://github.com/JojitaGamerHD/ArcadeBros1983-Recomp/releases/tag/v1.0.1),
 busca el archivo de Windows de esta versión:
 
 ```text
-ArcadeBros1983-Recomp-v1.0.0-Windows-x64.zip
+ArcadeBros1983-Recomp-v1.0.1-Windows-x64.zip
 ```
 
 1. Extrae el ZIP completo en una carpeta con permiso de escritura.
@@ -59,7 +59,9 @@ La release incluye un archivo `.zip.sha256` y el paquete lleva
 
 Consulta [NOTAS-v1.0.1](docs/NOTAS-v1.0.1.md) para compilar, probar y conocer las limitaciones.
 Para probar en otro PC, sigue [PROBAR-v1.0.1-WINDOWS](docs/PROBAR-v1.0.1-WINDOWS.md).
-La rama contiene fuentes para compilar; todavía no hay una release ni un tag v1.0.1.
+La release incluye el ZIP de Windows y su `.zip.sha256`; las fuentes se identifican
+con el tag `v1.0.1`. Para actualizar, extrae el ZIP en una carpeta nueva y copia
+tu carpeta `Datos` anterior con el programa cerrado.
 
 ## Novedades de v1.0.0
 
@@ -179,7 +181,7 @@ powershell -NoProfile -ExecutionPolicy Bypass `
 
 El empaquetador construye el motor y las herramientas genéricas sin consultar
 una ROM. Genera el ZIP, su `.sha256` y una copia limpia de comprobación en
-una carpeta nueva `build/r100-...`.
+una carpeta nueva `build/r101-...`.
 
 Consulta [COMPILAR-PORTABLE-v1.0.0](docs/COMPILAR-PORTABLE-v1.0.0.md) para los
 parámetros de LLVM, el proceso de empaquetado y las comprobaciones de distribución.

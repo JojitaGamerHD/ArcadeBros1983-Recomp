@@ -1,9 +1,9 @@
-# v1.0.1 — integrada en main, sin release
+# v1.0.1 — descarga pública para Windows x64
 
 Preparada a partir del tag `v1.0.0` (`c8c6c76d28b279477fb7effab84f15ed0cb591c6`).
 Probada por el autor en su PC e integrada en `main` con su autorización.
 La rama `desarrollo-v1.0.1` se conserva como referencia de las pruebas.
-No se crea tag ni release.
+La descarga y sus fuentes están en la [release v1.0.1](https://github.com/JojitaGamerHD/ArcadeBros1983-Recomp/releases/tag/v1.0.1).
 La guía breve de descarga y compilación está en [PROBAR-v1.0.1-WINDOWS](PROBAR-v1.0.1-WINDOWS.md).
 
 ## Controles
@@ -133,12 +133,22 @@ enemigos; queda repetir la prueba con tu copia real.
 - Revisión de cambios y comprobación de parches acumulativos sobre las
   revisiones fijadas. Los gitlinks y las revisiones de dependencias se conservan.
 
-No se aportó una ROM compatible ni pista musical a esta copia. No se ejecutó
-una partida real, no se probaron mandos físicos, ni se validó visualmente la
-interfaz en partida. No se generó el ZIP portable completo: falta una instalación
-real de Python y el kit LLVM portátil. Los binarios del motor sí compilan y las
-pruebas no necesitan ROM. La candidata requiere las comprobaciones manuales
-siguientes antes de publicar.
+El autor comprobó la candidata en su PC y confirmó su funcionamiento después
+de los últimos ajustes del selector y los colores. En este entorno no se
+aportó una ROM compatible ni pista musical, ni se probaron mandos físicos.
+
+Se construyó el ZIP público de Windows x64 con el empaquetador del proyecto:
+465 archivos, incluidos 80 headers del SDK genérico. Se comprobaron la lista
+permitida, los hashes internos y la extracción limpia. El importador, el host
+genérico y el compilador empaquetados pasaron sus comprobaciones sin ROM;
+la primera apertura mostró el selector de ROM. No se ejecutó aquí la
+importación completa ni una partida con el ZIP público.
+
+Archivo: `ArcadeBros1983-Recomp-v1.0.1-Windows-x64.zip` (82.077.392 bytes).
+SHA256: `47e45b75a4196d5518444a068a3e434ffee161b910a0fbb70dbf5844c36236e8`.
+El paquete no contiene ROM, música, `Datos` ni módulos privados generados.
+Las comprobaciones manuales siguientes también sirven para futuras
+actualizaciones y pruebas en otros equipos.
 
 ## Cómo compilar y probar en Windows
 
