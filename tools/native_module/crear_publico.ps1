@@ -1,13 +1,13 @@
 param(
     [string]$Compilador,
     [string]$Python,
-    [string]$Version='1.0.0'
+    [string]$Version='1.0.1'
 )
 $ErrorActionPreference='Stop'
 # Windows PowerShell targets an older .NET compatibility profile by default.
 [AppContext]::SetSwitch('Switch.System.IO.Compression.ZipFile.UseBackslash',$false)
 $raiz=(Resolve-Path -LiteralPath (Join-Path $PSScriptRoot '../..')).Path
-if ($Version -notmatch '^\d+\.\d+\.\d+(?:-[0-9A-Za-z]+(?:[.-][0-9A-Za-z]+)*)?(?:\+[0-9A-Za-z]+(?:[.-][0-9A-Za-z]+)*)?$') { throw 'La version debe tener formato SemVer, por ejemplo 1.0.0.' }
+if ($Version -notmatch '^\d+\.\d+\.\d+(?:-[0-9A-Za-z]+(?:[.-][0-9A-Za-z]+)*)?(?:\+[0-9A-Za-z]+(?:[.-][0-9A-Za-z]+)*)?$') { throw 'La version debe tener formato SemVer, por ejemplo 1.0.1.' }
 $engine=Join-Path $raiz 'deps/nesrecomp-arcade'
 $publico=Join-Path $PSScriptRoot 'public'
 foreach ($p in @(
@@ -29,7 +29,7 @@ $Python=(Resolve-Path -LiteralPath $Python).Path
 $cmake=(Get-Command cmake.exe -ErrorAction Stop).Source
 $buildRaiz=Join-Path $raiz 'build'
 New-Item -ItemType Directory -Path $buildRaiz -Force | Out-Null
-$build=Join-Path $buildRaiz ('r100-'+[guid]::NewGuid().ToString('N').Substring(0,8))
+$build=Join-Path $buildRaiz ('r101-'+[guid]::NewGuid().ToString('N').Substring(0,8))
 New-Item -ItemType Directory -Path $build | Out-Null
 $dev=Join-Path $build 'dev'
 $sdk=Join-Path $build 'sdk'

@@ -16,6 +16,7 @@
 #include "music.h"
 #include "music_gate.h"
 #include "smooth_host.h"
+#include "player_colors.h"
 #include "recomp_runtime_ui.h"
 #include <stdbool.h>
 #include <stdint.h>
@@ -215,7 +216,8 @@ static const RecompRuntimeUiItem opciones_creditos[] = {
         .label = "Port desarrollado por JojitaGamerHD",
         .description = "Ver los creditos completos del proyecto.",
         .type = RECOMP_RUNTIME_UI_ACTION
-    }
+    },
+#include "player_colors_menu.inc"
 };
 
 static int mostrar_creditos(
@@ -223,7 +225,7 @@ static int mostrar_creditos(
     const RecompRuntimeUiItem *item
 ) {
     (void)context;
-    (void)item;
+    if (strcmp(item->key, "arcade.creditos")) return arcade_colors_action(context, item);
 
 #ifdef _WIN32
     MessageBoxA(
@@ -247,7 +249,14 @@ static int mostrar_creditos(
 }
 
 static const RecompRuntimeUiCallbacks callbacks_creditos = {
-    .run_action = mostrar_creditos
+    .run_action = mostrar_creditos,
+    .get_value = arcade_colors_get,
+    .set_value = arcade_colors_set,
+    .get_text = arcade_colors_get_text,
+    .set_text = arcade_colors_set_text,
+    .get_color_preview = arcade_colors_preview,
+    .get_palette = arcade_colors_get_palette,
+    .set_palette = arcade_colors_set_palette
 };
 static const CycHostExtras extras = {
     .present = arcade_video_present,
@@ -264,6 +273,8 @@ static const CycHostExtras extras = {
     .menu_item_count =
         sizeof(opciones_creditos) / sizeof(opciones_creditos[0]),
     .menu_callbacks = &callbacks_creditos,
+    .load_setting = arcade_colors_load,
+    .save_settings = arcade_colors_save,
 };
 
 const CycHostExtras *cyc_host_extras(void) {

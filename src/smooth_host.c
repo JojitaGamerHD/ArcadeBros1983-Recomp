@@ -1,6 +1,8 @@
 /* ARCADE_SMOOTH_VIDEO_V090: observe the original game; never write its RAM. */
 #include "smooth_host.h"
 #include "smooth_video.h"
+#include "player_colors.h"
+#include "player_sprite.h"
 #include "cyc_render.h"
 #include "cyc_mod.h"
 #include <string.h>
@@ -16,6 +18,63 @@ static PreparedSprites previous, prepared;
 static ArcadeSmoothFrame from, to;
 static ArcadeVideoStats stats;
 static unsigned part, parts = 1, current_scale = 1;
+static uint32_t colored_native[256*240];
+
+static unsigned observe_sprite_owner(unsigned slot, const uint8_t entry[4], void *ctx) {
+    (void)ctx;
+    ArcadeSpriteLayout layout;
+    memset(&layout,0,sizeof layout);
+    /* Identify the scene at upload time, including the retained phase-end
+     * picture and the bonus results' separate, fixed portrait table. */
+    arcade_sprite_scene(&layout,cyc_mod_peek(0x40),cyc_mod_peek(0x3B),cyc_mod_peek(0x4B4),
+                        cyc_mod_peek(0x30),cyc_mod_peek(0x51));
+    if (!layout.gameplay && !layout.bonus_results) return 0;
+    for (unsigned e=0;e<ENTITIES;++e) {
+        uint16_t base=(uint16_t)(0x300+0x20*e);
+        layout.active[e]=cyc_mod_peek(base);
+        layout.draw[e]=cyc_mod_peek(base+5);
+        layout.offset[e]=cyc_mod_peek(base+10);
+        if (e<2) layout.state[e]=cyc_mod_peek(base+22);
+    }
+    if (layout.bonus_results)
+        for (unsigned i=0;i<12*4;++i) layout.shadow[i]=cyc_mod_peek((uint16_t)(0x200+i));
+    for (unsigned i=0;i<4;++i) layout.shadow[slot*4+i]=cyc_mod_peek((uint16_t)(0x200+slot*4+i));
+    return arcade_player_sprite_owner(&layout,slot,entry);
+}
+
+static void capture_player_preview(unsigned player) {
+    const uint8_t *oam=cyc_render_oam();
+    int left=256, top=240, right=0, bottom=0;
+    for (unsigned slot=0;slot<64;++slot) {
+        if (cyc_render_sprite_owner(slot)!=player+1 || oam[slot*4]>=0xEF) continue;
+        const uint8_t *s=oam+slot*4;
+        int y=s[0]+1, height=cyc_render_line_sprite16(y)?16:8;
+        if (s[3]<left) left=s[3]; if (y<top) top=y;
+        if (s[3]+8>right) right=s[3]+8; if (y+height>bottom) bottom=y+height;
+    }
+    int width=right-left, height=bottom-top;
+    if (width<=0 || width>32 || height<=0 || height>32) return;
+    uint8_t indices[32*32]={0};
+    for (unsigned slot=0;slot<64;++slot) {
+        if (cyc_render_sprite_owner(slot)!=player+1 || oam[slot*4]>=0xEF) continue;
+        const uint8_t *s=oam+slot*4; int y=s[0]+1;
+        int tall=cyc_render_line_sprite16(y), rows=tall?16:8;
+        for (int row=0;row<rows;++row) {
+            int r=(s[2]&0x80)?rows-1-row:row;
+            unsigned pattern=tall?(s[1]&1u)*0x1000u+(s[1]&0xFEu)*16u+(unsigned)(r/8)*16u:
+                cyc_render_line_sprite_table(y)+(unsigned)s[1]*16u;
+            unsigned lo=cyc_render_chr((uint16_t)(pattern+(r&7)));
+            unsigned hi=cyc_render_chr((uint16_t)(pattern+(r&7)+8));
+            for (int column=0;column<8;++column) {
+                int bit=(s[2]&0x40)?column:7-column;
+                uint8_t color=(uint8_t)(((lo>>bit)&1u)|(((hi>>bit)&1u)<<1));
+                unsigned at=(unsigned)((y-top+row)*width+s[3]-left+column);
+                if (color && !indices[at]) indices[at]=color;
+            }
+        }
+    }
+    arcade_colors_capture_preview(player,indices,width,height);
+}
 
 static int prepare_sprites(PreparedSprites *out) {
     static const unsigned counts[8] = {6,4,2,2,2,2,2,1};
@@ -60,11 +119,14 @@ void arcade_video_init(void) {
     memset(&stats, 0, sizeof(stats));
     part = 0; parts = current_scale = 1;
     cyc_render_capture_background(true);
+    cyc_render_set_sprite_owners(observe_sprite_owner,NULL);
 }
 
 void arcade_video_frame(void) {
     ++stats.frames;
+    capture_player_preview(0); capture_player_preview(1);
     from.eligible = to.eligible = 0;
+    from.color_enabled = to.color_enabled = 0;
     prepare_sprites(&prepared);
     const uint8_t *physical = cyc_render_oam();
     int coherent = previous.valid && prepared.valid && previous.scene == prepared.scene;
@@ -120,10 +182,21 @@ void arcade_video_phase(void *ctx, unsigned numerator, unsigned denominator) {
 unsigned arcade_video_scale(void *ctx) { (void)ctx; return current_scale; }
 const uint32_t *arcade_video_present(void *ctx, int *width, int *height) {
     (void)ctx; current_scale = 1;
-    if (parts != 2 && parts != 3) return NULL;
+    from.color_enabled = arcade_colors_current(from.player_colors);
+    to.color_enabled = arcade_colors_current(to.player_colors);
+    if (parts != 2 && parts != 3 && !(parts == 1 && from.color_enabled)) return NULL;
     const uint32_t *out = arcade_smooth_render_pair(&from, &to, part, parts, width, height);
     if (out) { current_scale = ARCADE_SMOOTH_SCALE; if (part) ++stats.rendered; }
-    else ++stats.native_fallback;
+    else {
+        ++stats.native_fallback;
+        /* Rejected interpolation must not discard character colors. The
+         * native mask comes from the actual winning PPU sprite pixels, so
+         * animation changes, death and other moving objects are independent. */
+        if (from.color_enabled && arcade_recolor_native(colored_native,cyc_frame_argb(),
+                cyc_render_sprite_pixels(),from.color_enabled,from.player_colors)) {
+            *width=256; *height=240; return colored_native;
+        }
+    }
     return out;
 }
 void arcade_video_stats(ArcadeVideoStats *out) { if (out) *out = stats; }

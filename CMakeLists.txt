@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.20)
 
-project(ArcadeBros1983Recomp LANGUAGES C CXX)
+project(ArcadeBros1983Recomp VERSION 1.0.1 LANGUAGES C CXX)
 
 set(CMAKE_C_STANDARD 11)
 set(CMAKE_CXX_STANDARD 17)
@@ -23,6 +23,7 @@ nesrecomp_add_cycle_game(ArcadeBros1983Recomp
     PLAYERS 2
     REGION NTSC
     HOST_EXTRAS "${CMAKE_CURRENT_SOURCE_DIR}/src/records.c"
+                "${CMAKE_CURRENT_SOURCE_DIR}/src/player_colors.c"
                 "${CMAKE_CURRENT_SOURCE_DIR}/src/music.cpp"
                 "${CMAKE_CURRENT_SOURCE_DIR}/src/smooth_video.cpp"
                 "${CMAKE_CURRENT_SOURCE_DIR}/src/smooth_host.c"

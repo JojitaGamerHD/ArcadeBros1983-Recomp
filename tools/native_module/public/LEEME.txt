@@ -51,6 +51,15 @@ Si la preparación falla, el mensaje indica dónde encontrar su registro en
 Datos/Logs. Comprueba que extrajiste todos los archivos y que la ROM coincide
 con la revisión admitida.
 
+En v1.0.1, configura teclado y mandos desde el launcher. Esc cancela una
+asignacion; Retroceso la borra. Los conflictos se indican en pantalla.
+Pausa > Colores tiene un boton Mario y otro Luigi. Cada editor muestra el
+personaje y sus tres tonos; elige con el disco de color y la barra Brillo,
+sin triangulo ni codigos. Listo conserva los tres colores; Cancelar o Esc
+restaura los tres valores anteriores del personaje. Se mantienen ocho presets.
+Primero entra en una partida para capturar la referencia desde tu ROM.
+Los ajustes y presets quedan en Datos/config.ini.
+
 Proyecto, fuentes, cambios y avisos de componentes:
 https://github.com/JojitaGamerHD/ArcadeBros1983-Recomp
 Consulta también SOURCES.txt y Bin/licenses.
