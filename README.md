@@ -5,35 +5,35 @@
 [![Estado](https://img.shields.io/badge/estado-Completo-blue)](https://github.com/JojitaGamerHD/ArcadeBros1983-Recomp)
 [![Plataforma](https://img.shields.io/badge/plataforma-Windows%20x64-blue)](https://github.com/JojitaGamerHD/ArcadeBros1983-Recomp)
 
-**Versión: v1.0.1** · [Descarga pública para Windows x64](https://github.com/JojitaGamerHD/ArcadeBros1983-Recomp/releases/tag/v1.0.1)
+**Versión: v1.0.2** · [Descarga pública para Windows x64](https://github.com/JojitaGamerHD/ArcadeBros1983-Recomp/releases/tag/v1.0.2)
 
-v1.0.0 incorpora un ZIP con ejecutable y preparación automática desde la ROM del
-jugador. La primera apertura prepara un módulo nativo privado; las siguientes
-reutilizan la caché. El jugador puede descargar, extraer y abrir el launcher
-sin instalar Visual Studio, CMake ni Python.
+El menú principal se abre con
+`Bin/ArcadeNativeHost.exe` antes de importar la ROM. El menú reúne los
+cuatro modos de juego, Opciones, Seleccionar ROM y Salir. La partida y la
+pausa se muestran en esa misma ventana.
 
 El repositorio contiene fuentes, scripts y parches. El ZIP contiene el motor
 y las herramientas genéricas. Cada jugador aporta su propia ROM compatible
 y, si quiere música de fondo, una pista local. El proyecto es independiente,
 sin fines comerciales y sin afiliación con Nintendo.
 
-## Descargar y jugar (v1.0.1)
+## Descargar y jugar
 
-En [la release v1.0.1](https://github.com/JojitaGamerHD/ArcadeBros1983-Recomp/releases/tag/v1.0.1),
+En [la release v1.0.2](https://github.com/JojitaGamerHD/ArcadeBros1983-Recomp/releases/tag/v1.0.2),
 busca el archivo de Windows de esta versión:
 
 ```text
-ArcadeBros1983-Recomp-v1.0.1-Windows-x64.zip
+ArcadeBros1983-Recomp-v1.0.2-Windows-x64.zip
 ```
 
 1. Extrae el ZIP completo en una carpeta con permiso de escritura.
-2. Abre `ArcadeBrosLauncher.exe` y selecciona tu ROM de Mario Bros. (NES).
-3. Espera a que termine la preparación inicial y pulsa **JUGAR**.
+2. Abre `Bin/ArcadeNativeHost.exe` y selecciona tu ROM de Mario Bros. (NES).
+3. Espera a que termine la preparación y elige jugadores y modo.
 4. En las siguientes aperturas se reutiliza el módulo preparado.
 
 Requisitos del paquete: **Windows 10 versión 1903 o posterior, o Windows 11,
 x64**, componentes multimedia de Windows y un controlador gráfico compatible
-con **OpenGL 3.3** para el launcher. Las ediciones Windows N necesitan Media
+con **OpenGL 3.3** para el menú. Las ediciones Windows N necesitan Media
 Feature Pack para esta aplicación.
 
 La revisión de ROM admitida se identifica por su SHA256 completo:
@@ -47,6 +47,16 @@ su contenido. El proyecto no proporciona archivos ni enlaces de descarga de ROMs
 
 La release incluye un archivo `.zip.sha256` y el paquete lleva
 `MANIFIESTO-SHA256.txt`, con las huellas de sus archivos originales.
+
+## Cambios de v1.0.2
+
+- Menú retro integrado, pausa y opciones en una sola ventana, con navegación por teclado y mando.
+- Modos Estándar (A) y Arcade (B) para uno o dos jugadores.
+- Fanfarria y demostración originales desde la ROM local. Al terminar la partida se vuelve al menú integrado.
+- Ajustes, controles personalizados, rueda de colores, ocho presets y récords persistentes.
+
+Para actualizar, extrae el ZIP en una carpeta nueva y copia `Datos` de tu
+instalación anterior con el programa cerrado.
 
 ## Cambios de v1.0.1
 
@@ -86,11 +96,13 @@ Consulta el alcance de la validación y las limitaciones en
 
 ## Controles y ajustes
 
-El launcher permite configurar teclado y mandos. Se ha comprobado el uso de
-un mando Xbox en el entorno de desarrollo. **Esc** abre la pausa y **F11**
-cambia la pantalla completa con los atajos predeterminados.
+En v1.0.2, abre **Opciones → Controles** y elige **J1** o **J2** para
+configurar teclado y mandos. En v1.0.1, los controles se ajustan desde el
+launcher, donde se ha comprobado el uso de un mando Xbox en el entorno de
+desarrollo. **Esc** abre la pausa y **F11** cambia la pantalla completa con
+los atajos predeterminados.
 
-Pantalla, Gráficos y Audio comparten sus ajustes entre el launcher y la pausa.
+Pantalla, Gráficos y Audio comparten sus ajustes entre el menú de inicio y la pausa.
 El menú de pausa permanece fijo; la ventana del juego se puede redimensionar.
 Los cambios de FPS, filtro o volumen conservan su tamaño.
 
@@ -132,8 +144,8 @@ original de la release; los archivos añadidos para jugar quedan en tu copia loc
 
 ```text
 ArcadeBros1983Recomp/
-├── ArcadeBrosLauncher.exe
 ├── Bin/                         motor, herramientas, recursos y avisos
+│   └── ArcadeNativeHost.exe     ejecutable del juego
 └── Datos/                       creado al usar el programa
     ├── Cache/                   ROM, código generado y módulo privados
     ├── ROM/                     copia de ROM para futuras versiones
@@ -179,12 +191,12 @@ powershell -NoProfile -ExecutionPolicy Bypass `
     -Python "C:\ruta\a\python.exe"
 ```
 
-El empaquetador construye el motor y las herramientas genéricas sin consultar
-una ROM. Genera el ZIP, su `.sha256` y una copia limpia de comprobación en
-una carpeta nueva `build/r101-...`.
+En la rama de desarrollo, el empaquetador construye el motor y las herramientas
+genéricas sin consultar una ROM. Genera el ZIP, su `.sha256` y una copia
+limpia de comprobación en una carpeta nueva `build/r102-...`.
 
-Consulta [COMPILAR-PORTABLE-v1.0.0](docs/COMPILAR-PORTABLE-v1.0.0.md) para los
-parámetros de LLVM, el proceso de empaquetado y las comprobaciones de distribución.
+Consulta [Motor genérico e importación local](tools/native_module/README.md)
+para los parámetros de LLVM y las pruebas de distribución.
 
 ### Dependencias fijadas
 

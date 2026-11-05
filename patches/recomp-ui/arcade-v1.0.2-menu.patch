@@ -1,0 +1,1945 @@
+diff --git a/src/common/backends/imgui/launcher_imgui.cpp b/src/common/backends/imgui/launcher_imgui.cpp
+--- a/src/common/backends/imgui/launcher_imgui.cpp
++++ b/src/common/backends/imgui/launcher_imgui.cpp
+@@ -73,6 +73,8 @@
+ #endif
+ 
+ #include <algorithm>
++#include <cfloat>
++#include <cmath>
+ #include <cerrno>
+ #include <cctype>
+ #include <cstdio>
+@@ -81,6 +83,7 @@
+ #include <filesystem>
+ #include <functional>
+ #include <string>
++#include <string_view>
+ #include <unordered_map>
+ #include <vector>
+ #if defined(_WIN32)
+@@ -1443,10 +1446,12 @@
+     }
+ }
+ 
++ImFont* g_arcade_title_font = nullptr;
++
+ // ---- DPI: rebuild fonts + re-derive style from an unscaled baseline ----------
+ void apply_scale(const LauncherTheme& th, float scale, const char* font_path,
+                  const char* jp_font_path, const char* symbols_font_path,
+-                 const char* emoji_font_path) {
++                 const char* emoji_font_path, bool arcade_menu) {
+     ImGuiIO& io = ImGui::GetIO();
+     io.Fonts->Clear();
+     ImFontConfig cfg; cfg.OversampleH = 2; cfg.OversampleV = 2;
+@@ -1517,6 +1522,9 @@
+      * rendering them denser would make them bigger, not sharper. Correct size,
+      * a little soft on a HiDPI display — the one thing density cannot fix. */
+     emoji_atlas_reserve(io.Fonts, base_font, body);
++    g_arcade_title_font = nullptr;
++    if (arcade_menu && loaded)
++        g_arcade_title_font = io.Fonts->AddFontFromFileTTF(font_path, 52.0f, &cfg);
+     io.Fonts->Build();
+     emoji_atlas_blit(io.Fonts);
+     g_emoji_atlas_dirty = false;
+@@ -1756,8 +1764,9 @@
+ // to the remaining height (used by the dashboard columns so the layout doesn't
+ // leave a big empty gap under short cards).
+ bool begin_panel(const char* id, float logical_w = 0.0f, bool fill_h = false,
+-                 bool no_scroll = false) {
++                 bool no_scroll = false, bool flatten_nav = false) {
+     ImGuiChildFlags flags = ImGuiChildFlags_Borders;
++    if (flatten_nav) flags |= ImGuiChildFlags_NavFlattened;
+     if (!fill_h) flags |= ImGuiChildFlags_AutoResizeY;
+     // A fill-height card (e.g. GAME) must SCROLL when the window is too short —
+     // otherwise its folded-in content (SAVES) clips out of reach. Only the
+@@ -1823,15 +1832,15 @@
+ // with the dropdowns above it instead of floating a few pixels inside them.
+ // 0 keeps the natural width every other caller has always had.
+ void stepper(const char* id, int value, const char* suffix, int* out_delta,
+-             float total_w = 0.0f) {
++             float total_w = 0.0f, float height = px(30)) {
+     ImGui::PushID(id);
+-    const float bh = px(30), bw = px(32), gap = px(6);
++    const float bw = px(32), gap = px(6);
+     float fw = px(58);
+     if (total_w > 0.0f) {
+         const float want = total_w - bw * 2.0f - gap * 2.0f;
+         if (want > fw) fw = want;
+     }
+-    if (ImGui::Button("-", ImVec2(bw, bh))) *out_delta = -5;
++    if (ImGui::Button("-", ImVec2(bw, height))) *out_delta = -5;
+     ImGui::SameLine(0, gap);
+     // value centered in a fixed-width field so "+" never shifts with the digits
+     char buf[32]; snprintf(buf, sizeof(buf), "%d%s", value, suffix);
+@@ -1842,7 +1851,7 @@
+     ImGui::TextUnformatted(buf);
+     ImGui::SameLine(0, 0);
+     ImGui::SetCursorPosX(cx + fw + gap);
+-    if (ImGui::Button("+", ImVec2(bw, bh))) *out_delta = +5;
++    if (ImGui::Button("+", ImVec2(bw, height))) *out_delta = +5;
+     ImGui::PopID();
+ }
+ 
+@@ -1928,13 +1937,13 @@
+  */
+ int settings_combo_row(const char* label, const LauncherTheme& th,
+                        const char* id, const SettingsChoice* choices,
+-                       int count, int current) {
++                       int count, int current, float width = px(SETTINGS_CTRL_W)) {
+     const char* current_label = "";
+     for (int i = 0; i < count; ++i)
+         if (choices[i].value == current) { current_label = choices[i].label; break; }
+ 
+-    row_label_right(label, th, px(SETTINGS_CTRL_W));
+-    ImGui::SetNextItemWidth(px(SETTINGS_CTRL_W));
++    row_label_right(label, th, width);
++    ImGui::SetNextItemWidth(width);
+     int picked = current;
+     if (ImGui::BeginCombo(id, ui_text(current_label))) {
+         for (int i = 0; i < count; ++i)
+@@ -3184,7 +3193,8 @@
+                            !strcmp(src_prof->id, "snes");
+     const bool n64_prof = src_prof && src_prof->id &&
+                           !strcmp(src_prof->id, "n64");
+-    if (ImGui::Selectable(ui_text("None"), m->s.player_src[p] == 0)) {
++    const bool arcade = m->arcade_menu_action != nullptr;
++    if (ImGui::Selectable(arcade ? "NINGUNA" : ui_text("None"), m->s.player_src[p] == 0)) {
+         launcher_model_set_source(m, p, 0, 0, nullptr, nullptr);
+         if (psx) launcher_binds_refresh(m);
+     }
+@@ -3196,7 +3206,7 @@
+         if (ImGui::Selectable(ui_text("Keyboard"), kb))
+             launcher_model_set_mouse_source(m, 0);
+     } else {
+-        if (ImGui::Selectable(ui_text("Keyboard"), m->s.player_src[p] == 1)) {
++        if (ImGui::Selectable(arcade ? "TECLADO" : ui_text("Keyboard"), m->s.player_src[p] == 1)) {
+             launcher_model_set_source(m, p, 1, 0, nullptr, nullptr);
+             if (psx) launcher_binds_refresh(m);
+         }
+@@ -3219,7 +3229,7 @@
+         }
+         if (g_pad_count == 0) {
+             ImGui::BeginDisabled();
+-            ImGui::Selectable(ui_text("(no gamepad connected)"));
++            ImGui::Selectable(arcade ? "SIN MANDO CONECTADO" : ui_text("(no gamepad connected)"));
+             ImGui::EndDisabled();
+         }
+         return;
+@@ -3927,57 +3937,88 @@
+     }
+ }
+ 
++float arcade_value_width() {
++    return std::min(ImGui::GetContentRegionAvail().x * 0.46f, px(238));
++}
++
++bool arcade_toggle_row(const char* label, const LauncherTheme& th, const char* id,
++                       bool value, bool retro) {
++    const float width = retro ? arcade_value_width() : ImGui::GetFrameHeight();
++    row_label_right(label, th, width);
++    if (!retro) return ImGui::Checkbox(id, &value);
++    ImGui::PushID(id);
++    const bool pressed = ImGui::Button(value ? "SÍ###toggle" : "NO###toggle", ImVec2(width, 0));
++    ImGui::PopID();
++    return pressed;
++}
++
+ /* ARCADE_OPTIONS_V070: the same values as the in-game menu. */
+-void draw_arcade_display_controls(LauncherModel* m, const LauncherTheme& th) {
++void draw_arcade_video_controls(LauncherModel* m, const LauncherTheme& th) {
+     static const SettingsChoice modes[] = {
+         {0, "Ventana"}, {1, "Sin bordes"}, {2, "Exclusiva"}
++    };
++    static const SettingsChoice retro_modes[] = {
++        {0, "VENTANA"}, {1, "PANTALLA COMPLETA"}
+     };
+     static const SettingsChoice scales[] = {
+         {1, "1x"}, {2, "2x"}, {3, "3x"}, {4, "4x"},
+         {5, "5x"}, {6, "6x"}, {7, "7x"}, {8, "8x"}
+     };
++    if (m->arcade_menu_action) {
++        // Legacy exclusive fullscreen has the same visible option as borderless.
++        const int current = m->s.fullscreen != 0 ? 1 : 0;
++        const float label_width = ImGui::CalcTextSize(retro_modes[1].label).x;
++        const float combo_width = label_width + ImGui::GetFrameHeight() +
++                                  2.0f * ImGui::GetStyle().FramePadding.x;
++        const int selected = settings_combo_row("MODO DE PANTALLA", th, "##arcade_fullscreen",
++            retro_modes, IM_ARRAYSIZE(retro_modes), current, std::max(arcade_value_width(), combo_width));
++        launcher_model_set_fullscreen(m, selected);
++        return;
++    }
++    launcher_model_set_fullscreen(m, settings_combo_row("Pantalla completa", th,
++        "##arcade_fullscreen", modes, IM_ARRAYSIZE(modes), m->s.fullscreen));
++    ImGui::BeginDisabled(m->s.fullscreen != 0);
++    m->s.window_scale = settings_combo_row("Escala de ventana", th,
++        "##arcade_scale", scales, IM_ARRAYSIZE(scales), m->s.window_scale);
++    ImGui::EndDisabled();
++}
++
++void draw_arcade_graphics_controls(LauncherModel* m, const LauncherTheme& th) {
+     static const SettingsChoice targets[] = {
+         {30, "30 FPS"}, {60, "60 FPS"}, {120, "120 FPS"}, {180, "180 FPS"}
+     };
+-    const float cb = ImGui::GetFrameHeight();
+-    eyebrow("DISPLAY");
+-    launcher_model_set_fullscreen(m, settings_combo_row(
+-        "Pantalla completa", th, "##arcade_fullscreen", modes, 3, m->s.fullscreen));
+-    ImGui::BeginDisabled(m->s.fullscreen != 0);
+-    m->s.window_scale = settings_combo_row("Escala de ventana", th,
+-        "##arcade_scale", scales, 8, m->s.window_scale);
+-    ImGui::EndDisabled();
+-
+-    ImGui::Spacing();
+-    eyebrow(u8"GR\u00c1FICOS");
+-    row_label_right("Escalado entero", th, cb);
+-    bool integer_scale = m->s.integer_scale != 0;
+-    if (ImGui::Checkbox("##arcade_integer", &integer_scale))
++    const bool retro = m->arcade_menu_action != nullptr;
++    const float width = retro ? arcade_value_width() : px(SETTINGS_CTRL_W);
++    if (arcade_toggle_row(retro ? "ESCALADO ENTERO" : "Escalado entero", th,
++                          "##arcade_integer", m->s.integer_scale != 0, retro))
+         launcher_model_toggle_integer_scale(m);
+-    row_label_right("Filtro lineal", th, cb);
+-    bool filter = m->s.linear_filter != 0;
+-    if (ImGui::Checkbox("##arcade_filter", &filter)) launcher_model_toggle_filter(m);
+-    row_label_right("Mostrar FPS", th, cb);
+-    bool show_fps = m->s.arcade_show_fps != 0;
+-    if (ImGui::Checkbox("##arcade_show_fps", &show_fps))
+-        m->s.arcade_show_fps = show_fps ? 1 : 0;
+-    m->s.arcade_target_fps = settings_combo_row(u8"L\u00edmite de FPS", th,
+-        "##arcade_target_fps", targets, 4, m->s.arcade_target_fps);
+-    if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayNormal))
++    if (!retro && arcade_toggle_row("Filtro lineal", th,
++                          "##arcade_filter", m->s.linear_filter != 0, false))
++        launcher_model_toggle_filter(m);
++    if (arcade_toggle_row(retro ? "MOSTRAR FPS" : "Mostrar FPS", th,
++                          "##arcade_show_fps", m->s.arcade_show_fps != 0, retro))
++        m->s.arcade_show_fps = !m->s.arcade_show_fps;
++    m->s.arcade_target_fps = settings_combo_row(retro ? "LÍMITE DE FPS" : "Límite de FPS", th,
++        "##arcade_target_fps", targets, 4, m->s.arcade_target_fps, width);
++    if (!retro && ImGui::IsItemHovered(ImGuiHoveredFlags_DelayNormal))
+         ImGui::SetTooltip("La NES mantiene su velocidad original.\n"
+                           "120/180 FPS repiten la imagen; no interpolan.");
+-    row_label_right("VSync", th, cb);
+     ImGui::BeginDisabled(m->s.arcade_target_fps != 60);
+-    bool vsync = m->s.vsync != RECOMP_LAUNCHER_VSYNC_OFF;
+-    if (ImGui::Checkbox("##arcade_vsync", &vsync)) launcher_model_toggle_vsync(m);
++    if (arcade_toggle_row(retro ? "VSYNC" : "VSync", th,
++                          "##arcade_vsync", m->s.vsync != RECOMP_LAUNCHER_VSYNC_OFF, retro))
++        launcher_model_toggle_vsync(m);
+     ImGui::EndDisabled();
+-    if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayNormal | ImGuiHoveredFlags_AllowWhenDisabled))
++    if (!retro && ImGui::IsItemHovered(ImGuiHoveredFlags_DelayNormal | ImGuiHoveredFlags_AllowWhenDisabled))
+         ImGui::SetTooltip("VSync solo se aplica con el limite de 60 FPS.");
+ }
+ 
+ void draw_display_controls(LauncherModel* m, const LauncherTheme& th) {
+     if (m->has_arcade_settings) {
+-        draw_arcade_display_controls(m, th);
++        eyebrow("DISPLAY");
++        draw_arcade_video_controls(m, th);
++        ImGui::Spacing();
++        eyebrow("GRÁFICOS");
++        draw_arcade_graphics_controls(m, th);
+         return;
+     }
+     eyebrow("DISPLAY");
+@@ -4538,14 +4579,14 @@
+     }
+ }
+ 
+-void draw_audio_controls(LauncherModel* m, const LauncherTheme& th) {
+-    eyebrow("AUDIO");
+-    if (m->has_arcade_settings) {
+-        row_label_right("Audio", th, ImGui::GetFrameHeight());
+-        bool enabled = m->s.enable_audio != 0;
+-        if (ImGui::Checkbox("##arcade_audio", &enabled))
+-            m->s.enable_audio = enabled ? 1 : 0;
+-    }
++void draw_audio_controls(LauncherModel* m, const LauncherTheme& th, bool show_heading = true) {
++    if (show_heading) eyebrow("AUDIO");
++    const bool retro = m->arcade_menu_action != nullptr;
++    const float width = retro ? arcade_value_width() : px(SETTINGS_CTRL_W);
++    if (m->has_arcade_settings &&
++        arcade_toggle_row(retro ? "AUDIO" : "Audio", th, "##arcade_audio",
++                          m->s.enable_audio != 0, retro))
++        m->s.enable_audio = !m->s.enable_audio;
+     // Labels at the card's left edge, controls at its right (row_label_right),
+     // matching DISPLAY. Every control is SETTINGS_CTRL_W wide -- including the
+     // volume stepper, which stretches its value field to reach it -- so the
+@@ -4560,18 +4601,18 @@
+                           ImVec2(px(SETTINGS_CTRL_W), px(30))))
+             launcher_model_cycle_freq(m);
+     }
+-    row_label_right("Volume", th, px(SETTINGS_CTRL_W));
+-    int dv = 0; stepper("vol", m->s.volume, "%", &dv, px(SETTINGS_CTRL_W));
++    const float stepper_height = retro ? ImGui::GetFrameHeight() : px(30);
++    row_label_right(retro ? "VOLUMEN" : "Volume", th, width);
++    int dv = 0; stepper("vol", m->s.volume, "%", &dv, width, stepper_height);
+     if (dv) launcher_model_volume_delta(m, dv);
+     if (m->has_arcade_settings) {
+-        ImGui::Spacing();
+-        row_label_right(u8"M\u00fasica de fondo", th, ImGui::GetFrameHeight());
+-        bool music = m->s.arcade_music_enabled != 0;
+-        if (ImGui::Checkbox("##arcade_music", &music))
+-            m->s.arcade_music_enabled = music ? 1 : 0;
+-        row_label_right(u8"Volumen de m\u00fasica", th, px(SETTINGS_CTRL_W));
++        if (!retro) ImGui::Spacing();
++        if (arcade_toggle_row(retro ? "MÚSICA DE FONDO" : "Música de fondo", th,
++                              "##arcade_music", m->s.arcade_music_enabled != 0, retro))
++            m->s.arcade_music_enabled = !m->s.arcade_music_enabled;
++        row_label_right(retro ? "VOLUMEN DE MÚSICA" : "Volumen de música", th, width);
+         int change = 0;
+-        stepper("arcade_music_volume", m->s.arcade_music_volume, "%", &change, px(SETTINGS_CTRL_W));
++        stepper("arcade_music_volume", m->s.arcade_music_volume, "%", &change, width, stepper_height);
+         if (change) m->s.arcade_music_volume = std::clamp(m->s.arcade_music_volume + change, 0, 100);
+     }
+ 
+@@ -5592,8 +5633,10 @@
+ // ControllerSpec.buttons[]/button_count (launcher_system.h) so each system
+ // renders its own real vocabulary (SNES: A/B/X/Y/L/R/...; PSX: Triangle/
+ // Circle/Cross/Square/L1/L2/R1/R2/L3/R3/...) instead of a hardcoded SNES set.
+-void draw_controller_config_view(LauncherModel* m, const LauncherTheme& th) {
++void draw_controller_config_view(LauncherModel* m, const LauncherTheme& th,
++                                 bool focus_source = false) {
+     const int p = m->cfg_player;
++    const bool arcade = m->arcade_menu_action != nullptr;
+     const SystemProfile* cfg_prof = (const SystemProfile*)m->profile;
+     const bool cfg_psx = cfg_prof && cfg_prof->id && !strcmp(cfg_prof->id, "psx");
+     const bool cfg_snes = cfg_prof && cfg_prof->id && !strcmp(cfg_prof->id, "snes");
+@@ -5602,12 +5645,22 @@
+         m->s.player_gamepad_guid[p][0] && !m->player_pad_name[p][0])
+         launcher_binds_hydrate_psx_pad_names(m);
+ 
+-    if (begin_panel("cfg_src", 0)) {
+-        ImGui::PushStyleColor(ImGuiCol_Text, col(th.accent2));
+-        ImGui::Text("%s %d", ui_text("CONTROLLER - PLAYER"), p + 1); ImGui::PopStyleColor(); ImGui::Spacing();
+-        row_label("Input source", th);
++    if (begin_panel("cfg_src", 0, false, false, arcade)) {
++        if (arcade) {
++            row_label_right("ENTRADA", th, px(200));
++        } else {
++            ImGui::PushStyleColor(ImGuiCol_Text, col(th.accent2));
++            ImGui::Text("%s %d", ui_text("CONTROLLER - PLAYER"), p + 1);
++            ImGui::PopStyleColor();
++            ImGui::Spacing();
++            row_label("Input source", th);
++        }
++        if (focus_source) ImGui::SetKeyboardFocusHere();
+         ImGui::SetNextItemWidth(px(200));
+-        if (ImGui::BeginCombo("##csrc", ui_text(launcher_model_player_src_label(m, p)))) {
++        const char* source = launcher_model_player_src_label(m, p);
++        if (arcade && m->s.player_src[p] != 2)
++            source = m->s.player_src[p] == 1 ? "TECLADO" : "NINGUNA";
++        if (ImGui::BeginCombo("##csrc", ui_text(source))) {
+             draw_source_selectables(m, p);
+             ImGui::EndCombo();
+         }
+@@ -5814,7 +5867,8 @@
+         // noise a player is trying to just clear -- 8% and 12% are different
+         // controllers. Whole percent, because the runner consumes a raw stick
+         // radius derived from this and a fraction would not survive the trip.
+-        row_label("Deadzone", th);
++        if (arcade) row_label_right("ZONA MUERTA", th, px(200));
++        else row_label("Deadzone", th);
+         {
+             int dz = m->s.deadzone[p];
+             // 0-50% is the whole useful range -- half a stick's travel is
+@@ -5822,7 +5876,7 @@
+             // gets the full scale rather than a handle pinned at the end
+             // showing a number the slider would silently rewrite.
+             const int hi = dz > 50 ? 100 : 50;
+-            ImGui::SetNextItemWidth(px(240));
++            ImGui::SetNextItemWidth(px(arcade ? 200 : 240));
+             if (ImGui::SliderInt("##dz", &dz, 0, hi, "%d%%",
+                                  ImGuiSliderFlags_AlwaysClamp))
+                 launcher_model_set_deadzone(m, p, dz);
+@@ -6076,7 +6130,7 @@
+     // Controller view is source+deadzone only.
+     if (m->hide_rebind) return;
+ 
+-    if (begin_panel("cfg_binds", 0)) {
++    if (begin_panel("cfg_binds", 0, false, false, arcade)) {
+         // Responsive grid: fit as many label+chip columns as the width allows
+         // (1..4) instead of one tall column with dead space to the right.
+         const SystemProfile* prof = (const SystemProfile*)m->profile;
+@@ -6402,8 +6456,9 @@
+         // Heading uses accent2 so each console's title tints in ITS logo colour
+         // (N64 blue; single-accent consoles set accent2 == accent).
+         ImGui::PushStyleColor(ImGuiCol_Text, col(th.accent2));
+-        if (has_pad) ImGui::Text("INPUT BINDINGS - PLAYER %d", p + 1);
+-        else         ImGui::Text("KEYBOARD BINDINGS - PLAYER %d", p + 1);
++        if (arcade) ImGui::TextUnformatted(pad_src ? "BOTONES DEL MANDO" : "TECLAS DEL JUEGO");
++        else if (has_pad) ImGui::Text("INPUT BINDINGS - PLAYER %d", p + 1);
++        else ImGui::Text("KEYBOARD BINDINGS - PLAYER %d", p + 1);
+         ImGui::PopStyleColor(); ImGui::Spacing();
+ 
+         // Rows shown follow the player's ACTIVE pad mode (Genesis 3-Button hides
+@@ -6466,9 +6521,15 @@
+         // stretch policy divides available width evenly across `cols`
+         // regardless of our computed cell_w, which reintroduces the very
+         // overlap/clip this sizing pass exists to avoid.
+-        if (ImGui::BeginTable("binds", cols, ImGuiTableFlags_SizingFixedFit)) {
+-            for (int c = 0; c < cols; ++c)
+-                ImGui::TableSetupColumn(nullptr, ImGuiTableColumnFlags_WidthFixed, cell_w);
++        if (arcade && !vertical)
++            cols = ImGui::GetContentRegionAvail().x >= 2.0f * (label_col_w + px(96)) ? 2 : 1;
++        const ImGuiTableFlags sizing = arcade ? ImGuiTableFlags_SizingStretchSame : ImGuiTableFlags_SizingFixedFit;
++        if (ImGui::BeginTable("binds", cols, sizing)) {
++            for (int c = 0; c < cols; ++c) {
++                if (arcade) ImGui::TableSetupColumn(nullptr, ImGuiTableColumnFlags_WidthStretch);
++                else ImGui::TableSetupColumn(nullptr, ImGuiTableColumnFlags_WidthFixed, cell_w);
++            }
++            const float value_width = arcade ? -FLT_MIN : chip_w;
+             const int cell_count = vertical ? (order_rows * order_cols) : nbtn;
+             for (int cell = 0; cell < cell_count; ++cell) {
+                 // Column-major: walk down column 0, then column 1, then 2. The
+@@ -6516,7 +6577,8 @@
+                         : (m->pad_binds[p][b][0]
+                             ? m->pad_binds[p][b] : "(unbound)");
+                     if (cap_pad) ImGui::PushStyleColor(ImGuiCol_Button, col(th.accent));
+-                    if (ImGui::Button(cap_pad ? "[ press a button... ]" : pl, ImVec2(chip_w, 0)))
++                    const char* waiting = arcade ? "PULSA UN BOTÓN" : "[ press a button... ]";
++                    if (ImGui::Button(cap_pad ? waiting : pl, ImVec2(value_width, 0)))
+                         launcher_model_begin_pad_capture(m, b);
+                     if (cap_pad) ImGui::PopStyleColor();
+                     ImGui::PopID();
+@@ -6529,7 +6591,8 @@
+                     const char* key_text = settings_player_binds
+                         ? settings_key_label(m->s.player_key_bind[p][b])
+                         : m->binds[p][b];
+-                    if (ImGui::Button(cap_key ? "[ press a key... ]" : key_text, ImVec2(chip_w, 0)))
++                    const char* waiting = arcade ? "PULSA UNA TECLA" : "[ press a key... ]";
++                    if (ImGui::Button(cap_key ? waiting : key_text, ImVec2(value_width, 0)))
+                         launcher_model_begin_capture(m, b);
+                     if (cap_key) ImGui::PopStyleColor();
+                 }
+@@ -6597,17 +6660,17 @@
+         }
+ 
+         if (automap_running) {
+-            if (ImGui::Button("Cancel Auto Map")) {
++            if (ImGui::Button(arcade ? "CANCELAR ASIGNACIÓN" : "Cancel Auto Map")) {
+                 s_automap_i = -1;
+                 s_automap_player = -1;
+             }
+-        } else if (ImGui::Button("Auto Map All")) {
++        } else if (ImGui::Button(arcade ? "ASIGNAR TODOS" : "Auto Map All")) {
+             m->binding_status[0] = 0;
+             s_automap_i = 0;
+             s_automap_player = p;
+         }
+         ImGui::SameLine();
+-        if (ImGui::Button("Reset to Defaults")) {
++        if (ImGui::Button(arcade ? "RESTABLECER" : "Reset to Defaults")) {
+             if (settings_player_binds)
+                 launcher_model_reset_player_bindings(m, m->cfg_player);
+             else
+@@ -6666,7 +6729,7 @@
+     /* Named host actions stand on their own; see the note in
+      * draw_assist_binding_editor. */
+     if (m->assist_binding_count > 0 && m->assist_binding_labels) {
+-        if (begin_panel("cfg_assist_binds", 0)) {
++        if (begin_panel("cfg_assist_binds", 0, false, false, arcade)) {
+             draw_controller_assist_shortcuts(m, th);
+         } end_panel();
+     }
+@@ -14086,7 +14149,440 @@
+     ImGui::PopStyleColor();
+ }
+ 
+-void draw_ui(LauncherModel* m, const LauncherTheme& th, int logical_w, int logical_h) {
++constexpr ImU32 arcade_text = IM_COL32(237, 244, 250, 255);
++constexpr ImU32 arcade_muted = IM_COL32(158, 178, 203, 255);
++constexpr ImU32 arcade_warm = IM_COL32(255, 170, 97, 255);
++
++enum class ArcadeOptionsPage { Categories, Video, Audio, Controls, Graphics };
++
++struct ArcadeTitleState {
++    // 0 is the main screen. 1 and 2 are player counts; 3 is credits.
++    int page = 0;
++    int selection = 0;
++    bool focus_selection = true;
++    ArcadeOptionsPage options = ArcadeOptionsPage::Categories;
++    int options_selection = 0;
++    bool focus_options = true;
++    bool options_modal = false;
++};
++
++struct ArcadeTitleCanvas {
++    ImVec2 origin;
++    float scale;
++    ImDrawList* draw;
++
++    ImVec2 point(float x, float y) const {
++        return ImVec2(std::round(origin.x + x * scale), std::round(origin.y + y * scale));
++    }
++
++    void rect(float x, float y, float w, float h, ImU32 color) const {
++        draw->AddRectFilled(point(x, y), point(x + w, y + h), color);
++    }
++
++    void text_at(const char* label, ImVec2 center, float size, ImU32 color) const {
++        ImFont* font = g_arcade_title_font ? g_arcade_title_font : ImGui::GetFont();
++        const ImVec2 bounds = font->CalcTextSizeA(size * scale, FLT_MAX, 0.0f, label);
++        const ImVec2 density = ImGui::GetIO().DisplayFramebufferScale;
++        const float x = std::round((center.x - bounds.x * 0.5f) * density.x) / density.x;
++        const float y = std::round((center.y - bounds.y * 0.5f) * density.y) / density.y;
++        draw->AddText(font, size * scale, ImVec2(x, y), color, label);
++    }
++
++    void text(const char* label, float x, float y, float size, ImU32 color) const {
++        text_at(label, point(x, y), size, color);
++    }
++};
++
++void draw_arcade_marquee(const ArcadeTitleCanvas& canvas) {
++    constexpr ImU32 red = IM_COL32(250, 12, 15, 255);
++    constexpr ImU32 white = IM_COL32(255, 252, 247, 255);
++    const ImU32 rails[2][3] = {
++        {IM_COL32(47, 55, 235, 255), IM_COL32(79, 209, 235, 255), white},
++        {IM_COL32(61, 106, 11, 255), IM_COL32(134, 198, 29, 255), white}
++    };
++    for (int half = 0; half < 2; ++half) {
++        for (int rail = 0; rail < 3; ++rail) {
++            const float x = 92.0f + 11.0f * static_cast<float>(rail);
++            const float y = 120.0f + 11.0f * static_cast<float>(rail);
++            const auto mirrored_rail = [&](float left, float top, float width, float height) {
++                if (half) top = 510.0f - top - height;
++                canvas.rect(left, top, width, height, rails[half][rail]);
++                canvas.rect(960.0f - left - width, top, width, height, rails[half][rail]);
++            };
++            // Flat pixels at the corner keep the silhouette stepped at any size.
++            mirrored_rail(x + 30, y, 465 - x - 30, 7);
++            mirrored_rail(x + 21, y + 5, 15, 8);
++            mirrored_rail(x + 13, y + 10, 15, 8);
++            mirrored_rail(x + 6, y + 16, 15, 8);
++            mirrored_rail(x, y + 23, 8, 67.0f - 11.0f * static_cast<float>(rail));
++        }
++    }
++
++    canvas.text("JojitaGamerHD", 480, 94, 32, red);
++    // Original tall block lettering for the marquee. Each row is five pixels.
++    static const char alphabet[] = "ABCDEORS";
++    static const unsigned char glyphs[][7] = {
++        {0x0e, 0x11, 0x11, 0x1f, 0x11, 0x11, 0x11},
++        {0x1e, 0x11, 0x11, 0x1e, 0x11, 0x11, 0x1e},
++        {0x0e, 0x11, 0x10, 0x10, 0x10, 0x11, 0x0e},
++        {0x1c, 0x12, 0x11, 0x11, 0x11, 0x12, 0x1c},
++        {0x1f, 0x10, 0x10, 0x1e, 0x10, 0x10, 0x1f},
++        {0x0e, 0x11, 0x11, 0x11, 0x11, 0x11, 0x0e},
++        {0x1e, 0x11, 0x11, 0x1e, 0x14, 0x12, 0x11},
++        {0x0f, 0x10, 0x10, 0x0e, 0x01, 0x01, 0x1e}
++    };
++    float title_x = 155;
++    for (const char letter : std::string_view("ARCADE BROS")) {
++        if (const char* glyph = std::strchr(alphabet, letter)) {
++            for (int row = 0; row < 7; ++row) {
++                for (int col = 0; col < 5; ++col) {
++                    if (glyphs[glyph - alphabet][row] & (0x10 >> col))
++                        canvas.rect(title_x + static_cast<float>(col) * 10, 179.0f + static_cast<float>(row) * 14, 10, 14, red);
++                }
++            }
++        }
++        title_x += 60;
++    }
++    canvas.text("1983 RECOMP", 480, 318, 55, red);
++}
++
++// Scale the menu in the same 16:15 proportions as the game's 256 × 240 frame.
++constexpr float arcade_canvas_width = 960.0f;
++constexpr float arcade_canvas_height = 900.0f;
++
++float arcade_canvas_scale(const ImGuiViewport* vp) {
++    return std::min(vp->Size.x / arcade_canvas_width, vp->Size.y / arcade_canvas_height);
++}
++
++ImVec2 arcade_canvas_origin(const ImGuiViewport* vp, float scale) {
++    return ImVec2(vp->Pos.x + (vp->Size.x - arcade_canvas_width * scale) * 0.5f,
++                  vp->Pos.y + (vp->Size.y - arcade_canvas_height * scale) * 0.5f);
++}
++
++ArcadeTitleCanvas arcade_title_canvas() {
++    const ImGuiViewport* vp = ImGui::GetMainViewport();
++    const float scale = arcade_canvas_scale(vp);
++    return {arcade_canvas_origin(vp, scale), scale, ImGui::GetWindowDrawList()};
++}
++
++int draw_arcade_menu_rows(const ArcadeTitleCanvas& canvas, const char* const* rows,
++                          int count, int& selection, bool& focus_selection,
++                          int white_row = -1, float center_y = 665.0f) {
++    constexpr ImU32 amber = IM_COL32(255, 176, 43, 255);
++    constexpr ImU32 white = IM_COL32(250, 240, 246, 255);
++    const float scale = canvas.scale;
++    // Snap once in framebuffer pixels so later rows can't round differently.
++    const float density = ImGui::GetIO().DisplayFramebufferScale.y;
++    const float pitch = std::max(1.0f, std::round(64.0f * scale * density));
++    const float center = (canvas.origin.y + center_y * scale) * density;
++    const float first = std::round(center - pitch * static_cast<float>(count - 1) * 0.5f);
++    const auto row_y = [=](int row) { return (first + pitch * static_cast<float>(row)) / density; };
++    ImGui::PushStyleColor(ImGuiCol_NavCursor, IM_COL32(0, 0, 0, 0));
++    int activated = -1;
++    int hovered = -1;
++    for (int i = 0; i < count; ++i) {
++        ImGui::SetCursorScreenPos(ImVec2(canvas.point(170, 0).x, row_y(i) - 24 * scale));
++        if (focus_selection && selection == i) ImGui::SetKeyboardFocusHere();
++        if (ImGui::InvisibleButton(rows[i], ImVec2(620 * scale, 48 * scale),
++                                   ImGuiButtonFlags_EnableNav))
++            activated = i;
++        if (ImGui::IsItemFocused()) selection = i;
++        if (ImGui::IsItemHovered()) hovered = i;
++        canvas.text_at(rows[i], ImVec2(canvas.point(480, 0).x, row_y(i)),
++                       42, i == white_row ? white : amber);
++    }
++    ImGui::PopStyleColor();
++    focus_selection = false;
++
++    const int highlighted = hovered >= 0 ? hovered : selection;
++    const char* label = rows[highlighted];
++    ImFont* font = g_arcade_title_font ? g_arcade_title_font : ImGui::GetFont();
++    const float label_width = font->CalcTextSizeA(42 * scale, FLT_MAX, 0.0f, label).x / scale;
++    const float star_x = 480 - label_width * 0.5f - 48;
++    const float star_y = (row_y(highlighted) - canvas.origin.y) / scale - 14;
++    static const unsigned char star[] = {0x41, 0x22, 0x14, 0x7f, 0x14, 0x22, 0x41};
++    for (int row = 0; row < 7; ++row)
++        for (int col = 0; col < 7; ++col)
++            if (star[row] & (0x40 >> col))
++                canvas.rect(star_x + static_cast<float>(col) * 4, star_y + static_cast<float>(row) * 4, 4, 4, white);
++    return activated;
++}
++
++bool arcade_back_pressed() {
++    return ImGui::IsKeyPressed(ImGuiKey_Escape, false) ||
++           ImGui::IsKeyPressed(ImGuiKey_GamepadFaceRight, false);
++}
++
++void draw_arcade_title_screen(LauncherModel* m, ArcadeTitleState& state) {
++    const ArcadeTitleCanvas canvas = arcade_title_canvas();
++    if (canvas.scale <= 0.0f) return;
++    draw_arcade_marquee(canvas);
++
++    static const char* const main[] = {
++        "1 JUGADOR", "2 JUGADORES", "OPCIONES", "SELECCIONA TU ROM", "SALIR", "CRÉDITOS"
++    };
++    static const char* const modes[] = {"MODO ESTÁNDAR", "MODO ARCADE", "VOLVER AL MENÚ"};
++    static const char* const credits[] = {"VOLVER AL MENÚ"};
++    const char* const* rows = state.page == 0 ? main : state.page == 3 ? credits : modes;
++    const int count = state.page == 0 ? IM_ARRAYSIZE(main) :
++                      state.page == 3 ? IM_ARRAYSIZE(credits) : IM_ARRAYSIZE(modes);
++    const float center_y = state.page == 3 ? 830.0f : state.page == 0 ? 665.0f : 595.0f;
++    if (state.page == 3 && m->credits_text)
++        canvas.text(m->credits_text, 480, 590, 21, IM_COL32(250, 240, 246, 255));
++
++    ImGui::PushID(state.page);
++    int activated = draw_arcade_menu_rows(canvas, rows, count, state.selection,
++                                         state.focus_selection, state.page == 0 ? 5 : -1, center_y);
++    ImGui::PopID();
++
++    if (m->arcade_menu_notice && state.page != 3)
++        canvas.text(m->arcade_menu_notice, 480, 877, 20, arcade_muted);
++
++    if (state.page != 0 && arcade_back_pressed())
++        activated = count - 1;
++    if (activated < 0) return;
++    if (state.page != 0) {
++        if (activated == count - 1) {
++            const int previous = state.page;
++            state = {0, previous == 3 ? 5 : previous - 1, true};
++        } else {
++            const int mode = (state.page - 1) * 2 + activated;
++            const int result = m->arcade_menu_action(mode);
++            if (result > 0) m->action = LNG_ACTION_LAUNCH;
++            else m->arcade_menu_notice = result < 0
++                ? "No se pudo iniciar la partida. Revisa la ROM local."
++                : "Selecciona la ROM para jugar.";
++        }
++        return;
++    }
++
++    switch (activated) {
++        case 0:
++        case 1: state = {activated + 1, 0, true}; break;
++        case 2:
++            state.focus_selection = true;
++            state.selection = 2;
++            state.options = ArcadeOptionsPage::Categories;
++            state.options_selection = 0;
++            state.focus_options = true;
++            launcher_model_set_view(m, LNG_VIEW_SETTINGS);
++            break;
++        case 3: {
++            const int result = m->arcade_menu_action(-1);
++            if (result > 0) {
++                m->arcade_rom_ready = true;
++                m->arcade_menu_notice = "ROM local preparada.";
++            } else if (result < 0) {
++                m->arcade_menu_notice = "No se pudo preparar la ROM seleccionada.";
++            }
++            break;
++        }
++        case 4: m->action = LNG_ACTION_QUIT; break;
++        case 5: state = {3, 0, true}; break;
++    }
++}
++
++void draw_arcade_options_categories(LauncherModel* m, ArcadeTitleState& state) {
++    const ArcadeTitleCanvas canvas = arcade_title_canvas();
++    if (canvas.scale <= 0.0f) return;
++    draw_arcade_marquee(canvas);
++
++    static const char* const rows[] = {
++        "VÍDEO", "AUDIO", "CONTROLES", "GRÁFICOS", "VOLVER AL MENÚ"
++    };
++    static const ArcadeOptionsPage pages[] = {
++        ArcadeOptionsPage::Video, ArcadeOptionsPage::Audio,
++        ArcadeOptionsPage::Controls, ArcadeOptionsPage::Graphics
++    };
++    ImGui::PushID("arcade_options");
++    const int activated = draw_arcade_menu_rows(canvas, rows, IM_ARRAYSIZE(rows),
++        state.options_selection, state.focus_options);
++    ImGui::PopID();
++    if (activated == 4 || arcade_back_pressed()) {
++        state.focus_selection = true;
++        launcher_model_set_view(m, LNG_VIEW_DASHBOARD);
++    } else if (activated >= 0) {
++        state.options_selection = activated;
++        state.options = pages[activated];
++        state.focus_options = true;
++    }
++}
++
++bool arcade_options_editing(const LauncherModel* m) {
++    return m->capturing || m->hk_capturing || m->camera_capturing ||
++           m->defaults_modal_open ||
++           ImGui::IsPopupOpen(nullptr, ImGuiPopupFlags_AnyPopupId | ImGuiPopupFlags_AnyPopupLevel);
++}
++
++void draw_arcade_options_detail(LauncherModel* m, const LauncherTheme& th,
++                               ArcadeTitleState& state) {
++    const bool controller = m->view == LNG_VIEW_CONTROLLER;
++    const auto back = [&] {
++        state.focus_options = true;
++        if (controller) launcher_model_set_view(m, LNG_VIEW_SETTINGS);
++        else state.options = ArcadeOptionsPage::Categories;
++    };
++    if (arcade_back_pressed() && !state.options_modal && !arcade_options_editing(m)) {
++        back();
++        return;
++    }
++
++    const char* label = "";
++    switch (state.options) {
++        case ArcadeOptionsPage::Video: label = "VÍDEO"; break;
++        case ArcadeOptionsPage::Audio: label = "AUDIO"; break;
++        case ArcadeOptionsPage::Controls:
++            label = controller ? (m->cfg_player == 0 ? "CONTROLES J1" : "CONTROLES J2") : "CONTROLES";
++            break;
++        case ArcadeOptionsPage::Graphics: label = "GRÁFICOS"; break;
++        case ArcadeOptionsPage::Categories: break;
++    }
++
++    const ArcadeTitleCanvas canvas = arcade_title_canvas();
++    if (canvas.scale <= 0.0f) return;
++    const float side = controller ? 114.0f : 200.0f;
++    const int row_count = state.options == ArcadeOptionsPage::Video ? 2 :
++                          state.options == ArcadeOptionsPage::Controls ? 3 : 5;
++    canvas.text(label, 480, 102, 48, arcade_warm);
++    canvas.rect(side, 150, 960.0f - 2.0f * side, 2, IM_COL32(255, 176, 43, 160));
++    if (state.options == ArcadeOptionsPage::Graphics) {
++        canvas.text("La NES mantiene su velocidad original.", 480, 650, 22, arcade_muted);
++        canvas.text("120/180 FPS repiten la imagen sin interpolarla.", 480, 680, 22, arcade_muted);
++        if (m->s.arcade_target_fps != 60)
++            canvas.text("VSync está disponible a 60 FPS.", 480, 710, 22, arcade_muted);
++    }
++    canvas.text("FLECHAS / D-PAD   ·   ENTER / A   ·   ESC / B", 480, 848, 19, arcade_muted);
++
++    ImGui::PushID(label);
++    if (g_arcade_title_font) ImGui::PushFont(g_arcade_title_font);
++    ImGui::SetWindowFontScale(std::max(14.0f, 25.0f * canvas.scale) / ImGui::GetFontSize());
++    const float rows_height = ImGui::GetFrameHeight() +
++        static_cast<float>(row_count) * ImGui::GetFrameHeightWithSpacing();
++    const float top = controller ? 188.0f : 440.0f - rows_height / (2.0f * canvas.scale);
++    const ImVec2 start = canvas.point(side, top);
++    const ImVec2 end = canvas.point(960.0f - side, 744);
++    ImGui::SetCursorScreenPos(start);
++    if (state.focus_options) ImGui::SetNextWindowScroll(ImVec2(0, 0));
++    const bool visible = ImGui::BeginChild("##arcade_settings_body", ImVec2(end.x - start.x, end.y - start.y),
++        ImGuiChildFlags_NavFlattened, ImGuiWindowFlags_NoBackground);
++    if (visible) {
++        const bool first = state.focus_options;
++        state.focus_options = false;
++        if (controller) {
++            draw_controller_config_view(m, th, first);
++        } else {
++            if (first) ImGui::SetKeyboardFocusHere();
++            switch (state.options) {
++                case ArcadeOptionsPage::Video:
++                    draw_arcade_video_controls(m, th);
++                    break;
++                case ArcadeOptionsPage::Audio:
++                    draw_audio_controls(m, th, false);
++                    break;
++                case ArcadeOptionsPage::Controls:
++                    if (ImGui::Button("JUGADOR 1", ImVec2(-FLT_MIN, ImGui::GetFrameHeight()))) {
++                        launcher_model_open_config(m, 0);
++                        state.focus_options = true;
++                    }
++                    if (ImGui::Button("JUGADOR 2", ImVec2(-FLT_MIN, ImGui::GetFrameHeight()))) {
++                        launcher_model_open_config(m, 1);
++                        state.focus_options = true;
++                    }
++                    break;
++                case ArcadeOptionsPage::Graphics:
++                    draw_arcade_graphics_controls(m, th);
++                    break;
++                case ArcadeOptionsPage::Categories:
++                    break;
++            }
++            const float back_width = 260 * canvas.scale;
++            ImGui::SetCursorPosX(ImGui::GetCursorPosX() +
++                (ImGui::GetContentRegionAvail().x - back_width) * 0.5f);
++            if (ImGui::Button("VOLVER", ImVec2(back_width, ImGui::GetFrameHeight())))
++                back();
++        }
++        draw_restore_defaults_modal(m);
++    }
++    ImGui::EndChild();
++    if (controller) {
++        const ImVec2 back_start = canvas.point(350, 768);
++        const ImVec2 back_end = canvas.point(610, 815);
++        ImGui::SetCursorScreenPos(back_start);
++        if (ImGui::Button("VOLVER", ImVec2(back_end.x - back_start.x, back_end.y - back_start.y)))
++            back();
++    }
++    ImGui::SetWindowFontScale(1.0f);
++    if (g_arcade_title_font) ImGui::PopFont();
++    ImGui::PopID();
++    state.options_modal = arcade_options_editing(m);
++}
++
++void draw_arcade_ui(LauncherModel* m, const LauncherTheme& th, ArcadeTitleState& title) {
++    ImGuiViewport* vp = ImGui::GetMainViewport();
++    const bool title_screen = m->view == LNG_VIEW_DASHBOARD;
++    const bool categories = m->view == LNG_VIEW_SETTINGS && title.options == ArcadeOptionsPage::Categories;
++    const float scale = arcade_canvas_scale(vp);
++    ImGui::SetNextWindowPos(title_screen ? vp->Pos : arcade_canvas_origin(vp, scale));
++    ImGui::SetNextWindowSize(title_screen ? vp->Size : ImVec2(arcade_canvas_width * scale, arcade_canvas_height * scale));
++    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0, 0));
++    ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, 0.0f);
++    ImGui::PushStyleVar(ImGuiStyleVar_FrameBorderSize, 1.0f);
++    ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(10.0f, std::max(4.0f, 8.0f * scale)));
++    ImGui::PushStyleColor(ImGuiCol_WindowBg, IM_COL32(0, 0, 0, 255));
++    ImGui::PushStyleColor(ImGuiCol_Text, arcade_text);
++    ImGui::PushStyleColor(ImGuiCol_Button, IM_COL32(24, 20, 13, 255));
++    ImGui::PushStyleColor(ImGuiCol_ButtonHovered, IM_COL32(54, 38, 15, 255));
++    ImGui::PushStyleColor(ImGuiCol_ButtonActive, IM_COL32(76, 50, 17, 255));
++    ImGui::PushStyleColor(ImGuiCol_Border, title_screen ? IM_COL32(98, 223, 239, 85) : IM_COL32(255, 176, 43, 105));
++    ImGui::PushStyleColor(ImGuiCol_NavCursor, arcade_warm);
++    if (!title_screen) ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0.0f);
++    ImGui::Begin("##arcade_screen", nullptr,
++        ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove |
++        ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoSavedSettings |
++        ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse);
++    if (!title_screen) ImGui::PopStyleVar();
++    if (title_screen) draw_arcade_title_screen(m, title);
++    else if (categories) draw_arcade_options_categories(m, title);
++    else {
++        LauncherTheme retro = th;
++        retro.text_muted = lng_rgba(1.0f, 0.82f, 0.49f, 1.0f);
++        retro.accent = retro.accent2 = retro.warn = lng_rgba(1.0f, 0.69f, 0.17f, 1.0f);
++        ImGui::PushStyleVar(ImGuiStyleVar_ChildRounding, 0.0f);
++        ImGui::PushStyleVar(ImGuiStyleVar_PopupRounding, 0.0f);
++        ImGui::PushStyleVar(ImGuiStyleVar_ScrollbarRounding, 0.0f);
++        ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(12.0f, 10.0f));
++        ImGui::PushStyleColor(ImGuiCol_ChildBg, IM_COL32(12, 9, 5, 255));
++        ImGui::PushStyleColor(ImGuiCol_PopupBg, IM_COL32(13, 10, 6, 255));
++        ImGui::PushStyleColor(ImGuiCol_FrameBg, IM_COL32(24, 20, 13, 255));
++        ImGui::PushStyleColor(ImGuiCol_FrameBgHovered, IM_COL32(54, 38, 15, 255));
++        ImGui::PushStyleColor(ImGuiCol_FrameBgActive, IM_COL32(76, 50, 17, 255));
++        ImGui::PushStyleColor(ImGuiCol_Header, IM_COL32(54, 38, 15, 255));
++        ImGui::PushStyleColor(ImGuiCol_HeaderHovered, IM_COL32(76, 50, 17, 255));
++        ImGui::PushStyleColor(ImGuiCol_HeaderActive, IM_COL32(93, 61, 19, 255));
++        ImGui::PushStyleColor(ImGuiCol_CheckMark, arcade_warm);
++        ImGui::PushStyleColor(ImGuiCol_SliderGrab, arcade_warm);
++        ImGui::PushStyleColor(ImGuiCol_SliderGrabActive, arcade_warm);
++        ImGui::PushStyleColor(ImGuiCol_TableHeaderBg, IM_COL32(24, 20, 13, 255));
++        ImGui::PushStyleColor(ImGuiCol_TableRowBgAlt, IM_COL32(37, 28, 13, 255));
++        ImGui::PushStyleColor(ImGuiCol_ScrollbarBg, IM_COL32(13, 10, 6, 255));
++        ImGui::PushStyleColor(ImGuiCol_ScrollbarGrab, IM_COL32(132, 93, 43, 255));
++        ImGui::PushStyleColor(ImGuiCol_ScrollbarGrabHovered, arcade_warm);
++        ImGui::PushStyleColor(ImGuiCol_ScrollbarGrabActive, arcade_warm);
++        draw_arcade_options_detail(m, retro, title);
++        ImGui::PopStyleColor(17);
++        ImGui::PopStyleVar(4);
++    }
++    ImGui::End();
++    ImGui::PopStyleColor(7);
++    ImGui::PopStyleVar(4);
++}
++
++void draw_ui(LauncherModel* m, const LauncherTheme& th, int logical_w, int logical_h,
++             ArcadeTitleState& title) {
++    if (m->arcade_menu_action) {
++        draw_arcade_ui(m, th, title);
++        return;
++    }
+     ImGuiViewport* vp = ImGui::GetMainViewport();
+     ImGui::SetNextWindowPos(vp->Pos);
+     ImGui::SetNextWindowSize(vp->Size);
+@@ -14723,6 +15219,7 @@
+ extern "C" LngAction launcher_backend_run(LauncherPlatform* p,
+                                           LauncherModel* m,
+                                           const LauncherTheme* th) {
++    ArcadeTitleState title;
+     LaunchCommitState launch_commit;
+     struct CommitBinding {
+         explicit CommitBinding(LaunchCommitState& state) { s_launch_commit = &state; }
+@@ -14733,6 +15230,7 @@
+     ImGui::CreateContext();
+     ImGuiIO& io = ImGui::GetIO();
+     io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
++    if (m->arcade_menu_action) io.ConfigFlags |= ImGuiConfigFlags_NoMouse;
+     /* Gamepad nav is enabled only once a real pad event has arrived -- see the
+      * arming note in the event loop. Keyboard nav is unconditional: a stuck
+      * KEY would have to be physically held, and the window would not have
+@@ -14748,7 +15246,7 @@
+ #if defined(IMGUI_VERSION_NUM) && IMGUI_VERSION_NUM >= 19140
+     // ConfigNavCursorVisibleAlways is 1.91.4+; a pre-1.91.4 host (rt64 1.90.x)
+     // simply keeps the default auto-visibility for the test hook.
+-    if (const char* nv = SDL_getenv("LNG_NAV_ALWAYS"); nv && nv[0] == '1')
++    if (const char* nv = SDL_getenv("LNG_NAV_ALWAYS"); m->arcade_menu_action || (nv && nv[0] == '1'))
+         io.ConfigNavCursorVisibleAlways = true;
+ #endif
+ 
+@@ -14891,6 +15389,10 @@
+     // that scale so the path can be exercised on a 100% display; nothing here
+     // reads the env var any more.
+     bool first_present_marked = false;
++    LauncherTexture attract_texture{};
++    std::vector<unsigned char> attract_rgba;
++    bool showing_demo = false;
++    SDL_Scancode dismissed_key = SDL_SCANCODE_UNKNOWN;
+ 
+     while ((m->action == LNG_ACTION_NONE && !p->should_quit) ||
+            launch_commit.job.pending()) {
+@@ -14918,8 +15420,15 @@
+             else { p->should_quit = true; break; }
+         }
+ 
++        bool dismissed_pad = false;
+         SDL_Event ev;
+         if (SDL_WaitEventTimeout(&ev, 16)) do {
++            /* A click on the non-interactive arcade UI must never clear
++             * ImGui's focused keyboard/controller window. */
++            if (m->arcade_menu_action &&
++                (ev.type == SDL_EVENT_MOUSE_MOTION || ev.type == SDL_EVENT_MOUSE_BUTTON_DOWN ||
++                 ev.type == SDL_EVENT_MOUSE_BUTTON_UP || ev.type == SDL_EVENT_MOUSE_WHEEL))
++                continue;
+             /* Window coordinates -> logical units, before anything reads the
+              * event. No-op unless the platform layer synthesized the split. */
+             scale_mouse_event(ev, p->input_scale);
+@@ -14929,6 +15438,25 @@
+             }
+             if (launch_commit.job.pending()) {
+                 LNG_ImplSDL_ProcessEvent(&ev);
++                continue;
++            }
++            if (dismissed_key != SDL_SCANCODE_UNKNOWN &&
++                (ev.type == SDL_EVENT_KEY_DOWN || ev.type == SDL_EVENT_KEY_UP) &&
++                LNG_EVSCAN(ev) == dismissed_key) {
++                if (ev.type == SDL_EVENT_KEY_UP) dismissed_key = SDL_SCANCODE_UNKNOWN;
++                continue;
++            }
++            if (dismissed_pad && (ev.type == SDL_EVENT_GAMEPAD_BUTTON_DOWN ||
++                                  ev.type == SDL_EVENT_JOYSTICK_BUTTON_DOWN)) continue;
++            if (showing_demo && m->arcade_menu_dismiss_demo &&
++                ((ev.type == SDL_EVENT_KEY_DOWN && !LNG_EVKEYREPEAT(ev)) ||
++                 ev.type == SDL_EVENT_GAMEPAD_BUTTON_DOWN || ev.type == SDL_EVENT_JOYSTICK_BUTTON_DOWN)) {
++                if (ev.type == SDL_EVENT_KEY_DOWN) dismissed_key = LNG_EVSCAN(ev);
++                else dismissed_pad = true;
++                m->arcade_menu_dismiss_demo();
++                showing_demo = false;
++                s_pad_nav_armed = false;
++                title.focus_selection = true;
+                 continue;
+             }
+             if (try_capture(m, ev)) continue;
+@@ -14972,7 +15500,7 @@
+         if (applied_scale != p->display_scale || g_emoji_atlas_dirty) {
+             apply_scale(*th, p->display_scale, font_path.c_str(),
+                         jp_font_path.c_str(), symbols_font_path.c_str(),
+-                        emoji_font_path.c_str());
++                        emoji_font_path.c_str(), m->arcade_menu_action != nullptr);
+             applied_scale = p->display_scale;
+             if (!first_present_marked)
+                 launcher_boot_timing_mark("rui:fonts_built");
+@@ -15065,8 +15593,45 @@
+         LNG_ImplSDL_NewFrame();
+         apply_logical_display(p);   // logical DisplaySize + pixel-density frame
+         ImGui::NewFrame();
++        const bool was_showing_demo = showing_demo;
++        showing_demo = false;
+         if (launch_commit.job.pending()) draw_launch_commit_progress(*th);
+-        else draw_ui(m, *th, p->logical_w, p->logical_h);
++        else {
++            const bool at_main = m->view == LNG_VIEW_DASHBOARD && title.page == 0;
++            const bool input_active = ImGui::IsKeyPressed(ImGuiKey_Enter) ||
++                ImGui::IsKeyPressed(ImGuiKey_GamepadFaceDown) ||
++                ImGui::IsKeyPressed(ImGuiKey_UpArrow) || ImGui::IsKeyPressed(ImGuiKey_DownArrow) ||
++                ImGui::IsKeyPressed(ImGuiKey_GamepadDpadUp) || ImGui::IsKeyPressed(ImGuiKey_GamepadDpadDown);
++            const uint32_t* demo = m->arcade_menu_attract ?
++                m->arcade_menu_attract(m->s.enable_audio, m->s.volume, at_main && !input_active) : nullptr;
++            if (demo) {
++                constexpr int width = 256, height = 240;
++                attract_rgba.resize(width * height * 4);
++                for (int i = 0; i < width * height; ++i) {
++                    attract_rgba[4 * i] = static_cast<unsigned char>(demo[i] >> 16);
++                    attract_rgba[4 * i + 1] = static_cast<unsigned char>(demo[i] >> 8);
++                    attract_rgba[4 * i + 2] = static_cast<unsigned char>(demo[i]);
++                    attract_rgba[4 * i + 3] = 255;
++                }
++                showing_demo = launcher_texture_update_pixels(&attract_texture, attract_rgba.data(), width, height);
++                if (showing_demo) {
++                    const ImGuiViewport* vp = ImGui::GetMainViewport();
++                    const float fit = std::min(vp->Size.x / width, vp->Size.y / height);
++                    const float scale = m->s.integer_scale && fit >= 1.0f ? std::floor(fit) : fit;
++                    const ImVec2 size(width * scale, height * scale);
++                    const ImVec2 min(vp->Pos.x + std::round((vp->Size.x - size.x) * 0.5f),
++                                     vp->Pos.y + std::round((vp->Size.y - size.y) * 0.5f));
++                    ImDrawList* background = ImGui::GetBackgroundDrawList();
++                    background->AddRectFilled(vp->Pos,
++                        ImVec2(vp->Pos.x + vp->Size.x, vp->Pos.y + vp->Size.y), IM_COL32_BLACK);
++                    background->AddImage(tid(attract_texture), min, ImVec2(min.x + size.x, min.y + size.y));
++                }
++            }
++            if (!showing_demo) {
++                if (was_showing_demo) title.focus_selection = true;
++                draw_ui(m, *th, p->logical_w, p->logical_h, title);
++            }
++        }
+         ImGui::Render();
+ 
+         /* Disc pickers, source/option edits and setup outputs have completed
+@@ -15108,6 +15673,7 @@
+             launcher_debug_step(p, m);   // script/screenshot: after draw, before swap
+         }
+         launcher_platform_present(p);
++
+         if (!first_present_marked) {
+             launcher_boot_timing_mark("rui:first_swap");
+             first_present_marked = true;
+@@ -15117,6 +15683,7 @@
+     launcher_boot_timing_mark("rui:action_requested");
+     launcher_input_shutdown();
+     launcher_boot_timing_mark("rui:input_closed");
++    launcher_texture_free(&attract_texture);
+     launcher_texture_free(&g_boxart);
+     launcher_texture_free(&g_pad);
+     launcher_texture_free(&g_pad_analog);
+diff --git a/src/common/backends/imgui/runtime_ui_imgui.cpp b/src/common/backends/imgui/runtime_ui_imgui.cpp
+--- a/src/common/backends/imgui/runtime_ui_imgui.cpp
++++ b/src/common/backends/imgui/runtime_ui_imgui.cpp
+@@ -7,6 +7,7 @@
+ #include "imgui.h"
+ 
+ #include <algorithm>
++#include <cfloat>
+ #include <cstdio>
+ #include <cstring>
+ #include <cmath>
+@@ -283,13 +284,14 @@
+     return IM_COL32((rgb>>16)&255,(rgb>>8)&255,rgb&255,255);
+ }
+ 
+-void draw_color_preview(RecompRuntimeUi *ui,const RecompRuntimeUiItem *item,float box) {
++void draw_color_preview(RecompRuntimeUi *ui,const RecompRuntimeUiItem *item,float box,
++                        const uint32_t *draft=nullptr) {
+     RecompRuntimeUiColorPreview preview{};
+     const bool available = ui->config.callbacks.get_color_preview &&
+         ui->config.callbacks.get_color_preview(ui->config.callbacks.context,item,&preview) &&
+         preview.width>0 && preview.height>0 &&
+         preview.width<=RECOMP_RUNTIME_UI_PREVIEW_MAX && preview.height<=RECOMP_RUNTIME_UI_PREVIEW_MAX;
+-    ImGui::TextUnformatted("Vista previa del personaje");
++    ImGui::TextUnformatted(draft?"Vista previa":"Vista previa del personaje");
+     const ImVec2 top=ImGui::GetCursorScreenPos();
+     ImDrawList *draw=ImGui::GetWindowDrawList();
+     const float tile=16.0f;
+@@ -306,12 +308,16 @@
+         for (int y=0;y<preview.height;++y) for (int x=0;x<preview.width;++x) {
+             const unsigned index=preview.pixels[y*preview.width+x];
+             if (!index || index>3) continue;
++            uint32_t rgb=preview.palette[index-1];
++            if (draft && item->type==RECOMP_RUNTIME_UI_PALETTE) rgb=draft[index-1];
++            else if (draft && static_cast<int>(index-1)==preview.selected_index) rgb=draft[0];
+             draw->AddRectFilled(ImVec2(origin.x+x*scale,origin.y+y*scale),
+-                ImVec2(origin.x+(x+1)*scale,origin.y+(y+1)*scale),preview_rgb(preview.palette[index-1]));
++                ImVec2(origin.x+(x+1)*scale,origin.y+(y+1)*scale),preview_rgb(rgb));
+         }
+     }
+     draw->AddRect(top,ImVec2(top.x+box,top.y+box),IM_COL32(85,125,155,255));
+     ImGui::Dummy(ImVec2(box,box));
++    if (draft) return;
+     if (available) {
+         ImGui::TextWrapped("La vista previa usa el sprite de tu partida.");
+     } else {
+@@ -319,27 +325,8 @@
+     }
+ }
+ 
+-/* A true hue/saturation disc. Radius chooses saturation; brightness has its
+- * own bar, so no small triangle needs to be targeted. */
+-bool color_disc(const char *id,float &hue,float &saturation,float diameter,int &dragging) {
+-    const ImVec2 top=ImGui::GetCursorScreenPos();
+-    const ImVec2 center(top.x+diameter*0.5f,top.y+diameter*0.5f);
+-    const float radius=std::max(1.0f,diameter*0.5f-4.0f);
+-    ImGui::InvisibleButton(id,ImVec2(diameter,diameter),ImGuiButtonFlags_MouseButtonLeft);
+-    const ImVec2 mouse=ImGui::GetIO().MousePos;
+-    const float dx=mouse.x-center.x,dy=mouse.y-center.y;
+-    const float distance=std::sqrt(dx*dx+dy*dy);
+-    if (ImGui::IsItemActivated()) dragging=distance<=radius;
+-    bool changed=false;
++void paint_color_disc(ImVec2 center,float radius,float hue,float saturation) {
+     constexpr float tau=6.28318530718f;
+-    if (ImGui::IsItemActive() && dragging) {
+-        float next_h=distance>0.001f?std::atan2(dy,dx)/tau:hue;
+-        if (next_h<0) next_h+=1.0f;
+-        const float next_s=std::clamp(distance/radius,0.0f,1.0f);
+-        changed=next_h!=hue || next_s!=saturation;
+-        hue=next_h; saturation=next_s;
+-    }
+-    if (!ImGui::IsMouseDown(0)) dragging=0;
+     ImDrawList *draw=ImGui::GetWindowDrawList();
+     const ImVec2 uv=ImGui::GetFontTexUvWhitePixel();
+     constexpr int segments=120;
+@@ -362,6 +349,30 @@
+                         center.y+std::sin(hue*tau)*saturation*radius);
+     draw->AddCircle(marker,6,IM_COL32(0,0,0,255),20,3.0f);
+     draw->AddCircle(marker,5,IM_COL32_WHITE,20,2.0f);
++}
++
++/* A true hue/saturation disc. Radius chooses saturation; brightness has its
++ * own bar, so no small triangle needs to be targeted. */
++bool color_disc(const char *id,float &hue,float &saturation,float diameter,int &dragging) {
++    const ImVec2 top=ImGui::GetCursorScreenPos();
++    const ImVec2 center(top.x+diameter*0.5f,top.y+diameter*0.5f);
++    const float radius=std::max(1.0f,diameter*0.5f-4.0f);
++    ImGui::InvisibleButton(id,ImVec2(diameter,diameter),ImGuiButtonFlags_MouseButtonLeft);
++    const ImVec2 mouse=ImGui::GetIO().MousePos;
++    const float dx=mouse.x-center.x,dy=mouse.y-center.y;
++    const float distance=std::sqrt(dx*dx+dy*dy);
++    if (ImGui::IsItemActivated()) dragging=distance<=radius;
++    bool changed=false;
++    if (ImGui::IsItemActive() && dragging) {
++        constexpr float tau=6.28318530718f;
++        float next_h=distance>0.001f?std::atan2(dy,dx)/tau:hue;
++        if (next_h<0) next_h+=1.0f;
++        const float next_s=std::clamp(distance/radius,0.0f,1.0f);
++        changed=next_h!=hue || next_s!=saturation;
++        hue=next_h; saturation=next_s;
++    }
++    if (!ImGui::IsMouseDown(0)) dragging=0;
++    paint_color_disc(center,radius,hue,saturation);
+     return changed;
+ }
+ 
+@@ -384,9 +395,161 @@
+     }
+ }
+ 
+-void draw_color_editor(RecompRuntimeUi *ui,const LauncherTheme &theme) {
++void center_color_item(float width) {
++    ImGui::SetCursorPosX(ImGui::GetCursorPosX()+
++        std::max(0.0f,(ImGui::GetContentRegionAvail().x-width)*0.5f));
++}
++
++void draw_console_color_editor(RecompRuntimeUi *ui,const RecompRuntimeUiItem *item,
++                               ImVec2 center, ImVec2 panel) {
++    const bool grouped=item->type==RECOMP_RUNTIME_UI_PALETTE;
++    const int first_field=grouped?0:1;
++    if (panel.x <= 0.0f || panel.y <= 0.0f) {
++        const ImVec2 display=ImGui::GetIO().DisplaySize;
++        center=ImVec2(display.x*0.5f,display.y*0.5f);
++        panel=ImVec2(std::clamp(display.x-16.0f,1.0f,640.0f),
++                     std::clamp(display.y-16.0f,1.0f,480.0f));
++    }
++    const float width=panel.x;
++    const float height=panel.y;
++    const float scale=std::clamp(std::min(width/460.0f,height/420.0f),0.46f,1.0f);
++    const float diameter=std::clamp(std::min(width*0.34f,height*0.36f),1.0f,160.0f);
++    constexpr const char *popup="Colores del personaje##recomp-runtime-color";
++    ImGui::SetNextWindowPos(center,ImGuiCond_Always,ImVec2(0.5f,0.5f));
++    ImGui::SetNextWindowSize(panel,ImGuiCond_Always);
++    ImGui::PushStyleColor(ImGuiCol_PopupBg,IM_COL32_BLACK);
++    ImGui::PushStyleColor(ImGuiCol_Border,IM_COL32_WHITE);
++    ImGui::PushStyleColor(ImGuiCol_ModalWindowDimBg,0);
++    ImGui::PushStyleVar(ImGuiStyleVar_PopupRounding,0.0f);
++    ImGui::PushStyleVar(ImGuiStyleVar_PopupBorderSize,2.0f);
++    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding,ImVec2(16*scale,12*scale));
++    ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing,ImVec2(8*scale,6*scale));
++    if (!ImGui::IsPopupOpen(popup)) ImGui::OpenPopup(popup);
++    if (ImGui::BeginPopupModal(popup,nullptr,ImGuiWindowFlags_NoTitleBar|ImGuiWindowFlags_NoResize|
++        ImGuiWindowFlags_NoMove|ImGuiWindowFlags_NoSavedSettings|ImGuiWindowFlags_NoNavInputs)) {
++        if (!ui->color_hsv_ready) {
++            if (grouped) std::memcpy(ui->color_draft,ui->palette_original,sizeof ui->color_draft);
++            else ui->color_draft[0]=static_cast<uint32_t>(ui->color_original);
++            for (int i=0;i<(grouped?3:1);++i) {
++                const ImVec4 rgb=ImGui::ColorConvertU32ToFloat4(preview_rgb(ui->color_draft[i]));
++                ImGui::ColorConvertRGBtoHSV(rgb.x,rgb.y,rgb.z,
++                    ui->color_hue[i],ui->color_saturation[i],ui->color_brightness[i]);
++            }
++            ui->color_hsv_ready=1;
++        }
++
++        const bool confirm_held=ImGui::IsKeyDown(ImGuiKey_Enter)||ImGui::IsKeyDown(ImGuiKey_KeypadEnter)||
++            ImGui::IsKeyDown(ImGuiKey_Space)||ImGui::IsKeyDown(ImGuiKey_GamepadFaceDown);
++        const bool cancel_held=ImGui::IsKeyDown(ImGuiKey_Escape)||ImGui::IsKeyDown(ImGuiKey_Backspace)||
++            ImGui::IsKeyDown(ImGuiKey_GamepadFaceRight);
++        if (!confirm_held && !cancel_held) ui->color_wait_release=0;
++        if (!ui->color_wait_release) {
++            const bool up=ImGui::IsKeyPressed(ImGuiKey_UpArrow)||ImGui::IsKeyPressed(ImGuiKey_GamepadDpadUp);
++            const bool down=ImGui::IsKeyPressed(ImGuiKey_DownArrow)||ImGui::IsKeyPressed(ImGuiKey_GamepadDpadDown);
++            if (up!=down) {
++                ui->color_field+=up?-1:1;
++                if (ui->color_field<first_field) ui->color_field=3;
++                if (ui->color_field>3) ui->color_field=first_field;
++            }
++            const bool left=ImGui::IsKeyPressed(ImGuiKey_LeftArrow)||ImGui::IsKeyPressed(ImGuiKey_GamepadDpadLeft);
++            const bool right=ImGui::IsKeyPressed(ImGuiKey_RightArrow)||ImGui::IsKeyPressed(ImGuiKey_GamepadDpadRight);
++            if (left!=right) {
++                const int delta=left?-1:1;
++                if (ui->color_field==0) ui->color_selected=(ui->color_selected+delta+3)%3;
++                else {
++                    const int tone=ui->color_selected;
++                    float &h=ui->color_hue[tone], &s=ui->color_saturation[tone], &v=ui->color_brightness[tone];
++                    if (ui->color_field==1) h=std::fmod(h+delta/72.0f+1.0f,1.0f);
++                    else if (ui->color_field==2) s=std::clamp(s+delta*0.05f,0.0f,1.0f);
++                    else v=std::clamp(v+delta*0.05f,0.0f,1.0f);
++                    float r,g,b;
++                    ImGui::ColorConvertHSVtoRGB(h,s,v,r,g,b);
++                    ui->color_draft[tone]=(uint32_t(std::lround(r*255.0f))<<16)|
++                        (uint32_t(std::lround(g*255.0f))<<8)|uint32_t(std::lround(b*255.0f));
++                }
++            }
++        }
++
++        const bool accept=!ui->color_wait_release &&
++            (ImGui::IsKeyPressed(ImGuiKey_Enter,false)||ImGui::IsKeyPressed(ImGuiKey_KeypadEnter,false)||
++             ImGui::IsKeyPressed(ImGuiKey_Space,false)||ImGui::IsKeyPressed(ImGuiKey_GamepadFaceDown,false));
++        const bool cancel=!ui->color_wait_release &&
++            (ImGui::IsKeyPressed(ImGuiKey_Escape,false)||ImGui::IsKeyPressed(ImGuiKey_Backspace,false)||
++             ImGui::IsKeyPressed(ImGuiKey_GamepadFaceRight,false));
++        if (accept || cancel) {
++            const bool done=cancel || (grouped ? recomp_runtime_ui_commit_palette(ui,item,ui->color_draft) :
++                recomp_runtime_ui_commit_color(ui,item,static_cast<int>(ui->color_draft[0])));
++            if (done) {
++                ui->editing_color=0;
++                ui->color_item=nullptr;
++                ImGui::CloseCurrentPopup();
++            }
++        } else {
++            ImGui::SetWindowFontScale(scale);
++            const char *name=item->label?item->label:"COLOR";
++            center_color_item(ImGui::CalcTextSize(name).x);
++            ImGui::TextUnformatted(name);
++            ImGui::Separator();
++            if (ImGui::BeginTable("##color_columns",2,ImGuiTableFlags_SizingStretchSame)) {
++                ImGui::TableNextColumn();
++                center_color_item(diameter);
++                const ImVec2 top=ImGui::GetCursorScreenPos();
++                const int tone=ui->color_selected;
++                paint_color_disc(ImVec2(top.x+diameter*0.5f,top.y+diameter*0.5f),
++                    std::max(1.0f,diameter*0.5f-4.0f),ui->color_hue[tone],ui->color_saturation[tone]);
++                ImGui::Dummy(ImVec2(diameter,diameter));
++                ImGui::TableNextColumn();
++                center_color_item(diameter);
++                draw_color_preview(ui,item,diameter-ImGui::GetTextLineHeightWithSpacing(),ui->color_draft);
++                ImGui::EndTable();
++            }
++            ImGui::Separator();
++            const int tone=ui->color_selected;
++            const int values[]={tone+1,static_cast<int>(ui->color_hue[tone]*360.0f),
++                int(std::lround(ui->color_saturation[tone]*100.0f)),
++                int(std::lround(ui->color_brightness[tone]*100.0f))};
++            static const char *const labels[]={"TONO","MATIZ","SATURACIÓN","BRILLO"};
++            static const char *const suffix[]={"","°","%","%"};
++            const ImVec4 amber=ImGui::ColorConvertU32ToFloat4(IM_COL32(255,176,43,255));
++            const float fields_width=std::min(ImGui::GetContentRegionAvail().x,320.0f*scale);
++            center_color_item(fields_width);
++            if (ImGui::BeginTable("##color_fields",2,ImGuiTableFlags_SizingStretchSame,ImVec2(fields_width,0))) {
++                for (int field=first_field;field<4;++field) {
++                    const bool selected=ui->color_field==field;
++                    const ImVec4 color=selected?ImVec4(1,1,1,1):amber;
++                    ImGui::TableNextColumn();
++                    ImGui::TextColored(color,"%s %s",selected?">":" ",labels[field]);
++                    ImGui::TableNextColumn();
++                    char value[16];
++                    std::snprintf(value,sizeof value,"%d%s",values[field],suffix[field]);
++                    ImGui::SetCursorPosX(ImGui::GetCursorPosX()+std::max(0.0f,
++                        ImGui::GetContentRegionAvail().x-ImGui::CalcTextSize(value).x));
++                    ImGui::TextColored(color,"%s",value);
++                }
++                ImGui::EndTable();
++            }
++            ImGui::Separator();
++            const char *help[]={"Arriba / Abajo: campo   Izquierda / Derecha: ajustar",
++                "A / Enter: listo   B / Esc: cancelar"};
++            for (const char *line:help) {
++                center_color_item(ImGui::CalcTextSize(line).x);
++                ImGui::TextDisabled("%s",line);
++            }
++        }
++        ImGui::EndPopup();
++    }
++    ImGui::PopStyleVar(4);
++    ImGui::PopStyleColor(3);
++}
++
++void draw_color_editor(RecompRuntimeUi *ui,const LauncherTheme &theme,
++                       ImVec2 center = ImVec2(), ImVec2 panel = ImVec2()) {
+     if (!ui->editing_color || !ui->color_item) return;
+     const RecompRuntimeUiItem *item=ui->color_item;
++    if (recomp_runtime_ui_uses_console_input(ui)) {
++        draw_console_color_editor(ui,item,center,panel);
++        return;
++    }
+     const ImVec2 display=ImGui::GetIO().DisplaySize;
+     const float width=std::max(1.0f,std::min(760.0f,display.x-24.0f));
+     const float height=std::max(1.0f,std::min(560.0f,display.y-24.0f));
+@@ -523,6 +686,163 @@
+     ImGui::PopStyleVar(8);
+ }
+ 
++constexpr ImU32 pause_amber = IM_COL32(255, 176, 43, 255);
++constexpr ImU32 pause_white = IM_COL32_WHITE;
++constexpr ImU32 pause_muted = IM_COL32(165, 147, 119, 255);
++
++struct PauseCanvas {
++    ImDrawList *draw;
++    ImFont *font;
++    ImVec2 center;
++    float scale;
++
++    ImVec2 point(float x, float y) const {
++        return ImVec2(std::round(center.x + x * scale),
++                      std::round(center.y + (y - 540.0f) * scale));
++    }
++
++    void rect(float x, float y, float w, float h, ImU32 color) const {
++        draw->AddRectFilled(point(x, y), point(x + w, y + h), color);
++    }
++
++    float text(const char *label, float x, float y, float size, ImU32 color,
++               float align = 0.5f, float limit = 770.0f) const {
++        float pixels = size * scale;
++        ImVec2 bounds = font->CalcTextSizeA(pixels, FLT_MAX, 0, label);
++        const float max_width = limit * scale;
++        if (bounds.x > max_width) {
++            pixels *= max_width / bounds.x;
++            bounds = font->CalcTextSizeA(pixels, FLT_MAX, 0, label);
++        }
++        const ImVec2 anchor = point(x, y);
++        draw->AddText(font, pixels,
++            ImVec2(std::round(anchor.x - bounds.x * align), std::round(anchor.y - bounds.y * 0.5f)),
++            color, label);
++        return x - bounds.x * align / scale;
++    }
++
++    void cursor(float left, float y) const {
++        static const unsigned char star[] = {0x41, 0x22, 0x14, 0x7f, 0x14, 0x22, 0x41};
++        for (int row = 0; row < 7; ++row)
++            for (int column = 0; column < 7; ++column)
++                if (star[row] & (0x40 >> column))
++                    rect(left + static_cast<float>(column) * 4.0f,
++                         y - 14.0f + static_cast<float>(row) * 4.0f, 4.0f, 4.0f, pause_white);
++    }
++};
++
++void pause_uppercase(char *text) {
++    for (unsigned char *c = reinterpret_cast<unsigned char *>(text); *c; ++c) {
++        if (*c == 0xc3 && (c[1] == 0xa1 || c[1] == 0xa9 || c[1] == 0xad ||
++                          c[1] == 0xb1 || c[1] == 0xb3 || c[1] == 0xba || c[1] == 0xbc)) {
++            ++c;
++            *c = static_cast<unsigned char>(*c - 0x20);
++        } else if (*c >= 'a' && *c <= 'z') {
++            *c = static_cast<unsigned char>(*c - ('a' - 'A'));
++        }
++    }
++}
++
++void draw_arcade_pause(RecompRuntimeUi *ui, LauncherTheme &theme, ImVec2 display,
++                       ImVec2 viewport_origin, ImVec2 viewport_size) {
++    // Leaving the only section with Back resumes the game.
++    if (!ui->in_section) {
++        recomp_runtime_ui_close(ui);
++        return;
++    }
++    const float scale = std::min(viewport_size.x / 1148.0f, viewport_size.y / 1080.0f);
++    const ImVec2 center(viewport_origin.x + viewport_size.x * 0.5f,
++                        viewport_origin.y + viewport_size.y * 0.5f);
++    theme.background = theme.panel = lng_rgba(0, 0, 0, 1);
++    theme.text = theme.border = lng_rgba(1, 1, 1, 1);
++    theme.accent = theme.accent2 = lng_rgba(1.0f, 0.69f, 0.17f, 1.0f);
++    theme.accent_dim = lng_rgba(0.38f, 0.24f, 0.06f, 1);
++    theme.control = lng_rgba(0.12f, 0.08f, 0.02f, 1);
++    theme.control_hovered = theme.panel_hovered = lng_rgba(0.26f, 0.17f, 0.05f, 1);
++    theme.text_muted = lng_rgba(0.65f, 0.58f, 0.47f, 1);
++    theme.radius_sm = theme.radius_lg = 0.0f;
++    push_runtime_style(theme, false, 1.0f);
++
++    ImGui::SetNextWindowPos(ImVec2(0, 0), ImGuiCond_Always);
++    ImGui::SetNextWindowSize(display, ImGuiCond_Always);
++    const ImGuiWindowFlags flags = ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoMove |
++        ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoBackground | ImGuiWindowFlags_NoInputs;
++    if (ImGui::Begin("##arcade-pause", nullptr, flags)) {
++        ImFont *font = ImGui::GetFont();
++        for (ImFont *candidate : ImGui::GetIO().Fonts->Fonts)
++            if (!std::strcmp(candidate->GetDebugName(), "Arcade Pause")) {
++                font = candidate;
++                break;
++            }
++        const PauseCanvas canvas{ImGui::GetWindowDrawList(), font, center, scale};
++        // The frozen stage stays visible on all four sides of the panel.
++        canvas.rect(-454.0f, 102.0f, 908.0f, 876.0f, pause_white);
++        canvas.rect(-449.0f, 107.0f, 898.0f, 866.0f, IM_COL32_BLACK);
++        canvas.text("PAUSA", 0.0f, 152.0f, 92.0f, pause_white);
++
++        const bool root = ui->page_depth == 0;
++        const bool categories = ui->page_depth == 1;
++        const size_t count = recomp_runtime_ui_page_entry_count(ui);
++        const size_t visible_count = std::min(size_t{8}, count);
++        const size_t first = visible_count && count > visible_count
++            ? std::min(count - visible_count, ui->row_index > 3 ? ui->row_index - 3 : 0) : 0;
++        if (!root && !categories) {
++            const char *last = std::strrchr(ui->page, '/');
++            char name[96];
++            std::snprintf(name, sizeof(name), "%s", last ? last + 1 : ui->page);
++            pause_uppercase(name);
++            canvas.text(name, 0.0f, 250.0f, 40.0f, pause_white);
++        }
++
++        const float pitch = std::max(1.0f, std::round(72.0f * scale));
++        const float first_y = std::round(
++            center.y - (static_cast<float>(visible_count) - 1.0f) * pitch * 0.5f);
++        for (size_t index = 0; index < visible_count; ++index) {
++            const size_t row = first + index;
++            char folder[96];
++            const RecompRuntimeUiItem *item = recomp_runtime_ui_page_entry(
++                ui, row, folder, sizeof(folder));
++            const char *label = item ? item->label : folder;
++            if (!label || !*label) continue;
++            const bool enabled = !item || recomp_runtime_ui_item_enabled(ui, item) != 0;
++            const ImU32 color = enabled ? pause_amber : pause_muted;
++            const float y = 540.0f + (first_y + static_cast<float>(index) * pitch - center.y) / scale;
++            char name[160];
++            std::snprintf(name, sizeof(name), "%s", label);
++            pause_uppercase(name);
++
++            float left;
++            if (item && (item->type == RECOMP_RUNTIME_UI_BOOL ||
++                         item->type == RECOMP_RUNTIME_UI_CHOICE ||
++                         item->type == RECOMP_RUNTIME_UI_INT)) {
++                char value[96];
++                value_text(ui, item, value, sizeof(value));
++                pause_uppercase(value);
++                char display_value[104];
++                std::snprintf(display_value, sizeof(display_value), "< %s >", value);
++                left = canvas.text(name, -350.0f, y, 38.0f, color, 0.0f, 430.0f);
++                canvas.text(display_value, 350.0f, y, 38.0f,
++                            enabled ? pause_white : pause_muted, 1.0f, 245.0f);
++            } else {
++                left = canvas.text(name, 0.0f, y, root ? 64.0f : categories ? 70.0f : 38.0f, color);
++            }
++            if (row == ui->row_index) canvas.cursor(left - 47.0f, y);
++        }
++
++        if (ui->status_frames) {
++            const char *status = ui->status;
++            if (!std::strcmp(status, "Done")) status = "";
++            else if (!std::strcmp(status, "Saved")) status = "GUARDADO";
++            canvas.text(status, 0.0f, 896.0f, 25.0f, pause_white);
++            recomp_runtime_ui_advance_status(ui, ImGui::GetIO().DeltaTime * 60.0f);
++        } else if (!root && !categories) {
++            canvas.text("ENTER / A     |     ESC / B", 0.0f, 894.0f, 24.0f, pause_muted);
++        }
++    }
++    ImGui::End();
++    draw_color_editor(ui, theme, center, ImVec2(908.0f * scale, 876.0f * scale));
++    pop_runtime_style();
++}
+ // The toast: a borderless panel centred near the top of the display, drawn
+ // with or without the menu. It takes no input and no focus.
+ void draw_toast(RecompRuntimeUi *ui, const LauncherTheme &theme) {
+@@ -562,7 +882,8 @@
+ 
+ } // namespace
+ 
+-extern "C" void recomp_runtime_ui_render_imgui(RecompRuntimeUi *ui) {
++extern "C" void recomp_runtime_ui_render_imgui_in_rect(RecompRuntimeUi *ui,
++    float rect_x, float rect_y, float rect_width, float rect_height) {
+     if (!ui || ImGui::GetCurrentContext() == nullptr) return;
+     if (!ui->open) {
+         if (recomp_runtime_ui_toast_visible(ui))
+@@ -582,6 +903,25 @@
+     const bool touch_friendly =
+         (ui->config.presentation_flags &
+          RECOMP_RUNTIME_UI_PRESENTATION_TOUCH_FRIENDLY) != 0;
++    const bool compact_pause = arcade_nes && !touch_friendly &&
++        ui->section_count == 1 && std::strcmp(ui->sections[0], "Pausa") == 0;
++    if (compact_pause) {
++        ImVec2 origin(0.0f, 0.0f);
++        ImVec2 size = display;
++        if (rect_width > 0.0f && rect_height > 0.0f) {
++            const float left = std::clamp(rect_x, 0.0f, display.x);
++            const float top = std::clamp(rect_y, 0.0f, display.y);
++            const float right = std::clamp(rect_x + rect_width, left, display.x);
++            const float bottom = std::clamp(rect_y + rect_height, top, display.y);
++            if (right > left && bottom > top) {
++                origin = ImVec2(left, top);
++                size = ImVec2(right - left, bottom - top);
++            }
++        }
++        draw_arcade_pause(ui, theme, display, origin, size);
++        if (recomp_runtime_ui_toast_visible(ui)) draw_toast(ui, theme);
++        return;
++    }
+     /* ARCADE_FIXED_MENU_V070: fixed geometry, scaled with the available window. */
+     const bool arcade_desktop = arcade_nes && !touch_friendly;
+     const float desktop_scale = arcade_desktop
+@@ -751,7 +1091,7 @@
+                                    ? ui->config.back_label : "Back";
+             if (arcade_nes)
+                 ImGui::TextDisabled(
+-                    "ESC: CONTINUAR");
++                    "Esc: Reanudar");
+             else
+                 ImGui::TextDisabled(
+                     "%s  Select    %s  Back    D-pad / Arrows  Navigate",
+@@ -765,7 +1105,7 @@
+             recomp_runtime_ui_advance_status(ui, ImGui::GetIO().DeltaTime * 60.0f);
+         }
+         ImGui::SameLine();
+-        const char *close_label = arcade_nes ? "CONTINUAR" : "Resume";
++        const char *close_label = arcade_nes ? "Reanudar" : "Resume";
+         const float close_w = touch_friendly
+             ? std::max(320.0f, ImGui::CalcTextSize(close_label).x +
+                                    theme.spacing_lg * 2.0f)
+@@ -781,3 +1121,7 @@
+     // Over the menu too: a shortcut can still answer while it is open.
+     if (recomp_runtime_ui_toast_visible(ui)) draw_toast(ui, theme);
+ }
++
++extern "C" void recomp_runtime_ui_render_imgui(RecompRuntimeUi *ui) {
++    recomp_runtime_ui_render_imgui_in_rect(ui, 0.0f, 0.0f, 0.0f, 0.0f);
++}
+diff --git a/src/common/launcher_model.c b/src/common/launcher_model.c
+--- a/src/common/launcher_model.c
++++ b/src/common/launcher_model.c
+@@ -436,6 +436,10 @@
+         m->has_rewind_depth     = game->has_rewind_depth != 0;
+         m->has_vsync            = game->has_vsync != 0;
+         m->has_arcade_settings  = game->has_arcade_settings != 0;
++        m->arcade_menu_action = game->arcade_menu_action;
++        m->arcade_rom_ready = game->arcade_rom_ready != 0;
++        m->arcade_menu_attract = game->arcade_menu_attract;
++        m->arcade_menu_dismiss_demo = game->arcade_menu_dismiss_demo;
+         m->has_skip_fmv         = game->has_skip_fmv != 0;
+         m->has_turbo_loads      = game->has_turbo_loads != 0;
+         m->has_geometry_precision = game->has_geometry_precision != 0;
+diff --git a/src/common/launcher_model.h b/src/common/launcher_model.h
+--- a/src/common/launcher_model.h
++++ b/src/common/launcher_model.h
+@@ -484,6 +484,11 @@
+     bool     has_rewind_depth;
+     bool     has_vsync;
+     bool     has_arcade_settings;
++    int      (*arcade_menu_action)(int action);
++    bool     arcade_rom_ready;
++    const uint32_t *(*arcade_menu_attract)(int enabled, int volume, int show_demo);
++    void     (*arcade_menu_dismiss_demo)(void);
++    const char* arcade_menu_notice;
+     bool     has_skip_fmv;
+     bool     has_turbo_loads;
+     // PSX geometry precision: sub-pixel vertices + perspective-correct UVs.
+diff --git a/src/common/launcher_host_capture.h b/src/common/launcher_host_capture.h
+--- a/src/common/launcher_host_capture.h
++++ b/src/common/launcher_host_capture.h
+@@ -57,7 +57,17 @@
+         }
+         return 1;
+     }
+-    if (!m->capture_pad) return 1;
++    if (!m->capture_pad) {
++        /* B can leave keyboard capture. It remains bindable during pad capture. */
++#if defined(LNG_SDL3)
++        const int back = SDL_GAMEPAD_BUTTON_EAST;
++#else
++        const int back = SDL_CONTROLLER_BUTTON_B;
++#endif
++        if (ev->type == SDL_EVENT_GAMEPAD_BUTTON_DOWN && LNG_EVGBTN((*ev)) == back)
++            launcher_model_cancel_capture(m);
++        return 1;
++    }
+     uint32_t which;
+     if (ev->type == SDL_EVENT_GAMEPAD_BUTTON_DOWN) which=(uint32_t)LNG_EVGBTNWHICH((*ev));
+     else if (ev->type == SDL_EVENT_GAMEPAD_AXIS_MOTION) which=(uint32_t)LNG_EVGAXISWHICH((*ev));
+diff --git a/tests/nes_host_bindings_test.c b/tests/nes_host_bindings_test.c
+--- a/tests/nes_host_bindings_test.c
++++ b/tests/nes_host_bindings_test.c
+@@ -56,6 +56,11 @@
+     ev.key.keysym.sym=SDLK_x; ev.key.keysym.scancode=SDL_SCANCODE_X;
+     launcher_host_capture_event(m,&ev);
+     assert(m->s.player_key_bind[0][4]==SDL_SCANCODE_C);
++    launcher_model_begin_capture(m,4);
++    ev.type=SDL_CONTROLLERBUTTONDOWN; ev.cbutton.button=SDL_CONTROLLER_BUTTON_B;
++    assert(launcher_host_capture_event(m,&ev));
++    assert(!m->capturing && m->s.player_key_bind[0][4]==SDL_SCANCODE_C);
++    memset(&ev,0,sizeof ev); ev.type=SDL_KEYDOWN;
+     launcher_model_begin_capture(m,4); ev.key.repeat=1;
+     launcher_host_capture_event(m,&ev); assert(m->capturing);
+     ev.key.repeat=0; ev.key.keysym.sym=SDLK_ESCAPE;
+@@ -67,11 +72,11 @@
+     launcher_model_begin_pad_capture(m,4);
+     ev.type=SDL_CONTROLLERAXISMOTION; ev.caxis.which=42; ev.caxis.axis=SDL_CONTROLLER_AXIS_TRIGGERRIGHT; ev.caxis.value=0;
+     launcher_host_capture_event(m,&ev); assert(!m->map_all_wait_release);
+-    ev.type=SDL_CONTROLLERBUTTONDOWN; ev.cbutton.which=99; ev.cbutton.button=SDL_CONTROLLER_BUTTON_Y;
++    ev.type=SDL_CONTROLLERBUTTONDOWN; ev.cbutton.which=99; ev.cbutton.button=SDL_CONTROLLER_BUTTON_B;
+     launcher_host_capture_event(m,&ev); assert(m->capturing);
+     ev.cbutton.which=42;
+     launcher_host_capture_event(m,&ev);
+-    assert(!m->capturing && m->s.player_pad_bind[0][4]==RECOMP_LAUNCHER_PAD_BUTTON(SDL_CONTROLLER_BUTTON_Y));
++    assert(!m->capturing && m->s.player_pad_bind[0][4]==RECOMP_LAUNCHER_PAD_BUTTON(SDL_CONTROLLER_BUTTON_B));
+     launcher_model_begin_pad_capture(m,4);
+     ev.type=SDL_CONTROLLERAXISMOTION; ev.caxis.which=42; ev.caxis.axis=SDL_CONTROLLER_AXIS_TRIGGERRIGHT; ev.caxis.value=0;
+     launcher_host_capture_event(m,&ev);
+diff --git a/src/common/launcher_debug.c b/src/common/launcher_debug.c
+--- a/src/common/launcher_debug.c
++++ b/src/common/launcher_debug.c
+@@ -135,9 +135,9 @@
+     SDL_Event e;
+     SDL_zero(e);
+     e.type = SDL_EVENT_KEY_DOWN;
+-#if defined(LNG_SDL3)
+-    /* ImGui's SDL3 backend drops key events for no known window. */
++    /* The ImGui SDL backends ignore key events without a known window. */
+     e.key.windowID = p && p->window ? SDL_GetWindowID(p->window) : 0;
++#if defined(LNG_SDL3)
+     e.key.key = key;
+     e.key.scancode = sc;
+     e.key.down = true;
+diff --git a/src/common/launcher_gl.c b/src/common/launcher_gl.c
+--- a/src/common/launcher_gl.c
++++ b/src/common/launcher_gl.c
+@@ -79,6 +79,27 @@
+     return load_impl(path, tolerance < 0 ? 0 : tolerance);
+ }
+ 
++bool launcher_texture_update_pixels(LauncherTexture* t, const unsigned char* rgba, int w, int h) {
++    if (!t || !rgba || w <= 0 || h <= 0) return false;
++    if (!t->id) {
++        glGenTextures(1, &t->id);
++        if (!t->id) return false;
++        glBindTexture(GL_TEXTURE_2D, t->id);
++        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
++        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
++        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
++        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
++    } else glBindTexture(GL_TEXTURE_2D, t->id);
++    glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
++    if (t->w != w || t->h != h) {
++        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, w, h, 0, GL_RGBA, GL_UNSIGNED_BYTE, rgba);
++        t->w = w;
++        t->h = h;
++    } else glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, w, h, GL_RGBA, GL_UNSIGNED_BYTE, rgba);
++    glBindTexture(GL_TEXTURE_2D, 0);
++    return true;
++}
++
+ void launcher_texture_free(LauncherTexture* t) {
+     if (t && t->id) {
+         GLuint id = (GLuint)t->id;
+diff --git a/src/common/launcher_gl.h b/src/common/launcher_gl.h
+--- a/src/common/launcher_gl.h
++++ b/src/common/launcher_gl.h
+@@ -30,6 +30,7 @@
+ // art asset-agnostic instead of hand-editing each game's images.
+ LauncherTexture launcher_texture_load_colorkey(const char* path, int tolerance);
+ 
++bool launcher_texture_update_pixels(LauncherTexture* t, const unsigned char* rgba, int w, int h);
+ void launcher_texture_free(LauncherTexture* t);
+ 
+ // Decode an image file to a tightly-packed RGBA8 buffer, WITHOUT touching GL.
+diff --git a/src/common/launcher_ng_capi.c b/src/common/launcher_ng_capi.c
+--- a/src/common/launcher_ng_capi.c
++++ b/src/common/launcher_ng_capi.c
+@@ -192,8 +192,14 @@
+                                           sizeof(window_size_path)))
+         launcher_window_size_load(window_size_path, &window_width, &window_height);
+     LauncherPlatform plat = {0};
+-    if (!launcher_platform_open(&plat, window_title ? window_title : "Launcher",
+-                                window_width, window_height)) {
++#if defined(LNG_SDL3)
++    const bool opened = launcher_platform_open(&plat, window_title ? window_title : "Launcher",
++                                               window_width, window_height);
++#else
++    const bool opened = launcher_platform_open_shared(&plat, window_title ? window_title : "Launcher",
++        window_width, window_height, game ? game->shared_window : NULL);
++#endif
++    if (!opened) {
+         // Window/GL init failed — tell the caller to boot as if the launcher was
+         // skipped, exactly like the old launcher's UNAVAILABLE path.
+         return RECOMP_LAUNCHER_RESULT_UNAVAILABLE;
+diff --git a/src/common/launcher_platform.h b/src/common/launcher_platform.h
+--- a/src/common/launcher_platform.h
++++ b/src/common/launcher_platform.h
+@@ -28,6 +28,7 @@
+ #endif
+ 
+ typedef struct LauncherPlatform {
++    bool retained_window;
+     SDL_Window*   window;
+     SDL_GLContext gl;
+ 
+@@ -54,6 +55,10 @@
+ 
+ // Create the window (RESIZABLE + HIGH_PIXEL_DENSITY) and a GL 3.3 core context.
+ // Returns false if SDL/GL initialization fails (caller boots as if skipped).
++#if !defined(LNG_SDL3)
++bool launcher_platform_open_shared(LauncherPlatform* p, const char* title,
++                                   int logical_w, int logical_h, SDL_Window** shared_window);
++#endif
+ bool launcher_platform_open(LauncherPlatform* p, const char* title,
+                             int logical_w, int logical_h);
+ 
+diff --git a/src/common/launcher_platform_sdl2.c b/src/common/launcher_platform_sdl2.c
+--- a/src/common/launcher_platform_sdl2.c
++++ b/src/common/launcher_platform_sdl2.c
+@@ -165,6 +165,11 @@
+ 
+ bool launcher_platform_open(LauncherPlatform* p, const char* title,
+                             int logical_w, int logical_h) {
++    return launcher_platform_open_shared(p, title, logical_w, logical_h, NULL);
++}
++
++bool launcher_platform_open_shared(LauncherPlatform* p, const char* title,
++                                   int logical_w, int logical_h, SDL_Window** shared_window) {
+     if (!p) return false;
+     SDL_zerop(p);
+     launcher_boot_timing_mark("rui:platform_open:begin");
+@@ -202,8 +207,9 @@
+     // every Linux install has.
+     SDL_SetHint(SDL_HINT_OPENGL_ES_DRIVER, "1");
+ #endif
+-    if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_GAMECONTROLLER |
+-                 SDL_INIT_SENSOR) != 0) {   // SDL2: 0 == success
++    const Uint32 systems = SDL_INIT_VIDEO | SDL_INIT_GAMECONTROLLER | SDL_INIT_SENSOR;
++    const Uint32 missing = systems & ~SDL_WasInit(systems);
++    if (SDL_Init(shared_window ? missing : systems) != 0) {
+         fprintf(stderr, "[launcher] SDL_Init failed: %s\n", SDL_GetError());
+         return false;
+     }
+@@ -254,29 +260,34 @@
+ #if defined(__ANDROID__)
+     window_flags |= SDL_WINDOW_FULLSCREEN_DESKTOP | SDL_WINDOW_BORDERLESS;
+ #endif
+-    p->window = SDL_CreateWindow(title ? title : "Launcher",
+-                                 SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED,
+-                                 win_w, win_h,
+-                                 window_flags);
++    const bool reusing = shared_window && *shared_window;
++    p->window = reusing ? *shared_window :
++        SDL_CreateWindow(title ? title : "Launcher",
++                         SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED,
++                         win_w, win_h, window_flags);
+     if (!p->window) {
+         fprintf(stderr, "[launcher] SDL_CreateWindow failed: %s\n", SDL_GetError());
+-        if (s_quit_sdl) SDL_Quit();
++        if (s_quit_sdl && !shared_window) SDL_Quit();
+         return false;
+     }
+ 
+     p->gl = SDL_GL_CreateContext(p->window);
+     if (!p->gl) {
+         fprintf(stderr, "[launcher] SDL_GL_CreateContext failed: %s\n", SDL_GetError());
+-        SDL_DestroyWindow(p->window);
++        if (!reusing) SDL_DestroyWindow(p->window);
+         p->window = NULL;
+-        if (s_quit_sdl) SDL_Quit();
++        if (s_quit_sdl && !shared_window) SDL_Quit();
+         return false;
+     }
+ 
++    if (shared_window) {
++        *shared_window = p->window;
++        p->retained_window = true;
++    }
+     SDL_GL_MakeCurrent(p->window, p->gl);
+     SDL_GL_SetSwapInterval(1);
+ 
+-    if (!test_hidden)
++    if (!test_hidden && !reusing)
+         SDL_RaiseWindow(p->window);   // foreground + keyboard focus (gamepad/kbd nav)
+ 
+     launcher_platform_refresh_metrics(p);
+@@ -287,7 +298,7 @@
+     // narrow one-column breakpoint on a 150% desktop — so this asks for the
+     // pixels the requested logical size really needs, and keeps the result
+     // reachable on displays that cannot show them all.
+-    fit_window_to_display(p, logical_w, logical_h);
++    if (!reusing) fit_window_to_display(p, logical_w, logical_h);
+     launcher_boot_timing_mark("rui:platform_open:window+gl_ready");
+     return true;
+ }
+@@ -448,12 +459,13 @@
+ void launcher_platform_close(LauncherPlatform* p) {
+     if (!p) return;
+     if (p->gl)     { SDL_GL_DeleteContext(p->gl); p->gl = NULL; }
+-    if (p->window) { SDL_DestroyWindow(p->window); p->window = NULL; }
++    if (p->window && !p->retained_window) SDL_DestroyWindow(p->window);
++    p->window = NULL;
+     SDL_GL_ResetAttributes();   // leave a clean slate for the game's SDL usage
+     /* Soft-return rematch hosts that skip SDL_Quit (s_quit_sdl=false) keep the
+      * subsystem alive across launcher↔game transitions. When we do quit, hosts
+      * MUST re-SDL_Init (video+audio+gamecontroller) before recreating the game
+      * window — see docs/HOST_NETPLAY.md. */
+-    if (s_quit_sdl)
++    if (s_quit_sdl && !p->retained_window)
+         SDL_Quit();
+ }
+diff --git a/src/common/recomp_runtime_settings.c b/src/common/recomp_runtime_settings.c
+--- a/src/common/recomp_runtime_settings.c
++++ b/src/common/recomp_runtime_settings.c
+@@ -96,6 +96,11 @@
+     }
+ 
+     size_t count = 0;
++    if (standard->pause_section && has(f, RECOMP_RUNTIME_UI_STANDARD_RESUME))
++        add_item(items, &count, RECOMP_RUNTIME_UI_KEY_RESUME, standard->pause_section,
++                 "Reanudar", "Continúa la partida.", RECOMP_RUNTIME_UI_ACTION,
++                 0, 0, 0, NULL, 0, NULL);
++    const size_t options_start = count;
+     if (has(f, RECOMP_RUNTIME_UI_STANDARD_FULLSCREEN))
+     add_item(items, &count, RECOMP_RUNTIME_UI_KEY_FULLSCREEN, "Pantalla",
+              "Pantalla completa", "Cambiar entre ventana y pantalla completa.",
+@@ -164,7 +169,7 @@
+         add_item(items, &count, RECOMP_RUNTIME_UI_KEY_VOLUME, "Audio", "Volumen",
+                  "Ajusta el volumen del juego.", RECOMP_RUNTIME_UI_INT,
+                  0, 100, 5, NULL, 0, NULL);
+-    if (has(f, RECOMP_RUNTIME_UI_STANDARD_RESUME))
++    if (!standard->pause_section && has(f, RECOMP_RUNTIME_UI_STANDARD_RESUME))
+         add_item(items, &count, RECOMP_RUNTIME_UI_KEY_RESUME, "Sistema", "Continuar partida",
+                  "Cierra el menú y continúa la partida.", RECOMP_RUNTIME_UI_ACTION,
+                  0, 0, 0, NULL, 0, NULL);
+@@ -202,6 +207,10 @@
+         confirm_prompts[count - 1] = "Press again to quit";
+     }
+ 
++    if (standard->options_section)
++        for (size_t i = options_start; i < count; ++i)
++            items[i].section = standard->options_section;
++
+     if (standard->extra_items && standard->extra_item_count) {
+         memcpy(items + count, standard->extra_items,
+                standard->extra_item_count * sizeof(*items));
+diff --git a/src/common/recomp_runtime_ui.c b/src/common/recomp_runtime_ui.c
+--- a/src/common/recomp_runtime_ui.c
++++ b/src/common/recomp_runtime_ui.c
+@@ -349,6 +349,7 @@
+         ui->editing_color = 1;
+         ui->color_original = rgb;
+         ui->color_selected = ui->color_hsv_ready = ui->color_disk_active = 0;
++        ui->color_field = item->type == RECOMP_RUNTIME_UI_PALETTE ? 0 : 1;
+         ui->color_wait_release = 1;
+         ui->color_item = item;
+         return;
+@@ -410,6 +411,10 @@
+ 
+ int recomp_runtime_ui_wants_text_input(const RecompRuntimeUi *ui) {
+     return (ui && ui->open && (ui->editing_text || ui->editing_color)) ? 1 : 0;
++}
++
++int recomp_runtime_ui_uses_console_input(const RecompRuntimeUi *ui) {
++    return ui && (ui->config.presentation_flags & RECOMP_RUNTIME_UI_PRESENTATION_CONSOLE_INPUT) != 0;
+ }
+ 
+ int recomp_runtime_ui_commit_color(RecompRuntimeUi *ui,
+diff --git a/src/common/recomp_runtime_ui_internal.h b/src/common/recomp_runtime_ui_internal.h
+--- a/src/common/recomp_runtime_ui_internal.h
++++ b/src/common/recomp_runtime_ui_internal.h
+@@ -50,7 +50,9 @@
+     int editing_color;
+     int color_original;
+     uint32_t palette_original[3];
++    uint32_t color_draft[3];
+     int color_selected, color_hsv_ready, color_disk_active;
++    int color_field;
+     float color_hue[3], color_saturation[3], color_brightness[3];
+     int color_wait_release;
+     const RecompRuntimeUiItem *color_item;
+diff --git a/src/recomp_launcher.h b/src/recomp_launcher.h
+--- a/src/recomp_launcher.h
++++ b/src/recomp_launcher.h
+@@ -2421,6 +2421,16 @@
+                         char* out, size_t out_size);
+     void*              rom_describe_ctx;
+     int                has_arcade_settings;
++    /* Optional integrated arcade menu. -1 selects a ROM, 0..3 start a mode.
++     * Positive return means ready, zero means missing/cancelled, negative error. */
++    int                (*arcade_menu_action)(int action);
++    int                arcade_rom_ready;
++    /* Optional local attract mode; non-null frame is 256 × 240 ARGB8888. */
++    const uint32_t    *(*arcade_menu_attract)(int enabled, int volume, int show_demo);
++    void               (*arcade_menu_dismiss_demo)(void);
++    /* Optional SDL2 window owned by the host. The menu borrows it, or creates
++     * it when the slot is empty, and leaves it alive when its UI closes. */
++    struct SDL_Window **shared_window;
+ } RecompLauncherCGameInfo;
+ 
+ /* RecompLauncherCGameInfo carries texture_filter_labels / _values. */
+diff --git a/src/recomp_runtime_ui.h b/src/recomp_runtime_ui.h
+--- a/src/recomp_runtime_ui.h
++++ b/src/recomp_runtime_ui.h
+@@ -184,6 +184,8 @@
+ 
+ enum {
+     RECOMP_RUNTIME_UI_PRESENTATION_TOUCH_FRIENDLY = UINT32_C(1) << 0,
++    /* Use directional input and confirm/cancel for color editors. */
++    RECOMP_RUNTIME_UI_PRESENTATION_CONSOLE_INPUT = UINT32_C(1) << 1,
+ };
+ 
+ enum {
+@@ -237,6 +239,9 @@
+ };
+ 
+ typedef struct RecompRuntimeUiStandardConfig {
++    /* Optional root and options page for a compact pause menu. */
++    const char *pause_section;
++    const char *options_section;
+     RecompRuntimeUiConfig menu;
+     RecompRuntimeUiStandardFeatures features;
+     unsigned view_modes;
+@@ -271,12 +276,13 @@
+                                    int pressed, int repeat);
+ 
+ /*
+- * Non-zero while a RECOMP_RUNTIME_UI_TEXT row has keyboard focus. The host must
++ * Non-zero while a text or color editor has keyboard focus. The host must
+  * then stop mapping arrows / Return / Escape to menu navigation and let its
+  * ImGui backend consume them, or typing would move the selection instead of
+  * entering characters. The keys should still be withheld from the game.
+  */
+ int recomp_runtime_ui_wants_text_input(const RecompRuntimeUi *ui);
++int recomp_runtime_ui_uses_console_input(const RecompRuntimeUi *ui);
+ 
+ /*
+  * How the open menu covers the game, so a player can see a picture setting's
+@@ -381,6 +387,9 @@
+  * version consume the same runtime model.
+  */
+ void recomp_runtime_ui_render_imgui(RecompRuntimeUi *ui);
++/* Fit the overlay inside the game image in ImGui window coordinates. */
++void recomp_runtime_ui_render_imgui_in_rect(RecompRuntimeUi *ui, float x, float y,
++                                           float width, float height);
+ 
+ #ifdef __cplusplus
+ }

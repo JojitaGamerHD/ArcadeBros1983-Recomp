@@ -212,6 +212,67 @@ static int grouped_editor() {
     return 0;
 }
 
+static int console_palette_editor() {
+    const RecompRuntimeUiItem item={"arcade.color.mario","Colores","Mario","",RECOMP_RUNTIME_UI_PALETTE};
+    RecompRuntimeUiConfig config{};
+    config.title="Colores"; config.theme="nes"; config.items=&item; config.item_count=1;
+    config.presentation_flags=RECOMP_RUNTIME_UI_PRESENTATION_CONSOLE_INPUT;
+    config.callbacks.get_palette=arcade_colors_get_palette;
+    config.callbacks.set_palette=arcade_colors_set_palette;
+    config.callbacks.get_color_preview=arcade_colors_preview;
+    config.callbacks.save=saved;
+    RecompRuntimeUi *ui=recomp_runtime_ui_create(&config);
+    CHECK(ui && recomp_runtime_ui_uses_console_input(ui));
+    CHECK(recomp_runtime_ui_open_section(ui,"Colores"));
+    uint32_t original[3],actual[3];
+    CHECK(arcade_colors_get_palette(nullptr,&item,original));
+    const int saves_before=saves;
+    ImGuiIO &io=ImGui::GetIO();
+    io.DisplaySize=ImVec2(640,480);
+    const ImGuiBackendFlags previous_backend = io.BackendFlags;
+    io.BackendFlags |= ImGuiBackendFlags_HasGamepad;
+    auto press=[&](ImGuiKey key) {
+        io.AddKeyEvent(key,true); frame(ui);
+        io.AddKeyEvent(key,false); frame(ui);
+    };
+    io.AddKeyEvent(ImGuiKey_GamepadFaceDown,true);
+    CHECK(recomp_runtime_ui_handle_input(ui,RECOMP_RUNTIME_UI_INPUT_ACCEPT,1,0));
+    frame(ui); frame(ui);
+    CHECK(ui->editing_color && ui->color_wait_release);
+    io.AddKeyEvent(ImGuiKey_GamepadFaceDown,false); frame(ui);
+    CHECK(!ui->color_wait_release && recomp_runtime_ui_wants_text_input(ui));
+    press(ImGuiKey_GamepadDpadRight);
+    CHECK(ui->color_selected==1 && ui->color_field==0);
+    press(ImGuiKey_GamepadDpadUp);
+    CHECK(ui->color_field==3);
+    press(ImGuiKey_GamepadDpadLeft);
+    const uint32_t draft=ui->color_draft[1];
+    CHECK(draft!=original[1] && saves==saves_before);
+    CHECK(arcade_colors_get_palette(nullptr,&item,actual) && !std::memcmp(actual,original,sizeof actual));
+    press(ImGuiKey_GamepadFaceRight);
+    CHECK(!ui->editing_color && recomp_runtime_ui_is_open(ui) && saves==saves_before);
+    CHECK(arcade_colors_get_palette(nullptr,&item,actual) && !std::memcmp(actual,original,sizeof actual));
+
+    io.DisplaySize=ImVec2(256,240);
+    CHECK(recomp_runtime_ui_handle_input(ui,RECOMP_RUNTIME_UI_INPUT_ACCEPT,1,0));
+    frame(ui); frame(ui); frame(ui);
+    ImGuiWindow *popup=ImGui::FindWindowByName("Colores del personaje##recomp-runtime-color");
+    CHECK(popup && popup->Active && popup->Pos.x>=0 && popup->Pos.y>=0);
+    CHECK(popup->Pos.x+popup->Size.x<=256 && popup->Pos.y+popup->Size.y<=240);
+    CHECK(popup->ContentSize.y<=popup->Size.y-popup->WindowPadding.y*2);
+    press(ImGuiKey_RightArrow);
+    press(ImGuiKey_UpArrow);
+    press(ImGuiKey_LeftArrow);
+    CHECK(ui->color_draft[1]==draft);
+    press(ImGuiKey_Enter);
+    CHECK(!ui->editing_color && recomp_runtime_ui_is_open(ui) && saves==saves_before+1);
+    CHECK(arcade_colors_get_palette(nullptr,&item,actual));
+    CHECK(actual[0]==original[0] && actual[1]==draft && actual[2]==original[2]);
+    io.BackendFlags = previous_backend;
+    recomp_runtime_ui_destroy(ui);
+    return 0;
+}
+
 static ImVec4 editor_disc_bounds() {
     ImGuiWindow *popup=ImGui::FindWindowByName("Colores del personaje##recomp-runtime-color");
     if (!popup) return ImVec4();
@@ -411,6 +472,7 @@ int main() {
     CHECK(wheel_editor()==0);
     CHECK(disc_controls()==0);
     CHECK(grouped_editor()==0);
+    CHECK(console_palette_editor()==0);
     CHECK(sdl_pointer_bridge()==0);
     ImGui::DestroyContext();
     std::puts("PASS grouped palettes, stable SDL-scaled mouse clicks/drags, letterboxing, live preview, cancel/save and compact layout.");

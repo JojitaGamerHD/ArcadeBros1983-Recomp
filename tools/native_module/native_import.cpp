@@ -1,5 +1,5 @@
-/* Original portable launcher: prepare a private native module on first import.
- * This executable contains no game instructions or extracted ROM resources. */
+/* Import a private native module from the user's local cartridge. */
+#include "native_import.h"
 #define WIN32_LEAN_AND_MEAN
 #define NOMINMAX
 #include <windows.h>
@@ -246,10 +246,11 @@ std::optional<fs::path> reusable_cache(const fs::path& cache_root, const std::st
     } catch (...) { return {}; }
 }
 
-fs::path pick_rom() {
+fs::path pick_rom(HWND owner) {
     std::vector<wchar_t> path(32768, L'\0');
     OPENFILENAMEW dialog{};
     dialog.lStructSize = sizeof(dialog);
+    dialog.hwndOwner = owner;
     dialog.lpstrFile = path.data();
     dialog.nMaxFile = static_cast<DWORD>(path.size());
     dialog.lpstrFilter = L"ROM de NES (*.nes)\0*.nes\0Todos los archivos (*.*)\0*.*\0\0";
@@ -263,7 +264,16 @@ fs::path pick_rom() {
 
 class Progress {
     HWND window_ = nullptr, message_ = nullptr, cancel_ = nullptr;
+    HWND owner_ = nullptr;
+    bool owner_disabled_ = false;
     bool cancelled_ = false;
+
+    void request_cancel() {
+        cancelled_ = true;
+        if (cancel_) EnableWindow(cancel_, FALSE);
+        if (message_) SetWindowTextW(message_, L"Cancelando la preparacion...");
+    }
+
     static LRESULT CALLBACK procedure(HWND window, UINT message, WPARAM wparam, LPARAM lparam) {
         Progress* self = reinterpret_cast<Progress*>(GetWindowLongPtrW(window, GWLP_USERDATA));
         if (message == WM_NCCREATE) {
@@ -271,16 +281,15 @@ class Progress {
             SetWindowLongPtrW(window, GWLP_USERDATA, reinterpret_cast<LONG_PTR>(self));
         }
         if (self && (message == WM_CLOSE || (message == WM_COMMAND && LOWORD(wparam) == IDCANCEL))) {
-            self->cancelled_ = true;
-            if (self->cancel_) EnableWindow(self->cancel_, FALSE);
-            if (self->message_) SetWindowTextW(self->message_, L"Cancelando la preparacion...");
+            self->request_cancel();
             return 0;
         }
         return DefWindowProcW(window, message, wparam, lparam);
     }
 public:
-    explicit Progress(HINSTANCE instance, bool visible) {
+    explicit Progress(HWND owner, bool visible) : owner_(owner) {
         if (!visible) return;
+        HINSTANCE instance = GetModuleHandleW(nullptr);
         INITCOMMONCONTROLSEX controls{sizeof(controls), ICC_PROGRESS_CLASS};
         if (!InitCommonControlsEx(&controls)) throw Failure{1, L"No se pudo abrir la ventana de preparacion.", {}};
         WNDCLASSW type{};
@@ -298,7 +307,7 @@ public:
         int width = rectangle.right - rectangle.left, height = rectangle.bottom - rectangle.top;
         window_ = CreateWindowExW(0, type.lpszClassName, kTitle, style,
             (GetSystemMetrics(SM_CXSCREEN) - width) / 2, (GetSystemMetrics(SM_CYSCREEN) - height) / 2,
-            width, height, nullptr, nullptr, instance, this);
+            width, height, owner, nullptr, instance, this);
         if (!window_) throw Failure{1, L"No se pudo abrir la ventana de preparacion.", {}};
         message_ = CreateWindowExW(0, L"STATIC", L"Preparando tu ROM para jugar...", WS_CHILD | WS_VISIBLE,
             24, 22, 430, 24, window_, nullptr, instance, nullptr);
@@ -314,10 +323,18 @@ public:
         SendMessageW(message_, WM_SETFONT, reinterpret_cast<WPARAM>(font), TRUE);
         SendMessageW(cancel_, WM_SETFONT, reinterpret_cast<WPARAM>(font), TRUE);
         SendMessageW(bar, PBM_SETMARQUEE, TRUE, 30);
+        if (owner_ && IsWindowEnabled(owner_)) {
+            EnableWindow(owner_, FALSE);
+            owner_disabled_ = true;
+        }
         ShowWindow(window_, SW_SHOW);
+        SetFocus(cancel_);
         UpdateWindow(window_);
     }
-    ~Progress() { if (window_ && IsWindow(window_)) DestroyWindow(window_); }
+    ~Progress() {
+        if (owner_disabled_ && IsWindow(owner_)) EnableWindow(owner_, TRUE);
+        if (window_ && IsWindow(window_)) DestroyWindow(window_);
+    }
     Progress(const Progress&) = delete;
     Progress& operator=(const Progress&) = delete;
     bool cancelled() const { return cancelled_; }
@@ -325,6 +342,12 @@ public:
         MSG message;
         while (PeekMessageW(&message, nullptr, 0, 0, PM_REMOVE)) {
             if (message.message == WM_QUIT) { cancelled_ = true; continue; }
+            if (window_ && message.message == WM_KEYDOWN && !(message.lParam & (1L << 30)) &&
+                (message.hwnd == window_ || IsChild(window_, message.hwnd)) &&
+                (message.wParam == VK_ESCAPE || (message.hwnd == cancel_ && message.wParam == VK_RETURN))) {
+                request_cancel();
+                continue;
+            }
             TranslateMessage(&message);
             DispatchMessageW(&message);
         }
@@ -356,9 +379,9 @@ public:
     PPROC_THREAD_ATTRIBUTE_LIST get() const { return list_; }
 };
 
-void run_preparer(HINSTANCE instance, bool headless, const fs::path& kit, const fs::path& rom,
+void run_preparer(HWND owner, bool headless, const fs::path& kit, const fs::path& rom,
     const fs::path& cache, const fs::path& data, const fs::path& log) {
-    Progress progress(instance, !headless);
+    Progress progress(owner, !headless);
     SECURITY_ATTRIBUTES security{sizeof(security), nullptr, TRUE};
     Handle output(CreateFileW(log.c_str(), GENERIC_WRITE, FILE_SHARE_READ, &security,
         CREATE_NEW, FILE_ATTRIBUTE_NORMAL, nullptr));
@@ -457,7 +480,9 @@ struct Prepared {
     bool reused;
 };
 
-Prepared prepare(HINSTANCE instance, const Options& input, const fs::path& kit, const fs::path& data) {
+Prepared prepare(HWND owner, bool headless, const fs::path& rom, const fs::path& kit, const fs::path& data) {
+    if (!compatible_rom(rom))
+        throw Failure{2, L"ROM no compatible. Selecciona la revision compatible de Mario Bros. (1983).", {}};
     const std::string id = kit_id(kit);
     if (!plain_file(kit / L"ArcadePrepare.exe") || !plain_file(kit / L"ArcadeNativeHost.exe"))
         throw Failure{1, L"Faltan archivos del juego. Extrae el ZIP completo antes de abrirlo.", {}};
@@ -466,13 +491,6 @@ Prepared prepare(HINSTANCE instance, const Options& input, const fs::path& kit, 
     ensure_directory(cache_root);
     if (auto cached = reusable_cache(cache_root, id)) return {*cached, true};
 
-    fs::path rom = input.rom;
-    if (!input.prepare_only) {
-        const fs::path stored = data / L"ROM/Mario Bros..nes";
-        rom = compatible_rom(stored) ? stored : pick_rom();
-        if (!compatible_rom(rom))
-            throw Failure{2, L"ROM no compatible. Selecciona la revision compatible de Mario Bros. (1983).", {}};
-    }
     const std::wstring token = unique_token();
     const std::string prefix = id.substr(0, 16) + "-";
     const std::wstring leaf = std::wstring(prefix.begin(), prefix.end()) + token.substr(0, 8);
@@ -483,7 +501,7 @@ Prepared prepare(HINSTANCE instance, const Options& input, const fs::path& kit, 
     ensure_directory(logs);
     const fs::path log = logs / (L"prepare-" + token + L".log");
     try {
-        run_preparer(instance, input.prepare_only, kit, rom, cache, data, log);
+        run_preparer(owner, headless, kit, rom, cache, data, log);
         if (kit_id(kit) != id || !imported_files_valid(cache))
             throw Failure{1, L"La preparacion no quedo completa o el paquete cambio. Intenta de nuevo.", log};
         const std::string module_hash = sha256(cache / L"ArcadeLocalModule.dll");
@@ -509,52 +527,91 @@ Prepared prepare(HINSTANCE instance, const Options& input, const fs::path& kit, 
     return {cache, false};
 }
 
-void launch_game(const fs::path& kit, const fs::path& data, const fs::path& cache) {
-    const fs::path executable = kit / L"ArcadeNativeHost.exe";
-    std::wstring command = quote(executable.wstring()) + L" " + quote((cache / L"ArcadeLocalModule.dll").wstring()) +
-        L" " + quote((cache / L"game.nes").wstring()) + L" --config " + quote((data / L"config.ini").wstring());
-    if (command.size() >= 32767) throw Failure{1, L"La ruta del juego es demasiado larga.", {}};
-    STARTUPINFOW startup{};
-    startup.cb = sizeof(startup);
-    PROCESS_INFORMATION information{};
-    if (!CreateProcessW(executable.c_str(), command.data(), nullptr, nullptr, FALSE,
-        CREATE_NO_WINDOW, nullptr, data.c_str(), &startup, &information))
-        throw Failure{1, L"No se pudo abrir el juego." + windows_error(GetLastError()), {}};
-    Handle process(information.hProcess), thread(information.hThread);
+fs::path data_directory(const fs::path& kit) {
+    const bool packaged = CompareStringOrdinal(kit.filename().c_str(), -1, L"Bin", -1, TRUE) == CSTR_EQUAL;
+    return (packaged ? kit.parent_path() : kit) / L"Datos";
+}
+
+void set_paths(ArcadeImportPaths& paths, const fs::path& data, const fs::path& cache = {}) {
+    static std::string module_path, rom_path, config_path, data_path;
+    config_path = utf8((data / L"config.ini").wstring());
+    data_path = utf8(data.wstring());
+    paths = {nullptr, nullptr, config_path.c_str(), data_path.c_str()};
+    if (!cache.empty()) {
+        module_path = utf8((cache / L"ArcadeLocalModule.dll").wstring());
+        rom_path = utf8((cache / L"game.nes").wstring());
+        paths.module = module_path.c_str();
+        paths.rom = rom_path.c_str();
+    }
+}
+
+std::wstring failure_message(const Failure& failure) {
+    std::wstring message = failure.message;
+    if (!failure.log.empty()) message += L"\n\nRegistro de preparacion:\n" + failure.log.wstring();
+    return message;
+}
+
+enum class ImportAction { Lookup, Restore, Select };
+
+ArcadeImportStatus import_paths(HWND owner, ArcadeImportPaths& paths, ImportAction action) {
+    paths = {};
+    try {
+        const fs::path kit = executable_directory();
+        const fs::path data = data_directory(kit);
+        set_paths(paths, data);
+        ensure_directory(data);
+        if (action != ImportAction::Select) {
+            if (plain_file(kit / L"kit-id.txt")) {
+                if (auto cache = reusable_cache(data / L"Cache", kit_id(kit))) {
+                    set_paths(paths, data, *cache);
+                    return ARCADE_IMPORT_READY;
+                }
+            }
+            if (action == ImportAction::Lookup) return ARCADE_IMPORT_MISSING;
+        }
+        const fs::path rom = action == ImportAction::Select ? pick_rom(owner) : data / L"ROM/Mario Bros..nes";
+        if (action == ImportAction::Restore && !compatible_rom(rom)) return ARCADE_IMPORT_MISSING;
+        set_paths(paths, data, prepare(owner, false, rom, kit, data).cache);
+        return ARCADE_IMPORT_READY;
+    } catch (const Cancelled&) {
+        return ARCADE_IMPORT_MISSING;
+    } catch (const Failure& failure) {
+        const std::wstring message = failure_message(failure);
+        if (action == ImportAction::Lookup) std::cerr << utf8(message) << '\n';
+        else MessageBoxW(owner, message.c_str(), kTitle, MB_OK | MB_ICONERROR);
+    } catch (const std::exception&) {
+        const wchar_t* message = L"No se pudo completar la operacion. Comprueba los permisos y extrae el ZIP completo.";
+        if (action == ImportAction::Lookup) std::cerr << utf8(message) << '\n';
+        else MessageBoxW(owner, message, kTitle, MB_OK | MB_ICONERROR);
+    }
+    return ARCADE_IMPORT_ERROR;
 }
 } // namespace
 
-int WINAPI wWinMain(HINSTANCE instance, HINSTANCE, PWSTR, int) {
-    bool headless = false;
-    // Detect verification mode before parsing so even malformed test options
-    // report to stderr instead of opening a product MessageBox.
-    if (const wchar_t* command = GetCommandLineW())
-        headless = std::wstring(command).find(L"--prepare-only") != std::wstring::npos;
+ArcadeImportStatus arcade_import_cached(ArcadeImportPaths* paths) {
+    return import_paths(nullptr, *paths, ImportAction::Lookup);
+}
+
+ArcadeImportStatus arcade_import_restore(void* owner, ArcadeImportPaths* paths) {
+    return import_paths(static_cast<HWND>(owner), *paths, ImportAction::Restore);
+}
+
+ArcadeImportStatus arcade_import_select(void* owner, ArcadeImportPaths* paths) {
+    return import_paths(static_cast<HWND>(owner), *paths, ImportAction::Select);
+}
+
+int arcade_import_prepare_only(void) {
     try {
-        Options input = options();
-        headless = input.prepare_only;
-        const fs::path root = executable_directory();
-        const fs::path kit = root / L"Bin";
-        const fs::path data = input.prepare_only ? input.data : root / L"Datos";
-        Prepared result = prepare(instance, input, kit, data);
-        if (input.prepare_only) {
-            std::cout << (result.reused ? "[launcher] cache reused\n" : "[launcher] preparation completed\n");
-            return 0;
-        }
-        launch_game(kit, data, result.cache);
-        return 0;
-    } catch (const Cancelled&) {
+        const Options input = options();
+        if (!input.prepare_only) return -1;
+        const Prepared result = prepare(nullptr, true, input.rom, executable_directory(), input.data);
+        std::cout << (result.reused ? "[arcade import] cache reused\n" : "[arcade import] preparation completed\n");
         return 0;
     } catch (const Failure& failure) {
-        std::wstring message = failure.message;
-        if (!failure.log.empty()) message += L"\n\nRegistro de preparacion:\n" + failure.log.wstring();
-        if (headless) std::cerr << utf8(message) << '\n';
-        else MessageBoxW(nullptr, message.c_str(), kTitle, MB_OK | MB_ICONERROR);
+        std::cerr << utf8(failure_message(failure)) << '\n';
         return failure.code;
     } catch (const std::exception&) {
-        const std::wstring message = L"No se pudo completar la operacion. Comprueba los permisos y extrae el ZIP completo.";
-        if (headless) std::cerr << utf8(message) << '\n';
-        else MessageBoxW(nullptr, message.c_str(), kTitle, MB_OK | MB_ICONERROR);
+        std::cerr << "No se pudo completar la preparacion de la ROM. Comprueba los permisos del juego.\n";
         return 1;
     }
 }

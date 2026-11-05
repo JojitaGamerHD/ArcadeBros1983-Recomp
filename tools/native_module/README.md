@@ -1,4 +1,4 @@
-# Motor generico e importacion local de v1.0.0
+# Motor genérico e importación local
 
 ## Crear el ZIP de distribucion
 
@@ -10,8 +10,8 @@ se puede indicar su directorio con `-Compilador`.
 
 El resultado contiene ZIP, SHA256, manifiesto de archivos y una copia extraida
 limpia. El script comprueba la lista de archivos permitidos y todos los hashes
-dentro del ZIP y despues de extraerlo. Las instrucciones completas estan en
-[COMPILAR-PORTABLE-v1.0.0](../../docs/COMPILAR-PORTABLE-v1.0.0.md).
+dentro del ZIP y después de extraerlo. Ejecuta `Bin/ArcadeNativeHost.exe` de la
+copia extraída para probar el menú.
 
 Las siguientes secciones conservan las pruebas progresivas que validan la
 separacion del motor, la importacion y la interfaz.
@@ -22,7 +22,7 @@ Despues se genera una DLL privada a partir de la ROM local compatible, se carga
 en el motor y se compara con una compilacion de referencia.
 
 La primera prueba utiliza Visual Studio, CMake y Python del desarrollador.
-Las siguientes etapas preparan el importador y el launcher portable.
+Las siguientes etapas preparan el importador y el menú integrado.
 
 ## Importacion autonoma
 
@@ -41,19 +41,18 @@ posterior. La prueba usa una cache con espacios y un caracter acentuado.
 La prueba compara estado, audio y ciclos nativos de 960 fotogramas con la
 referencia, comprueba las dependencias y confirma que el kit no cambia.
 
-## Launcher portable con ventana
+## Menú integrado
 
 `probar_launcher.ps1 -Prueba build/m100-... -Importacion build/i100-... -Compilador build/p100-...`
-construye el motor generico con SDL, el launcher y los menus existentes,
-record permanente, musica opcional y suavizado experimental. Genera una
-carpeta `build/l100-.../portable` para pruebas locales. No crea una release.
+construye el motor genérico con SDL, el menú principal, récord persistente,
+música opcional y suavizado experimental. Genera una carpeta
+`build/l102-.../portable` para pruebas locales.
 
-`ArcadeBrosLauncher.exe` prepara la ROM compatible una vez y reutiliza su modulo
-en aperturas posteriores. La preparacion muestra una ventana de progreso con
-cancelacion del importador y sus hijos. `Bin/kit-id.txt` identifica la version
-del kit; una version diferente recibe una cache nueva. El recibo local verifica
-el SHA256 de la DLL y la ROM antes de reutilizarlas. Las preparaciones anteriores
-se conservan, incluida cualquier preparacion interrumpida.
+`Bin/ArcadeNativeHost.exe` abre el menú principal sin ROM y conserva la misma
+ventana al comenzar una partida o al volver desde la pausa. Seleccionar ROM
+muestra el progreso de la preparación y permite cancelar el importador. En
+aperturas posteriores se reutiliza el módulo si el kit, la DLL y la ROM
+coinciden con el recibo local. `Bin/kit-id.txt` identifica la versión del kit.
 
 `Bin` contiene el motor y las herramientas genericas. `Datos/Cache` contiene
 la ROM y la DLL privadas; `Datos/config.ini` y `Datos/Records` guardan ajustes
@@ -61,13 +60,22 @@ y records. La musica aportada por el usuario se busca en `Datos/Music/stage1.m4a
 se conserva la ruta anterior junto al ejecutable como alternativa compatible.
 El script de prueba copia la pista local a Datos y activa su opcion si existe.
 
-La prueba verifica la primera importacion, la reutilizacion sin recompilar,
-el rechazo de otra ROM, equivalencia de 960 fotogramas y audio, las dependencias
-y la integridad de Bin. Captura el launcher oculto mediante LNG_SCRIPT y el
-juego y su pausa mediante el servidor TCP local de pruebas. Los controles de
-verificacion son opcionales del motor; la apertura normal no habilita ese puerto.
-Para una distribucion publica se preparara otro paquete excluyendo `Datos`,
-los registros y todos los archivos generados desde la ROM.
+La prueba verifica el menú principal y Opciones antes de importar la ROM.
+Comprueba después la primera importación, la reutilización de la caché, el
+rechazo de otra ROM, la equivalencia de 960 fotogramas y audio, las dependencias
+y la integridad de `Bin`. Captura el menú principal mediante `LNG_SCRIPT`, y
+el juego y su pausa mediante el servidor TCP local de pruebas. La apertura
+normal deja ese puerto desactivado.
+
+Para comprobar únicamente el arranque y Opciones, ejecuta desde PowerShell con
+una copia extraída limpia del ZIP:
+
+```powershell
+$portable = 'C:\ruta\a\la\copia\extraida'
+.\tools\native_module\verificar_ventana.ps1 -SoloMenu `
+    -Ejecutable (Join-Path $portable 'Bin/ArcadeNativeHost.exe') `
+    -Salida (Join-Path $PWD 'build/menu-sin-rom')
+```
 
 ```powershell
 powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\native_module\probar.ps1 -Python "C:\ruta\a\python.exe"

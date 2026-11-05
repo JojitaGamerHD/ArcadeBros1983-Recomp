@@ -13,8 +13,8 @@ if(NOT EXISTS "${CYC}/cyc.cmake")
     message(FATAL_ERROR "Prepare the project dependencies first.")
 endif()
 option(ARCADE_PREPARE_MODULE "Generate a private module from the local ROM" ON)
-option(ARCADE_WINDOWED_HOST "Build the generic SDL host and portable launcher" OFF)
-set(ARCADE_RELEASE_VERSION "1.0.1" CACHE STRING "Arcade Bros release version")
+option(ARCADE_WINDOWED_HOST "Build the generic SDL host with its integrated menu" OFF)
+set(ARCADE_RELEASE_VERSION "1.0.2" CACHE STRING "Arcade Bros release version")
 if(ARCADE_WINDOWED_HOST AND ARCADE_PREPARE_MODULE)
     message(FATAL_ERROR "ARCADE_WINDOWED_HOST requires ARCADE_PREPARE_MODULE=OFF; the public host must not generate ROM code.")
 endif()
@@ -26,7 +26,7 @@ if(ARCADE_WINDOWED_HOST)
     # Compile the machine on this target so CYC_WITH_SDL reaches cyc_host.c.
     # The headless object library below deliberately has no SDL definitions.
     add_executable(ArcadeNativeHost ${NESRECOMP_CYC_SOURCES}
-        native_bridge.c native_main.c runtime_exports.def
+        native_bridge.c native_main.c native_import.cpp native_mode.c native_title_audio.c runtime_exports.def
         "${ARCADE_ROOT}/src/records.c"
         "${ARCADE_ROOT}/src/player_colors.c"
         "${ARCADE_ROOT}/src/music.cpp"
@@ -56,7 +56,13 @@ if(ARCADE_WINDOWED_HOST)
     set(RECOMP_UI_SDL3 OFF CACHE BOOL "Use SDL2 for the generic runtime" FORCE)
     include("${RECOMP_UI_ROOT}/recomp_ui.cmake")
     target_compile_features(ArcadeNativeHost PRIVATE cxx_std_17)
+    # Explorer opens the game window directly. Preserve main/argv and redirected
+    # output for --prepare-only and the existing command-line verification.
+    set_target_properties(ArcadeNativeHost PROPERTIES WIN32_EXECUTABLE TRUE)
+    target_link_options(ArcadeNativeHost PRIVATE /ENTRY:mainCRTStartup)
+    target_include_directories(ArcadeNativeHost PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}")
     target_compile_definitions(ArcadeNativeHost PRIVATE
+        ARCADE_NATIVE_MENU UNICODE _UNICODE
         CYC_GAME_PLAYERS=2 NESRECOMP_GAME_PLAYERS=2 CYC_GAME_REGION=0
         "CYC_BUILD_VERSION=\"${ARCADE_RELEASE_VERSION}\"")
     set_property(TARGET ArcadeNativeHost PROPERTY NESRECOMP_CYCLE_BACKEND TRUE)
@@ -68,7 +74,7 @@ if(ARCADE_WINDOWED_HOST)
     endif()
     nesrecomp_cyc_enable_recomp_ui(ArcadeNativeHost
         ROM_SHA256 "0cc334007d3eae698cdcd034d12ec9bab2b5266e85bc703cf24ccb4e2d63b654")
-    target_link_libraries(ArcadeNativeHost PRIVATE mfplat mfreadwrite mfuuid ole32)
+    target_link_libraries(ArcadeNativeHost PRIVATE mfplat mfreadwrite mfuuid ole32 comdlg32 bcrypt comctl32 shell32)
     add_custom_command(TARGET ArcadeNativeHost POST_BUILD
         COMMAND "${CMAKE_COMMAND}" -E make_directory
             "$<TARGET_FILE_DIR:ArcadeNativeHost>/assets/fonts"
@@ -84,11 +90,6 @@ if(ARCADE_WINDOWED_HOST)
             "$<TARGET_FILE_DIR:ArcadeNativeHost>/assets/img/arcade_bros_1983.png"
         VERBATIM)
     # User music remains private; no local OST is copied into the public host.
-    add_executable(ArcadeBrosLauncher WIN32 portable_launcher.cpp utf8.manifest)
-    target_compile_features(ArcadeBrosLauncher PRIVATE cxx_std_17)
-    target_compile_options(ArcadeBrosLauncher PRIVATE /utf-8 /W4)
-    target_compile_definitions(ArcadeBrosLauncher PRIVATE UNICODE _UNICODE _CRT_SECURE_NO_WARNINGS)
-    target_link_libraries(ArcadeBrosLauncher PRIVATE comdlg32 bcrypt comctl32 shell32 ole32)
 endif()
 
 # Generic developer tools: neither target reads or embeds a ROM.

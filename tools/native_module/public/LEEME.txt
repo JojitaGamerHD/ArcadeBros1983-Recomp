@@ -1,9 +1,13 @@
 ARCADE BROS 1983 RECOMP — WINDOWS X64
 
 1. Extrae el ZIP completo en una carpeta donde puedas guardar archivos.
-2. Abre ArcadeBrosLauncher.exe.
-3. Elige tu propia ROM compatible de Mario Bros. (NES).
-4. Espera a que termine la preparación inicial y pulsa JUGAR en el launcher.
+2. Abre Bin\ArcadeNativeHost.exe para entrar al menú principal.
+3. Elige Seleccionar ROM y abre tu propia ROM compatible de Mario Bros. (NES).
+4. Al terminar la preparación, elige 1 jugador A/B o 2 jugadores A/B.
+   La partida empieza en la misma ventana del menú.
+   Una vez preparada la ROM, su fanfarria de título suena en el menú.
+   Si dejas el menú principal en reposo, verás la demostración original.
+   Pulsa una tecla o un botón del mando para volver al menú.
 
 La preparación se realiza en tu equipo y se guarda para las siguientes
 aperturas. El paquete contiene las herramientas necesarias: el jugador no
@@ -19,9 +23,14 @@ SISTEMA Y CONTROLES
 Windows 10 versión 1903 o posterior, o Windows 11, de 64 bits (x64), con los
 componentes multimedia de Windows. Las ediciones Windows N necesitan Media
 Feature Pack para esta aplicación.
-Controlador gráfico con OpenGL 3.3 para el launcher.
-La configuración y los controles se ajustan desde el launcher.
-Esc abre el menú de pausa. F11 cambia la pantalla completa.
+Controlador gráfico con OpenGL 3.3 para el menú principal.
+Navega por el menú con las flechas o la cruceta, confirma con Enter o A
+y vuelve con Esc o B. En Opciones > Controles, elige J1 o J2 para configurar
+el teclado y los mandos antes de importar la ROM. El selector de archivos
+de Windows se puede manejar con teclado.
+Esc abre Pausa. Desde allí puedes reanudar, abrir Opciones, volver al menú
+principal o cerrar el juego. F11 cambia la pantalla completa.
+Al terminar la secuencia de fin de partida vuelves al menú principal.
 60 FPS es la opción recomendada. Los modos 120/180 son experimentales:
 la lógica y la velocidad de NES permanecen aproximadamente a 60 FPS.
 
@@ -51,12 +60,12 @@ Si la preparación falla, el mensaje indica dónde encontrar su registro en
 Datos/Logs. Comprueba que extrajiste todos los archivos y que la ROM coincide
 con la revisión admitida.
 
-En v1.0.1, configura teclado y mandos desde el launcher. Esc cancela una
-asignacion; Retroceso la borra. Los conflictos se indican en pantalla.
-Pausa > Colores tiene un boton Mario y otro Luigi. Cada editor muestra el
-personaje y sus tres tonos; elige con el disco de color y la barra Brillo,
-sin triangulo ni codigos. Listo conserva los tres colores; Cancelar o Esc
-restaura los tres valores anteriores del personaje. Se mantienen ocho presets.
+Esc cancela una asignación de control y Retroceso la borra. Los conflictos
+se indican en pantalla. En Pausa, abre Opciones y después Colores para
+editar a Mario o Luigi.
+Cada editor muestra el personaje y sus tres tonos. Elige con el disco de
+color y la barra Brillo. Listo guarda los tres colores. Cancelar o Esc
+restaura los valores anteriores del personaje. Se mantienen ocho presets.
 Primero entra en una partida para capturar la referencia desde tu ROM.
 Los ajustes y presets quedan en Datos/config.ini.
 

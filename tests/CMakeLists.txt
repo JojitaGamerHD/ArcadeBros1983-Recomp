@@ -17,6 +17,12 @@ add_test(NAME dependencies_patch_upgrade COMMAND powershell -NoProfile -Executio
     -File "${CMAKE_CURRENT_SOURCE_DIR}/patch_upgrade_test.ps1"
     -Root "${ARCADE_ROOT}" -Scratch "${CMAKE_CURRENT_BINARY_DIR}")
 
+set(NATIVE_MODULE_ROOT "${ARCADE_ROOT}/tools/native_module")
+add_executable(native_mode_test native_mode_test.c "${NATIVE_MODULE_ROOT}/native_mode.c")
+target_include_directories(native_mode_test PRIVATE "${NATIVE_MODULE_ROOT}")
+target_compile_features(native_mode_test PRIVATE c_std_11)
+add_test(NAME native_game_over_return COMMAND native_mode_test)
+
 set(UI_ROOT "${ARCADE_ROOT}/recomp-ui/src")
 include("${CYC_ROOT}/cyc.cmake")
 add_executable(native_colors_test native_colors_test.cpp

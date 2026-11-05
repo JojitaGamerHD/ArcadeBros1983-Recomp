@@ -1,22 +1,23 @@
+[CmdletBinding(DefaultParameterSetName='Juego')]
 param(
     [Parameter(Mandatory=$true)][string]$Ejecutable,
-    [Parameter(Mandatory=$true)][string]$Modulo,
-    [Parameter(Mandatory=$true)][string]$Rom,
-    [Parameter(Mandatory=$true)][string]$Datos,
-    [Parameter(Mandatory=$true)][string]$Salida
+    [Parameter(Mandatory=$true,ParameterSetName='Juego')][string]$Modulo,
+    [Parameter(Mandatory=$true,ParameterSetName='Juego')][string]$Rom,
+    [Parameter(Mandatory=$true,ParameterSetName='Juego')][string]$Datos,
+    [Parameter(Mandatory=$true)][string]$Salida,
+    [Parameter(Mandatory=$true,ParameterSetName='Menu')][switch]$SoloMenu
 )
 $ErrorActionPreference='Stop'
-New-Item -ItemType Directory -Path $Salida | Out-Null
+$Ejecutable=(Resolve-Path -LiteralPath $Ejecutable).Path
+$Salida=(New-Item -ItemType Directory -Path $Salida).FullName
 $utf8=[Text.UTF8Encoding]::new($false)
-$config=Join-Path $Salida 'config.ini'
-[IO.File]::WriteAllText($config,"[Display]`nWindowScale=3`nFullscreen=0`nTargetFPS=60`nVSync=0`n[Audio]`nEnabled=1`nMusicEnabled=1`nMusicVolume=35`n",$utf8)
 
 function Iniciar-Ventana([string[]]$Argumentos,[hashtable]$Entorno) {
     $pi=New-Object Diagnostics.ProcessStartInfo
     $pi.FileName=$Ejecutable
     foreach($a in $Argumentos){if($a.Contains('"') -or $a.EndsWith('\')){throw 'Argumento inesperado de ventana.'}}
     $pi.Arguments=($Argumentos|ForEach-Object{'"'+$_+'"'}) -join ' '
-    $pi.WorkingDirectory=$Datos
+    $pi.WorkingDirectory=if ($SoloMenu) { $Salida } else { $Datos }
     $pi.UseShellExecute=$false
     $pi.CreateNoWindow=$true
     $pi.WindowStyle=[Diagnostics.ProcessWindowStyle]::Hidden
@@ -49,19 +50,26 @@ function Finalizar-Ventana($Trabajo,[string]$Nombre) {
     return $texto
 }
 
-# Exercise the real launcher renderer without showing or focusing a window.
-$dashboard=Join-Path $Salida 'launcher.png'
-$settings=Join-Path $Salida 'launcher-opciones.png'
-$script='wait:8;shot:'+$dashboard+';view:settings;wait:6;shot:'+$settings+';quit'
-$w=Iniciar-Ventana @($Modulo,$Rom,'--config',$config,'--no-save','--hidden') @{
-    LNG_SCRIPT=$script;LNG_TEST_HIDDEN='1';SDL_AUDIODRIVER='dummy'
-}
-[void](Finalizar-Ventana $w 'launcher')
-foreach($p in @($dashboard,$settings)){
-    if(!(Test-Path -LiteralPath $p) -or (Get-Item -LiteralPath $p).Length -lt 1000){throw 'Falta una captura del launcher.'}
+if ($SoloMenu) {
+    # Exercise the normal entry point without supplying a ROM or a module.
+    $dashboard=Join-Path $Salida 'menu.png'
+    $settings=Join-Path $Salida 'opciones.png'
+    $script='wait:8;shot:'+$dashboard+';key:Down;wait:4;click:20,20;wait:4;key:Down;wait:4;key:Return;wait:6;shot:'+$settings+';quit'
+    $w=Iniciar-Ventana @() @{LNG_SCRIPT=$script;LNG_TEST_HIDDEN='1';SDL_AUDIODRIVER='dummy'}
+    [void](Finalizar-Ventana $w 'menu')
+    foreach($p in @($dashboard,$settings)){
+        if(!(Test-Path -LiteralPath $p) -or (Get-Item -LiteralPath $p).Length -lt 1000){throw 'Falta una captura del menu integrado.'}
+    }
+    if ((Get-FileHash -LiteralPath $dashboard).Hash -eq (Get-FileHash -LiteralPath $settings).Hash) {
+        throw 'La ventana no cambio al abrir Opciones.'
+    }
+    Write-Host 'Menu principal y opciones comprobados sin ROM.'
+    return
 }
 
 # The game and pause menu use SDL's software renderer and the TCP test API.
+$config=Join-Path $Salida 'config.ini'
+[IO.File]::WriteAllText($config,"[Display]`nWindowScale=3`nFullscreen=0`nTargetFPS=60`nVSync=0`n[Audio]`nEnabled=1`nMusicEnabled=1`nMusicVolume=35`n",$utf8)
 $listener=[Net.Sockets.TcpListener]::new([Net.IPAddress]::Loopback,0)
 $listener.Start()
 $port=$listener.LocalEndpoint.Port
@@ -138,4 +146,4 @@ if(Test-Path -LiteralPath (Join-Path $Datos 'Music/stage1.m4a')){
 foreach($p in @('juego.png','pausa.png')){
     if(!(Test-Path -LiteralPath (Join-Path $Salida $p))){throw ('Falta captura: '+$p)}
 }
-Write-Host 'Launcher, opciones y menu de pausa comprobados en ventanas ocultas.'
+Write-Host 'Juego y menu de pausa comprobados en ventanas ocultas.'

@@ -1,0 +1,617 @@
+diff --git a/runner/cyc/cyc_host.c b/runner/cyc/cyc_host.c
+--- a/runner/cyc/cyc_host.c
++++ b/runner/cyc/cyc_host.c
+@@ -175,6 +175,9 @@
+ #include "cyc_mod.h"
+ #include "cyc_ramview.h"
+ #include "cyc_recomp.h"
++#ifdef ARCADE_NATIVE_MENU
++#include "native_menu.h"
++#endif
+ #include "cyc_render.h"
+ #include "cyc_run.h"
+ #include "cyc_session.h"
+@@ -1533,6 +1536,12 @@
+ 
+     cyc_sdl_force_launcher = true;
+     free(image);
++#ifdef ARCADE_NATIVE_MENU
++    if (arcade_menu_active()) {
++        arcade_menu_end_game();
++        rom_path = NULL;
++    }
++#endif
+     goto arcade_session_restart;
+ }
+         return saves_ok?result:2;
+diff --git a/runner/cyc/cyc_sdl.c b/runner/cyc/cyc_sdl.c
+--- a/runner/cyc/cyc_sdl.c
++++ b/runner/cyc/cyc_sdl.c
+@@ -79,6 +79,11 @@
+ #include "../../common/nes_fds.h"
+ #ifdef CYC_WITH_RECOMP_UI
+ #include "cyc_ui.h"
++#ifdef ARCADE_NATIVE_MENU
++#include "native_menu.h"
++#include "native_mode.h"
++#include "cyc_mod.h"
++#endif
+ #include "cyc_ui_text_input.h"
+ #include "recomp_runtime_ui.h"
+ #endif
+@@ -216,7 +221,11 @@
+ 
+     const char *no = getenv("NESRECOMP_NO_LAUNCHER");
+     extern bool cyc_sdl_force_launcher;
+-    if (cyc_sdl_force_launcher || (!(no && *no && *no != '0') && !s_set.skip_launcher)) {
++    if (
++#ifdef ARCADE_NATIVE_MENU
++        arcade_menu_active() ||
++#endif
++        cyc_sdl_force_launcher || (!(no && *no && *no != '0') && !s_set.skip_launcher)) {
+         cyc_sdl_force_launcher=false;
+         /* The launcher's BIOS state runs the host's own lookup (cyc_fds_bios.h);
+          * its pick comes back in s_set.fds_bios. PLAY commits the Mods
+@@ -295,12 +304,30 @@
+     return false;
+ }
+ 
++static SDL_Renderer *create_game_renderer(void)
++{
++    if (!s_win) return NULL;
++#ifdef ARCADE_NATIVE_MENU
++    if (arcade_menu_active()) {
++        /* Keep the OpenGL window flag across the handoff. SDL can recreate the
++         * native window when a renderer asks for a different graphics backend. */
++        for (int i = 0; i < SDL_GetNumRenderDrivers(); ++i) {
++            SDL_RendererInfo driver;
++            if (!SDL_GetRenderDriverInfo(i, &driver) && !strcmp(driver.name, "opengl"))
++                return SDL_CreateRenderer(s_win, i, SDL_RENDERER_ACCELERATED);
++        }
++        SDL_SetError("OpenGL SDL renderer unavailable");
++        return NULL;
++    }
++#endif
++    SDL_Renderer *renderer = SDL_CreateRenderer(s_win, -1, SDL_RENDERER_ACCELERATED);
++    return renderer ? renderer : SDL_CreateRenderer(s_win, -1, SDL_RENDERER_SOFTWARE);
++}
++
+ static bool create_renderer(void)
+ {
+     s_vsync_supported = s_vsync_active = false;
+-    s_ren = s_win ? SDL_CreateRenderer(s_win, -1, SDL_RENDERER_ACCELERATED) : NULL;
+-    /* offscreen / headless video drivers have no accelerated renderer */
+-    if (s_win && !s_ren) s_ren = SDL_CreateRenderer(s_win, -1, SDL_RENDERER_SOFTWARE);
++    s_ren = create_game_renderer();
+     if (!s_ren) return false;
+ #if SDL_VERSION_ATLEAST(2, 0, 18)
+     if (s_set.vsync && SDL_RenderSetVSync(s_ren, 1) == 0) {
+@@ -310,8 +337,7 @@
+             s_vsync_supported = true;
+         } else {
+             SDL_DestroyRenderer(s_ren);
+-            s_ren = SDL_CreateRenderer(s_win, -1, SDL_RENDERER_ACCELERATED);
+-            if (!s_ren) s_ren = SDL_CreateRenderer(s_win, -1, SDL_RENDERER_SOFTWARE);
++            s_ren = create_game_renderer();
+         }
+     }
+ #endif
+@@ -1392,7 +1418,12 @@
+      * input for an unfocused application unless told otherwise. */
+     if (s_hidden) SDL_SetHint(SDL_HINT_JOYSTICK_ALLOW_BACKGROUND_EVENTS, "1");
+     cyc_diagnostics_note("initializing SDL video/controllers/audio");
+-    if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_GAMECONTROLLER | SDL_INIT_JOYSTICK | SDL_INIT_AUDIO) != 0) {
++    const Uint32 systems = SDL_INIT_VIDEO | SDL_INIT_GAMECONTROLLER | SDL_INIT_JOYSTICK | SDL_INIT_AUDIO;
++    bool shared_window = false;
++#ifdef ARCADE_NATIVE_MENU
++    shared_window = arcade_menu_active();
++#endif
++    if (SDL_Init(shared_window ? (systems & ~SDL_WasInit(systems)) : systems) != 0) {
+         char message[700]; snprintf(message, sizeof(message), "SDL initialization failed: %s", SDL_GetError());
+         cyc_diagnostics_error("%s\n", message);
+         cyc_sdl_error_box("Cannot start game", message);
+@@ -1411,15 +1442,26 @@
+     s_texture_scale = s_picture_scale;
+     s_applied_window_scale = 0;
+     s_applied_picture_w = s_applied_picture_h = 0;
+-    s_win = SDL_CreateWindow(title, SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, picture_w() * s_set.window_scale,
+-                             logical_h() * s_set.window_scale,
+-                             SDL_WINDOW_RESIZABLE | SDL_WINDOW_ALLOW_HIGHDPI | (s_hidden ? SDL_WINDOW_HIDDEN : 0));
++#ifdef ARCADE_NATIVE_MENU
++    if (shared_window) {
++        s_win = *arcade_menu_window();
++        /* The title screen already owns a size and position. Options can
++         * still resize the window after the first frame. */
++        s_applied_window_scale = s_set.window_scale;
++        s_applied_picture_w = picture_w();
++        s_applied_picture_h = logical_h();
++    } else
++#endif
++        s_win = SDL_CreateWindow(title, SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED,
++            picture_w() * s_set.window_scale, logical_h() * s_set.window_scale,
++            SDL_WINDOW_RESIZABLE | SDL_WINDOW_ALLOW_HIGHDPI | (s_hidden ? SDL_WINDOW_HIDDEN : 0));
+     s_ren = NULL;
+     if (!create_renderer() || !ensure_texture(w, h)) {
+         char message[700]; snprintf(message, sizeof(message), "Could not create the game window or renderer: %s", SDL_GetError());
+         cyc_diagnostics_error("%s\n", message);
+         cyc_sdl_error_box("Cannot start game", message);
+-        SDL_Quit();
++        SDL_DestroyRenderer(s_ren);
++        if (!shared_window) SDL_Quit();
+         return 1;
+     }
+     if (s_set.vsync)
+@@ -1486,6 +1528,10 @@
+     long loops = 0;
+     bool prev[CYC_SC_COUNT] = { false };
+     bool hold_input = false;     /* after the menu closes: until every key is up */
++#ifdef ARCADE_NATIVE_MENU
++    ArcadeModeLaunch mode_launch;
++    arcade_mode_begin(&mode_launch, arcade_menu_mode());
++#endif
+ #ifdef CYC_WITH_RECOMP_UI
+     bool text_shortcuts_wait_release = false;
+ #endif
+@@ -1615,6 +1661,9 @@
+         bool inactive = s_pause_unfocused && !s_hidden && !(SDL_GetWindowFlags(s_win) & SDL_WINDOW_INPUT_FOCUS);
+         bool loading = false, fast = false;
+         bool online=false,replay=false;
++#ifdef ARCADE_NATIVE_MENU
++        bool game_over_complete = false;
++#endif
+ #ifdef NESRECOMP_NET
+         online=nes_netplay_active();
+         if(online&&cyc_net_leaving()){s_running=false;break;}
+@@ -1639,6 +1688,16 @@
+             cyc_host_disk_frame(now, s_frames_done);
+             cyc_session_logical_input(st.buttons,CYC_INPUT_PLAYERS);
+             cyc_session_input(buttons);
++#ifdef ARCADE_NATIVE_MENU
++            if (mode_launch.status == ARCADE_MODE_PENDING) {
++                ArcadeModeStatus status = arcade_mode_input(&mode_launch, cyc_mod_peek, buttons);
++                if (status != ARCADE_MODE_PENDING) {
++                    hold_input = true;
++                    cyc_diagnostics_note("arcade mode=%d handoff=%s", mode_launch.mode,
++                        status == ARCADE_MODE_STARTED ? "started" : "timed out");
++                }
++            }
++#endif
+             cyc_set_controller(0, buttons[0]);
+             cyc_set_controller(1, buttons[1]);
+             zapper_mouse_frame();
+@@ -1652,10 +1711,18 @@
+             frames++;
+             arcade_guest_count++;
+             cyc_host_frame_done(++s_frames_done);
++#ifdef ARCADE_NATIVE_MENU
++            if (s_running && shared_window && !online)
++                game_over_complete = arcade_mode_game_over_complete(&mode_launch, cyc_mod_peek);
++#endif
+             loading = s_fds && cyc_host_frame_unpaced();
+             /* Modo arcade: no acelerar mediante Tab o RT. */
+ fast = !online && loading;
+         }
++        bool starting_mode = false;
++#ifdef ARCADE_NATIVE_MENU
++        starting_mode = mode_launch.status == ARCADE_MODE_PENDING;
++#endif
+         int16_t pcm[4096];
+         size_t n;
+         while ((n = cyc_audio_read(pcm, 4096)) > 0) {
+@@ -1664,13 +1731,25 @@
+             cyc_session_audio_mix(pcm,n);
+             audio_samples_produced += n;
+             /* Keep latency bounded: skip a frame's audio if ~100 ms are queued. */
+-            if (replay || !dev || fast || open || inactive || !s_set.audio_enabled || SDL_GetQueuedAudioSize(dev) >= (Uint32)(have.freq / 10) * 2)
++            if (replay || !dev || fast || open || inactive || starting_mode || !s_set.audio_enabled || SDL_GetQueuedAudioSize(dev) >= (Uint32)(have.freq / 10) * 2)
+                 continue;
+             if (s_set.volume < 100)
+                 for (size_t i = 0; i < n; ++i) pcm[i] = (int16_t)(pcm[i] * s_set.volume / 100);
+             SDL_QueueAudio(dev, pcm, (Uint32)(n * sizeof(int16_t)));
+             audio_samples_queued += n;
+         }
++#ifdef ARCADE_NATIVE_MENU
++        if (game_over_complete) {
++            /* Play out the last queued samples without rendering or ticking
++             * the guest title screen. A stalled audio device cannot block. */
++            const uint64_t deadline = now_ms() + 150;
++            while (dev && SDL_GetQueuedAudioSize(dev) && now_ms() < deadline)
++                SDL_Delay(1);
++            cyc_sdl_return_to_launcher = true;
++            cyc_diagnostics_note("arcade game over complete, returning to menu");
++            break;
++        }
++#endif
+         if(replay){next=SDL_GetPerformanceCounter();continue;}
+ 
+         /* Keep guest deadlines independent of the display. A late picture is
+@@ -1695,7 +1774,7 @@
+             s_set.fps_target == 30 &&
+             !unpaced && !open && !inactive && !online &&
+             (s_frames_done % 2) != 0;
+-        if (present && !arcade_omitir_30 && !(unpaced && s_vsync_active) &&
++        if (present && (!starting_mode || open) && !arcade_omitir_30 && !(unpaced && s_vsync_active) &&
+             (!loading || tnow - shown >= frame_ticks)) {
+             show(loading, toast_title, toast_body);
+             if (s_present_out && s_present_every > 0 && loops % s_present_every == 0) present_shot(s_frames_done);
+@@ -1737,7 +1816,7 @@
+          * Simulation, audio and input still advance once per NES frame. */
+         int arcade_partes = (int)s_arcade_present_parts;
+ 
+-        if (arcade_partes > 1 &&
++        if (!starting_mode && arcade_partes > 1 &&
+             !fast && !s_uncapped && !open && !inactive &&
+             !online && !s_vsync_active && next > tnow) {
+ 
+@@ -1823,8 +1902,11 @@
+     if (s_vpad_joy) SDL_JoystickClose(s_vpad_joy);
+     SDL_DestroyTexture(s_tex);
+     SDL_DestroyRenderer(s_ren);
+-    SDL_DestroyWindow(s_win);
+-    SDL_Quit();
++    if (!shared_window) {
++        SDL_DestroyWindow(s_win);
++        SDL_Quit();
++    }
++    s_win = NULL;
+ #ifdef NESRECOMP_NET
+     if(nes_netplay_active())return 3;
+ #endif
+diff --git a/runner/cyc/cyc_ui_imgui.cpp b/runner/cyc/cyc_ui_imgui.cpp
+--- a/runner/cyc/cyc_ui_imgui.cpp
++++ b/runner/cyc/cyc_ui_imgui.cpp
+@@ -39,6 +39,8 @@
+     s_ctx = ImGui::CreateContext();
+     ImGui::SetCurrentContext(s_ctx);
+     ImGuiIO &io = ImGui::GetIO();
++    if (recomp_runtime_ui_uses_console_input(cyc_ui_runtime()))
++        io.ConfigFlags |= ImGuiConfigFlags_NoMouse;
+     /* ARCADE_FIXED_MENU_V070: geometry is computed for the current window. */
+     io.IniFilename = nullptr;
+     io.LogFilename = nullptr;
+@@ -70,6 +72,12 @@
+                 &arcade_font_config,
+                 io.Fonts->GetGlyphRangesDefault()
+             );
++            if (arcade_font && recomp_runtime_ui_uses_console_input(cyc_ui_runtime())) {
++                ImFontConfig pause_config = arcade_font_config;
++                std::snprintf(pause_config.Name, sizeof(pause_config.Name), "%s", "Arcade Pause");
++                io.Fonts->AddFontFromFileTTF(arcade_path, 48.0f, &pause_config,
++                                             io.Fonts->GetGlyphRangesDefault());
++            }
+         }
+     }
+ 
+@@ -116,6 +124,10 @@
+ extern "C" void cyc_ui_process_event(const SDL_Event *ev)
+ {
+     if (!s_ready) return;
++    if (recomp_runtime_ui_uses_console_input(cyc_ui_runtime()) &&
++        (ev->type == SDL_MOUSEMOTION || ev->type == SDL_MOUSEBUTTONDOWN ||
++         ev->type == SDL_MOUSEBUTTONUP || ev->type == SDL_MOUSEWHEEL))
++        return;
+     ImGui::SetCurrentContext(s_ctx);
+     const SDL_Event window_event = cyc_ui_pointer_window_event(s_ren, ev);
+     /* The SDL ImGui backend does not read the coordinates on button events.
+@@ -139,16 +151,35 @@
+     SDL_Rect viewport{};
+     SDL_RenderGetLogicalSize(s_ren, &lw, &lh);
+     SDL_RenderGetViewport(s_ren, &viewport);
++    int x0 = 0, y0 = 0, x1 = 0, y1 = 0;
++#if SDL_VERSION_ATLEAST(2, 0, 18)
++    if (lw > 0 && lh > 0) {
++        SDL_RenderLogicalToWindow(s_ren, 0.0f, 0.0f, &x0, &y0);
++        SDL_RenderLogicalToWindow(s_ren, static_cast<float>(lw), static_cast<float>(lh), &x1, &y1);
++    }
++#endif
+     SDL_RenderSetLogicalSize(s_ren, 0, 0);
+     SDL_RenderSetViewport(s_ren, nullptr);
+     ImGui::SetCurrentContext(s_ctx);
++    /* Poll controllers for modal editors while the host's ordinary menu
++     * navigation and hotkeys are suspended. */
++    if (recomp_runtime_ui_uses_console_input(ui)) {
++        ImGuiIO &io = ImGui::GetIO();
++        if (recomp_runtime_ui_wants_text_input(ui))
++            io.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;
++        else
++            io.ConfigFlags &= ~ImGuiConfigFlags_NavEnableGamepad;
++    }
+     ImGui_ImplSDLRenderer2_NewFrame();
+     ImGui_ImplSDL2_NewFrame();
+     ImGui::NewFrame();
+-    recomp_runtime_ui_render_imgui(ui);
++    recomp_runtime_ui_render_imgui_in_rect(ui, static_cast<float>(x0), static_cast<float>(y0),
++        static_cast<float>(x1 - x0), static_cast<float>(y1 - y0));
+     ImGui::Render();
+     ImGui_ImplSDLRenderer2_RenderDrawData(ImGui::GetDrawData(), s_ren);
+     SDL_RenderSetLogicalSize(s_ren, lw, lh);
+-    SDL_RenderSetViewport(s_ren, &viewport);
++    // SDL recalculates its letterbox in output pixels. Reapplying the
++    // rounded logical viewport would move it on a fractional scale.
++    if (lw <= 0 || lh <= 0) SDL_RenderSetViewport(s_ren, &viewport);
+     SDL_SetRenderDrawBlendMode(s_ren, SDL_BLENDMODE_NONE);
+ }
+diff --git a/runner/cyc/cyc_ui_launcher.c b/runner/cyc/cyc_ui_launcher.c
+--- a/runner/cyc/cyc_ui_launcher.c
++++ b/runner/cyc/cyc_ui_launcher.c
+@@ -7,6 +7,10 @@
+  * every controller button and host shortcut, keyboard and controller.
+  */
+ #include "cyc_ui.h"
++#ifdef ARCADE_NATIVE_MENU
++#include "native_menu.h"
++#include "native_title_audio.h"
++#endif
+ #include "cyc_settings.h"
+ #include "cyc_diagnostics.h"
+ 
+@@ -256,6 +260,19 @@
+      * renderer with SDL_RENDERER_PRESENTVSYNC when the setting is on. */
+     gi.has_vsync = 1;
+     gi.has_arcade_settings = 1;
++#ifdef ARCADE_NATIVE_MENU
++    if (arcade_menu_active()) {
++        gi.arcade_menu_action = arcade_menu_action;
++        gi.arcade_rom_ready = arcade_menu_rom_ready();
++        gi.arcade_menu_attract = arcade_title_audio_update;
++        gi.arcade_menu_dismiss_demo = arcade_title_audio_restart;
++        arcade_title_audio_restart();
++        gi.shared_window = arcade_menu_window();
++        gi.netplay = NULL;
++        gi.netplay_supported = 0;
++        gi.host_persists_paths = 1;
++    }
++#endif
+     /* a game's view modes are a runtime-menu row (live), not a launcher toggle */
+     gi.widescreen_supported = 0;
+     (void)extras;
+@@ -335,22 +352,40 @@
+     }
+ #endif
+     char title[300];
+-    snprintf(title, sizeof(title), "%s - Launcher", name);
++    snprintf(title, sizeof(title), "%s", name);
+ #ifdef RECOMP_LAUNCHER_HAS_PRESERVE_SDL
+     recomp_launcher_set_preserve_sdl(1);
+ #endif
+     out_rom[0] = 0;
+     cyc_diagnostics_note("entering launcher");
+     int act = recomp_launcher_run_window(title, &io, &gi, ".", *rom_path ? *rom_path : "", out_rom, sizeof(out_rom));
++#ifdef ARCADE_NATIVE_MENU
++    if (gi.arcade_menu_attract) arcade_title_audio_stop();
++#endif
+     cyc_diagnostics_note("launcher returned action=%d", act);
+     /* The edits come back whichever way the launcher closed. */
+     from_launcher(&io, settings, shortcuts, count);
++#ifdef ARCADE_NATIVE_MENU
++    if (arcade_menu_active()) {
++        settings->fullscreen = settings->fullscreen ? 1 : 0;
++        settings->linear_filter = false;
++    }
++#endif
+ #ifdef NES_HOST_HAS_RECOMP_UI
+     if(act==RECOMP_LAUNCHER_RESULT_LAUNCH && io.netplay_launch.enabled) {
+         NesNetplayConfig cfg;
+         if(nes_host_lobby_config_from_launch(&io.netplay_launch,&cfg))nes_netplay_set_pending_config(&cfg);
+     }
+ #endif
++#ifdef ARCADE_NATIVE_MENU
++    if (arcade_menu_active()) {
++        if (act == RECOMP_LAUNCHER_RESULT_LAUNCH) {
++            *rom_path = arcade_menu_rom();
++            return *rom_path ? 0 : 2;
++        }
++        return act == RECOMP_LAUNCHER_RESULT_QUIT ? 1 : 2;
++    }
++#endif
+     if (act == RECOMP_LAUNCHER_RESULT_LAUNCH && out_rom[0]) *rom_path = out_rom;
+     return act == RECOMP_LAUNCHER_RESULT_LAUNCH ? 0 : act == RECOMP_LAUNCHER_RESULT_QUIT ? 1 : 2;
+ }
+diff --git a/runner/cyc/cyc_ui_menu.c b/runner/cyc/cyc_ui_menu.c
+--- a/runner/cyc/cyc_ui_menu.c
++++ b/runner/cyc/cyc_ui_menu.c
+@@ -256,6 +256,101 @@
+     it->choice_values = values;
+ }
+ 
++#ifdef ARCADE_NATIVE_MENU
++static const char *const s_source_keys[] = { "cyc.controls.source.1", "cyc.controls.source.2" };
++static const char *const s_deadzone_keys[] = { "cyc.controls.deadzone.1", "cyc.controls.deadzone.2" };
++
++static int *arcade_control_setting(const RecompRuntimeUiItem *it)
++{
++    for (int player = 0; player < 2; ++player) {
++        if (is_key(it, s_source_keys[player])) return &s_host.settings->bind.source[player];
++        if (is_key(it, s_deadzone_keys[player])) return &s_host.settings->bind.deadzone[player];
++    }
++    return NULL;
++}
++
++static void arcade_pause_back(const char *page)
++{
++    add("cyc.arcade.back", page, "Volver", NULL, RECOMP_RUNTIME_UI_ACTION, 0, 0, 0, NULL, 0, NULL);
++}
++
++static void arcade_pause_append(const RecompRuntimeUiItem *items, size_t count,
++                                const char *category, const char *path)
++{
++    for (size_t i = 0; i < count && s_item_count < sizeof(s_items) / sizeof(s_items[0]); ++i) {
++        const char *section = items[i].section;
++        bool match = category ? section && strcmp(section, category) == 0
++            : !section || (strcmp(section, "Audio") != 0 && strcmp(section, "Colores") != 0);
++        if (match) {
++            s_items[s_item_count] = items[i];
++            s_items[s_item_count++].section = path;
++        }
++    }
++}
++
++static void arcade_pause_options(const CycHostExtras *extras)
++{
++    static const char *const fullscreen[] = { "Ventana", "Pantalla completa" };
++    static const char *const devices[] = { "Desactivado", "Teclado", "Mando" };
++    static const char *const player_pages[] = {
++        "Pausa/Opciones/Controles/Jugador 1", "Pausa/Opciones/Controles/Jugador 2"
++    };
++    static const char *const view_labels[] = { "Nativo", "16:9 fijo", "Adaptativo" };
++    static const char *view_choices[3];
++    static int view_values[3];
++    const char *video = "Pausa/Opciones/Vídeo";
++    const char *audio = "Pausa/Opciones/Audio";
++    const char *graphics = "Pausa/Opciones/Gráficos";
++    const char *colors = "Pausa/Opciones/Colores";
++
++    RecompRuntimeUiItem extras_items[sizeof(s_items) / sizeof(s_items[0])];
++    const size_t extras_count = s_item_count;
++    memcpy(extras_items, s_items, extras_count * sizeof(s_items[0]));
++    s_item_count = 0;
++
++    add(RECOMP_RUNTIME_UI_KEY_RESUME, "Pausa", "Reanudar", NULL,
++        RECOMP_RUNTIME_UI_ACTION, 0, 0, 0, NULL, 0, NULL);
++    add(RECOMP_RUNTIME_UI_KEY_FULLSCREEN, video, "Modo de pantalla", NULL,
++        RECOMP_RUNTIME_UI_CHOICE, 0, 1, 1, fullscreen, 2, NULL);
++    arcade_pause_back(video);
++
++    add(RECOMP_RUNTIME_UI_KEY_AUDIO, audio, "Audio del juego", NULL,
++        RECOMP_RUNTIME_UI_BOOL, 0, 1, 1, NULL, 0, NULL);
++    add(RECOMP_RUNTIME_UI_KEY_VOLUME, audio, "Volumen", NULL,
++        RECOMP_RUNTIME_UI_INT, 0, 100, 5, NULL, 0, NULL);
++    arcade_pause_append(extras_items, extras_count, "Audio", audio);
++    arcade_pause_back(audio);
++
++    for (int player = 0; player < 2; ++player) {
++        add(s_source_keys[player], player_pages[player], "Dispositivo", NULL,
++            RECOMP_RUNTIME_UI_CHOICE, 0, 2, 1, devices, 3, NULL);
++        add(s_deadzone_keys[player], player_pages[player], "Zona muerta (%)", NULL,
++            RECOMP_RUNTIME_UI_INT, 0, 100, 5, NULL, 0, NULL);
++        arcade_pause_back(player_pages[player]);
++    }
++    arcade_pause_back("Pausa/Opciones/Controles");
++
++    add(RECOMP_RUNTIME_UI_KEY_INTEGER_SCALE, graphics, "Escalado entero", NULL,
++        RECOMP_RUNTIME_UI_BOOL, 0, 1, 1, NULL, 0, NULL);
++    if (extras && extras->view_modes && extras->set_view_mode) {
++        const unsigned modes = extras->view_modes | RECOMP_RUNTIME_UI_VIEW_MODE_NATIVE;
++        size_t count = 0;
++        for (int mode = 0; mode < 3; ++mode) {
++            if (!(modes & (1u << mode))) continue;
++            view_values[count] = mode;
++            view_choices[count++] = view_labels[mode];
++        }
++        add(RECOMP_RUNTIME_UI_KEY_VIEW_MODE, graphics, "Modo de vista", NULL,
++            RECOMP_RUNTIME_UI_CHOICE, 0, 2, 1, view_choices, count, view_values);
++    }
++    arcade_pause_append(extras_items, extras_count, NULL, graphics);
++    arcade_pause_back(graphics);
++
++    arcade_pause_append(extras_items, extras_count, "Colores", colors);
++    arcade_pause_back(colors);
++    arcade_pause_back("Pausa/Opciones");
++}
++#endif
+ /* Refresh every row whose text follows the machine (before each draw). */
+ static void refresh(void)
+ {
+@@ -302,7 +397,12 @@
+     (void)ctx;
+     const CycSettings *s = s_host.settings;
+     const CycHostExtras *x = s_host.extras;
+-    if (is_key(it, RECOMP_RUNTIME_UI_KEY_FULLSCREEN)) *out = s->fullscreen;
++#ifdef ARCADE_NATIVE_MENU
++    const int *control = arcade_control_setting(it);
++    if (control) { *out = *control; return 1; }
++#endif
++    if (is_key(it, RECOMP_RUNTIME_UI_KEY_FULLSCREEN))
++        *out = it->maximum == 1 ? (s->fullscreen != 0) : s->fullscreen;
+     else if (is_key(it, RECOMP_RUNTIME_UI_KEY_WINDOW_SCALE)) *out = s->window_scale;
+     else if (is_key(it, RECOMP_RUNTIME_UI_KEY_INTEGER_SCALE)) *out = s->integer_scale;
+     else if (is_key(it, RECOMP_RUNTIME_UI_KEY_LINEAR_FILTER)) *out = s->linear_filter;
+@@ -336,6 +436,15 @@
+     (void)ctx;
+     CycSettings *s = s_host.settings;
+     const CycHostExtras *x = s_host.extras;
++#ifdef ARCADE_NATIVE_MENU
++    int *control = arcade_control_setting(it);
++    if (control) {
++        if (v < it->minimum || v > it->maximum) return 0;
++        *control = v;
++        if (s_host.apply) s_host.apply();
++        return 1;
++    }
++#endif
+     if (is_key(it, RECOMP_RUNTIME_UI_KEY_FULLSCREEN)) s->fullscreen = v < 0 ? 0 : v > 2 ? 2 : v;
+     else if (is_key(it, RECOMP_RUNTIME_UI_KEY_WINDOW_SCALE)) s->window_scale = v < 1 ? 1 : v > 8 ? 8 : v;
+     else if (is_key(it, RECOMP_RUNTIME_UI_KEY_INTEGER_SCALE)) s->integer_scale = v != 0;
+@@ -381,6 +490,10 @@
+     const CycHostExtras *x = s_host.extras;
+     long f = s_host.frames_done();
+     if (is_key(it, RECOMP_RUNTIME_UI_KEY_RESUME)) { recomp_runtime_ui_close(s_ui); return 1; }
++#ifdef ARCADE_NATIVE_MENU
++    if (is_key(it, "cyc.arcade.back"))
++        return recomp_runtime_ui_handle_input(s_ui, RECOMP_RUNTIME_UI_INPUT_BACK, 1, 0);
++#endif
+     if (is_key(it, "cyc.disk.eject")) {
+         CycDiskToast t;
+         cyc_disk_action_toast(cyc_host_disk_action(), s_host.now_ms(), &t);
+@@ -426,7 +539,7 @@
+ #ifdef NESRECOMP_NET
+             nes_netplay_active()?"Press again to leave the match":
+ #endif
+-            "Press again to quit");
++            "Pulsa de nuevo para cerrar el juego");
+         return 0;
+     }
+     if (game_row(it) && x && x->menu_callbacks && x->menu_callbacks->run_action) {
+@@ -572,12 +685,18 @@
+         add("cyc.zapper.crosshair", "Zapper", "Crosshair", "Show the aiming marker.",
+             RECOMP_RUNTIME_UI_BOOL, 0, 1, 1, NULL, 0, NULL);
+     }
+-add("cyc.return_to_launcher", "Sistema",
+-    "Volver al launcher",
++#ifdef ARCADE_NATIVE_MENU
++    arcade_pause_options(x);
++    const char *system_section = "Pausa";
++#else
++    const char *system_section = "Sistema";
++#endif
++    add("cyc.return_to_launcher", system_section,
++    "Volver al menú principal",
+     "Termina la partida y regresa al menu principal.",
+     RECOMP_RUNTIME_UI_ACTION,
+     0, 0, 0, NULL, 0, NULL);
+-    add("cyc.quit", "Sistema", "Salir del juego", "Cierra el juego.", RECOMP_RUNTIME_UI_ACTION,
++    add("cyc.quit", system_section, "Cerrar juego", "Cierra el juego.", RECOMP_RUNTIME_UI_ACTION,
+         0, 0, 0, NULL, 0, NULL);
+     refresh();
+ 
+@@ -599,6 +718,10 @@
+     std.menu.callbacks.get_color_preview = get_color_preview;
+     std.menu.callbacks.get_palette = get_palette;
+     std.menu.callbacks.set_palette = set_palette;
++#ifdef ARCADE_NATIVE_MENU
++    std.menu.presentation_flags |= RECOMP_RUNTIME_UI_PRESENTATION_CONSOLE_INPUT;
++    std.menu.navigation_flags |= RECOMP_RUNTIME_UI_NAVIGATION_SKIP_DISABLED;
++#else
+     std.features = RECOMP_RUNTIME_UI_STANDARD_FULLSCREEN | RECOMP_RUNTIME_UI_STANDARD_WINDOW_SCALE |
+                    RECOMP_RUNTIME_UI_STANDARD_INTEGER_SCALE | RECOMP_RUNTIME_UI_STANDARD_LINEAR_FILTER |
+                    RECOMP_RUNTIME_UI_STANDARD_AUDIO | RECOMP_RUNTIME_UI_STANDARD_VOLUME |
+@@ -608,6 +731,7 @@
+         std.features |= RECOMP_RUNTIME_UI_STANDARD_VIEW_MODE;
+         std.view_modes = x->view_modes;
+     }
++#endif
+     std.extra_items = s_items;
+     std.extra_item_count = s_item_count;
+     s_ui = recomp_runtime_ui_create_standard(&std);
+@@ -632,7 +756,11 @@
+ {
+     if (!s_ui) return;
+     if (recomp_runtime_ui_is_open(s_ui)) recomp_runtime_ui_close(s_ui);
++#ifdef ARCADE_NATIVE_MENU
++    else recomp_runtime_ui_open_section(s_ui, "Pausa");
++#else
+     else recomp_runtime_ui_open(s_ui);
++#endif
+ }
+ 
+ void cyc_ui_nav(int input, bool repeat)

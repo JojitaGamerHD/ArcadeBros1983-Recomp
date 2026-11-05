@@ -207,49 +207,12 @@ static void al_terminar_fotograma(void *ctx) {
     restaurar_si_falta();
 }
 
-/* Creditos personalizados del port. */
-
-static const RecompRuntimeUiItem opciones_creditos[] = {
-    {
-        .key = "arcade.creditos",
-        .section = "Créditos",
-        .label = "Port desarrollado por JojitaGamerHD",
-        .description = "Ver los creditos completos del proyecto.",
-        .type = RECOMP_RUNTIME_UI_ACTION
-    },
+static const RecompRuntimeUiItem opciones_colores[] = {
 #include "player_colors_menu.inc"
 };
 
-static int mostrar_creditos(
-    void *context,
-    const RecompRuntimeUiItem *item
-) {
-    (void)context;
-    if (strcmp(item->key, "arcade.creditos")) return arcade_colors_action(context, item);
-
-#ifdef _WIN32
-    MessageBoxA(
-        NULL,
-        "ARCADE BROS 1983 RECOMP\n\n"
-        "Port desarrollado por JojitaGamerHD\n"
-        "https://github.com/JojitaGamerHD\n\n"
-        "Juego original: Mario Bros. (1983) - Nintendo\n\n"
-        "NESRecomp: Matthew Stanley (mstan)\n"
-        "https://github.com/mstan/nesrecomp\n\n"
-        "recomp-ui: RetroPortingToolKit\n"
-        "https://github.com/RetroPortingToolKit/recomp-ui",
-        "Creditos - Arcade Bros 1983 Recomp",
-        MB_OK | MB_ICONINFORMATION
-    );
-#else
-    fprintf(stderr, "Port desarrollado por JojitaGamerHD\n");
-#endif
-
-    return 1;
-}
-
-static const RecompRuntimeUiCallbacks callbacks_creditos = {
-    .run_action = mostrar_creditos,
+static const RecompRuntimeUiCallbacks callbacks_colores = {
+    .run_action = arcade_colors_action,
     .get_value = arcade_colors_get,
     .set_value = arcade_colors_set,
     .get_text = arcade_colors_get_text,
@@ -269,10 +232,10 @@ static const CycHostExtras extras = {
     .frame_begin = al_empezar_fotograma,
     .frame_end = al_terminar_fotograma,
 
-    .menu_items = opciones_creditos,
+    .menu_items = opciones_colores,
     .menu_item_count =
-        sizeof(opciones_creditos) / sizeof(opciones_creditos[0]),
-    .menu_callbacks = &callbacks_creditos,
+        sizeof(opciones_colores) / sizeof(opciones_colores[0]),
+    .menu_callbacks = &callbacks_colores,
     .load_setting = arcade_colors_load,
     .save_settings = arcade_colors_save,
 };

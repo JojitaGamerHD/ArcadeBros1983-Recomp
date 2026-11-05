@@ -3,7 +3,7 @@ param([Parameter(Mandatory=$true)][string]$Root,
 $ErrorActionPreference = 'Stop'
 $ast = [Management.Automation.Language.Parser]::ParseFile(
     (Join-Path $Root 'tools/preparar_dependencias.ps1'), [ref]$null, [ref]$null)
-foreach ($name in @('Verificar-Comando', 'Aplicar-Parche')) {
+foreach ($name in @('Verificar-Comando', 'Probar-ParcheAplicado', 'Aplicar-Parche')) {
     $node = $ast.Find({ param($n)
         $n -is [Management.Automation.Language.FunctionDefinitionAst] -and $n.Name -eq $name
     }, $true)
@@ -37,6 +37,14 @@ foreach ($case in @(
     Aplicar-Parche $fixture $current $case[0] $previous
     git -C $fixture apply --reverse $current
     Verificar-Comando 'Fallo la aplicacion limpia o la idempotencia.'
+    Aplicar-Parche $fixture $current $case[0]
+    $menu = Join-Path $patchRoot 'arcade-v1.0.2-menu.patch'
+    Aplicar-Parche $fixture $menu $case[0]
+    Aplicar-Parche $fixture $menu $case[0]
+    git -C $fixture apply --reverse $menu
+    Verificar-Comando 'Fallo la aplicacion o la idempotencia del menu integrado.'
+    git -C $fixture apply --reverse $current
+    Verificar-Comando 'El parche del menu altero la base de v1.0.1.'
     foreach ($old in $previous) {
         git -C $fixture apply $old
         Verificar-Comando 'No se pudo preparar la version anterior.'

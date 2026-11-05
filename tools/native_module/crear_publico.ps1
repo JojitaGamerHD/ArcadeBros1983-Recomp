@@ -1,13 +1,13 @@
 param(
     [string]$Compilador,
     [string]$Python,
-    [string]$Version='1.0.1'
+    [string]$Version='1.0.2'
 )
 $ErrorActionPreference='Stop'
 # Windows PowerShell targets an older .NET compatibility profile by default.
 [AppContext]::SetSwitch('Switch.System.IO.Compression.ZipFile.UseBackslash',$false)
 $raiz=(Resolve-Path -LiteralPath (Join-Path $PSScriptRoot '../..')).Path
-if ($Version -notmatch '^\d+\.\d+\.\d+(?:-[0-9A-Za-z]+(?:[.-][0-9A-Za-z]+)*)?(?:\+[0-9A-Za-z]+(?:[.-][0-9A-Za-z]+)*)?$') { throw 'La version debe tener formato SemVer, por ejemplo 1.0.1.' }
+if ($Version -notmatch '^\d+\.\d+\.\d+(?:-[0-9A-Za-z]+(?:[.-][0-9A-Za-z]+)*)?(?:\+[0-9A-Za-z]+(?:[.-][0-9A-Za-z]+)*)?$') { throw 'La version debe tener formato SemVer, por ejemplo 1.0.2.' }
 $engine=Join-Path $raiz 'deps/nesrecomp-arcade'
 $publico=Join-Path $PSScriptRoot 'public'
 foreach ($p in @(
@@ -29,7 +29,7 @@ $Python=(Resolve-Path -LiteralPath $Python).Path
 $cmake=(Get-Command cmake.exe -ErrorAction Stop).Source
 $buildRaiz=Join-Path $raiz 'build'
 New-Item -ItemType Directory -Path $buildRaiz -Force | Out-Null
-$build=Join-Path $buildRaiz ('r101-'+[guid]::NewGuid().ToString('N').Substring(0,8))
+$build=Join-Path $buildRaiz ('r102-'+[guid]::NewGuid().ToString('N').Substring(0,8))
 New-Item -ItemType Directory -Path $build | Out-Null
 $dev=Join-Path $build 'dev'
 $sdk=Join-Path $build 'sdk'
@@ -97,7 +97,7 @@ $assets=@('assets/fonts/LatoLatin-Bold.ttf','assets/fonts/LatoLatin-Regular.ttf'
     'assets/img/arcade_bros_1983.png','assets/img/brand_mark.tga','assets/img/brand_nes.tga','assets/img/flags.png',
     'assets/img/pad_nes.tga','assets/img/verdict_bad.tga','assets/img/verdict_none.tga','assets/img/verdict_ok.tga','assets/img/verdict_warn.tga')
 function Permitido([string]$Relativo) {
-    if ($Relativo -cin @('ArcadeBrosLauncher.exe','LEEME.txt','SOURCES.txt','MANIFIESTO-SHA256.txt')) { return $true }
+    if ($Relativo -cin @('LEEME.txt','SOURCES.txt','MANIFIESTO-SHA256.txt')) { return $true }
     if (!$Relativo.StartsWith('Bin/',[StringComparison]::Ordinal)) { return $false }
     $r=$Relativo.Substring(4)
     if ($r -cin $archivosBin -or $r -cin $assets) { return $true }
@@ -138,14 +138,13 @@ foreach ($h in @('stdint.h','stdbool.h','stddef.h')) {
 Write-Host '2/6 Compilando los ejecutables genericos, sin consultar una ROM...'
 [void](Ejecutar $cmake @('-S',$PSScriptRoot,'-B',$dev,'-G','Visual Studio 17 2022','-A','x64',
     ('-DARCADE_ROOT='+$raiz),'-DARCADE_WINDOWED_HOST=ON','-DARCADE_PREPARE_MODULE=OFF',('-DARCADE_RELEASE_VERSION='+$Version)) 'configurar')
-[void](Ejecutar $cmake @('--build',$dev,'--config','Release','--target','ArcadeNativeHost','ArcadeBrosLauncher',
+[void](Ejecutar $cmake @('--build',$dev,'--config','Release','--target','ArcadeNativeHost',
     'ArcadePrepare','NESRecomp','--parallel','1') 'compilar')
 [void](Ejecutar $Python @('-I',(Join-Path $PSScriptRoot 'prepare_sdk.py'),$engine,$sdk) 'preparar-sdk')
 if (@(Get-ChildItem -LiteralPath $sdk -File -Recurse | Where-Object {$_.Extension -cne '.h'}).Count) { throw 'El SDK generico contiene archivos distintos de headers.' }
 
 Write-Host '3/6 Montando una carpeta nueva con herramientas, assets y avisos...'
 New-Item -ItemType Directory -Path $kit,(Join-Path $kit 'compiler/bin'),(Join-Path $kit 'compiler/lib/clang') | Out-Null
-Copy-Item -LiteralPath (Join-Path $dev 'Release/ArcadeBrosLauncher.exe') -Destination (Join-Path $stage 'ArcadeBrosLauncher.exe')
 foreach ($f in @('ArcadeNativeHost.exe','ArcadeNativeHost.lib','ArcadePrepare.exe','NESRecomp.exe','SDL2.dll')) {
     Copy-Item -LiteralPath (Join-Path $dev ('Release/'+$f)) -Destination (Join-Path $kit $f)
 }
@@ -233,11 +232,11 @@ foreach ($f in $extraidos) {
 if (Test-Path -LiteralPath (Join-Path $copia 'Datos')) { throw 'La extraccion publica contiene Datos.' }
 
 Write-Host '6/6 Guardando el resultado de la candidata publica...'
-$resumen=[ordered]@{Zip=$zip;Sha256=$zipSha;CarpetaPrueba=$copia;Launcher=(Join-Path $copia 'ArcadeBrosLauncher.exe');
+$resumen=[ordered]@{Zip=$zip;Sha256=$zipSha;CarpetaPrueba=$copia;Juego=(Join-Path $copia 'Bin/ArcadeNativeHost.exe');
     Kit=(Join-Path $copia 'Bin');Manifest=(Join-Path $copia 'MANIFIESTO-SHA256.txt');Version=$Version;RuntimeGenerico=$true}
 [IO.File]::WriteAllText((Join-Path $build 'resultado.json'),($resumen|ConvertTo-Json),$utf8)
 Write-Host 'PAQUETE PUBLICO PREPARADO' -ForegroundColor Green
 Write-Host ('ZIP: '+$zip)
 Write-Host ('SHA256: '+$zipSha)
-Write-Host ('Copia limpia para probar: '+$resumen.Launcher)
+Write-Host ('Copia limpia para probar: '+$resumen.Juego)
 Write-Host 'La candidata no incluye Datos ni se ha ejecutado con una ROM o publicado en GitHub.'
