@@ -5,7 +5,7 @@
 [![Estado](https://img.shields.io/badge/estado-Completo-blue)](https://github.com/JojitaGamerHD/ArcadeBros1983-Recomp)
 [![Plataforma](https://img.shields.io/badge/plataforma-Windows%20x64-blue)](https://github.com/JojitaGamerHD/ArcadeBros1983-Recomp)
 
-**Versión: v1.0.2** · [Descarga pública para Windows x64](https://github.com/JojitaGamerHD/ArcadeBros1983-Recomp/releases/tag/v1.0.2)
+**Versión estable v1.0.3** · [Descargar para Windows x64](https://github.com/JojitaGamerHD/ArcadeBros1983-Recomp/releases/download/v1.0.3/ArcadeBros1983-Recomp-v1.0.3-Windows-x64.zip)
 
 El menú principal se abre con
 `Bin/ArcadeNativeHost.exe` antes de importar la ROM. El menú reúne los
@@ -19,12 +19,7 @@ sin fines comerciales y sin afiliación con Nintendo.
 
 ## Descargar y jugar
 
-En [la release v1.0.2](https://github.com/JojitaGamerHD/ArcadeBros1983-Recomp/releases/tag/v1.0.2),
-busca el archivo de Windows de esta versión:
-
-```text
-ArcadeBros1983-Recomp-v1.0.2-Windows-x64.zip
-```
+Descarga `ArcadeBros1983-Recomp-v1.0.3-Windows-x64.zip`. [Release v1.0.3 y archivo SHA-256](https://github.com/JojitaGamerHD/ArcadeBros1983-Recomp/releases/tag/v1.0.3)
 
 1. Extrae el ZIP completo en una carpeta con permiso de escritura.
 2. Guarda tu ROM compatible de Mario Bros. (NES) como `rom/game.nes` en la
@@ -50,15 +45,22 @@ de descarga de ROMs.
 La release incluye un archivo `.zip.sha256` y el paquete lleva
 `MANIFIESTO-SHA256.txt`, con las huellas de sus archivos originales.
 
+Para actualizar, cierra el programa, extrae el ZIP en una carpeta nueva y
+copia `Datos` y tu archivo `rom/game.nes` de la instalación anterior.
+
+## Cambios de v1.0.3
+
+- Filtro **Grid** para la partida y la demo, con intensidad ajustable y activación desde **Gráficos → Filtro visual**. Empieza desactivado y se muestra a partir de 2× de escala.
+- Marco clásico con color personalizable. Se dibuja en el espacio disponible alrededor de la imagen, que conserva su tamaño y proporción original.
+- **Ventana / Pantalla completa** se aplica al instante desde Gráficos. Audio y Música de fondo muestran claramente **Sí / No**.
+- **Cargar ROM** busca `rom/game.nes` y muestra el aviso en el menú si el archivo falta o es incompatible.
+
 ## Cambios de v1.0.2
 
 - Menú retro integrado, pausa y opciones en una sola ventana, con navegación por teclado y mando.
 - Modos Estándar (A) y Arcade (B) para uno o dos jugadores.
 - Fanfarria y demostración originales desde la ROM local. Al terminar la partida se vuelve al menú integrado.
 - Ajustes, controles personalizados, rueda de colores, ocho presets y récords persistentes.
-
-Para actualizar, cierra el programa, extrae el ZIP en una carpeta nueva y
-copia `Datos` y tu archivo `rom/game.nes` de la instalación anterior.
 
 ## Cambios de v1.0.1
 
@@ -98,11 +100,9 @@ Consulta el alcance de la validación y las limitaciones en
 
 ## Controles y ajustes
 
-En v1.0.2, abre **Opciones → Controles** y elige **J1** o **J2** para
-configurar teclado y mandos. En v1.0.1, los controles se ajustan desde el
-launcher, donde se ha comprobado el uso de un mando Xbox en el entorno de
-desarrollo. **Esc** abre la pausa y **F11** cambia la pantalla completa con
-los atajos predeterminados.
+Abre **Opciones → Controles** y elige **J1** o **J2** para configurar teclado
+y mandos. **Esc** abre la pausa y **F11** cambia la pantalla completa con los
+atajos predeterminados.
 
 Gráficos y Audio comparten sus ajustes entre el menú de inicio y la pausa.
 En **Gráficos → Marco** puedes activar el marco clásico y elegir su color
@@ -200,23 +200,23 @@ powershell -NoProfile -ExecutionPolicy Bypass `
 
 En la rama de desarrollo, el empaquetador construye el motor y las herramientas
 genéricas sin consultar una ROM. Genera el ZIP, su `.sha256` y una copia
-limpia de comprobación en una carpeta nueva `build/r102-...`.
+limpia de comprobación en una carpeta nueva dentro de `build/`.
 
 Consulta [Motor genérico e importación local](tools/native_module/README.md)
 para los parámetros de LLVM y las pruebas de distribución.
 
 ### Dependencias fijadas
 
-| Componente | Revisión o versión | Parche activo |
+| Componente | Revisión o versión | Parches |
 | --- | --- | --- |
-| NESRecomp | `5a2eddeecc646e9325bef53f3c711e119423f99c` | `patches/nesrecomp/arcade-v1.0.1-estable.patch` |
-| recomp-ui | `7c635c6b366a6e0d5d3c913a7fce6ec04dd9f256` | `patches/recomp-ui/arcade-v1.0.1-editor.patch` |
+| NESRecomp | `5a2eddeecc646e9325bef53f3c711e119423f99c` | [Capas de NESRecomp](patches/nesrecomp) |
+| recomp-ui | `7c635c6b366a6e0d5d3c913a7fce6ec04dd9f256` | [Capas de recomp-ui](patches/recomp-ui) |
 | LLVM/Clang/LLD | `23.1.4`, archivo oficial Windows x64 verificado | — |
 
 Los parches son acumulativos sobre las revisiones originales. El preparador
 identifica los cambios aplicados y conserva las revisiones fijadas. El gitlink
 de `recomp-ui` permanece en su revisión original; las adaptaciones se guardan
-en el parche del proyecto.
+en los parches del proyecto.
 
 ### Pruebas de desarrollo
 

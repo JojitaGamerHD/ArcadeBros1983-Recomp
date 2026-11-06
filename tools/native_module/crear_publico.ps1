@@ -1,13 +1,13 @@
 param(
     [string]$Compilador,
     [string]$Python,
-    [string]$Version='1.0.2'
+    [string]$Version='1.0.3'
 )
 $ErrorActionPreference='Stop'
 # Windows PowerShell targets an older .NET compatibility profile by default.
 [AppContext]::SetSwitch('Switch.System.IO.Compression.ZipFile.UseBackslash',$false)
 $raiz=(Resolve-Path -LiteralPath (Join-Path $PSScriptRoot '../..')).Path
-if ($Version -notmatch '^\d+\.\d+\.\d+(?:-[0-9A-Za-z]+(?:[.-][0-9A-Za-z]+)*)?(?:\+[0-9A-Za-z]+(?:[.-][0-9A-Za-z]+)*)?$') { throw 'La version debe tener formato SemVer, por ejemplo 1.0.2.' }
+if ($Version -notmatch '^\d+\.\d+\.\d+(?:-[0-9A-Za-z]+(?:[.-][0-9A-Za-z]+)*)?(?:\+[0-9A-Za-z]+(?:[.-][0-9A-Za-z]+)*)?$') { throw 'La version debe tener formato SemVer, por ejemplo 1.0.3.' }
 $engine=Join-Path $raiz 'deps/nesrecomp-arcade'
 $publico=Join-Path $PSScriptRoot 'public'
 foreach ($p in @(
