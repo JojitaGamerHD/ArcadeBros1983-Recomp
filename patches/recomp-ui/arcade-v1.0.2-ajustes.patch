@@ -1,0 +1,737 @@
+diff --git a/src/common/backends/imgui/launcher_imgui.cpp b/src/common/backends/imgui/launcher_imgui.cpp
+--- a/src/common/backends/imgui/launcher_imgui.cpp
++++ b/src/common/backends/imgui/launcher_imgui.cpp
+@@ -31,6 +31,7 @@
+ #include "launcher_host_capture.h"
+ 
+ #include "imgui.h"
++#include "arcade_color_disc.h"
+ #include "launcher_nav.h"
+ #if defined(LNG_SDL3)
+   #include "imgui_impl_sdl3.h"
+@@ -3942,12 +3943,11 @@
+ }
+ 
+ bool arcade_toggle_row(const char* label, const LauncherTheme& th, const char* id,
+-                       bool value, bool retro) {
+-    const float width = retro ? arcade_value_width() : ImGui::GetFrameHeight();
+-    row_label_right(label, th, width);
+-    if (!retro) return ImGui::Checkbox(id, &value);
++                       bool value, float retro_width) {
++    row_label_right(label, th, retro_width > 0.0f ? retro_width : ImGui::GetFrameHeight());
++    if (retro_width <= 0.0f) return ImGui::Checkbox(id, &value);
+     ImGui::PushID(id);
+-    const bool pressed = ImGui::Button(value ? "SÍ###toggle" : "NO###toggle", ImVec2(width, 0));
++    const bool pressed = ImGui::Button(value ? "SÍ###toggle" : "NO###toggle", ImVec2(retro_width, 0));
+     ImGui::PopID();
+     return pressed;
+ }
+@@ -3957,24 +3957,10 @@
+     static const SettingsChoice modes[] = {
+         {0, "Ventana"}, {1, "Sin bordes"}, {2, "Exclusiva"}
+     };
+-    static const SettingsChoice retro_modes[] = {
+-        {0, "VENTANA"}, {1, "PANTALLA COMPLETA"}
+-    };
+     static const SettingsChoice scales[] = {
+         {1, "1x"}, {2, "2x"}, {3, "3x"}, {4, "4x"},
+         {5, "5x"}, {6, "6x"}, {7, "7x"}, {8, "8x"}
+     };
+-    if (m->arcade_menu_action) {
+-        // Legacy exclusive fullscreen has the same visible option as borderless.
+-        const int current = m->s.fullscreen != 0 ? 1 : 0;
+-        const float label_width = ImGui::CalcTextSize(retro_modes[1].label).x;
+-        const float combo_width = label_width + ImGui::GetFrameHeight() +
+-                                  2.0f * ImGui::GetStyle().FramePadding.x;
+-        const int selected = settings_combo_row("MODO DE PANTALLA", th, "##arcade_fullscreen",
+-            retro_modes, IM_ARRAYSIZE(retro_modes), current, std::max(arcade_value_width(), combo_width));
+-        launcher_model_set_fullscreen(m, selected);
+-        return;
+-    }
+     launcher_model_set_fullscreen(m, settings_combo_row("Pantalla completa", th,
+         "##arcade_fullscreen", modes, IM_ARRAYSIZE(modes), m->s.fullscreen));
+     ImGui::BeginDisabled(m->s.fullscreen != 0);
+@@ -3983,33 +3969,47 @@
+     ImGui::EndDisabled();
+ }
+ 
+-void draw_arcade_graphics_controls(LauncherModel* m, const LauncherTheme& th) {
++float draw_arcade_graphics_controls(LauncherModel* m, const LauncherTheme& th) {
+     static const SettingsChoice targets[] = {
+         {30, "30 FPS"}, {60, "60 FPS"}, {120, "120 FPS"}, {180, "180 FPS"}
+     };
+     const bool retro = m->arcade_menu_action != nullptr;
+-    const float width = retro ? arcade_value_width() : px(SETTINGS_CTRL_W);
++    float retro_width = 0.0f;
++    if (retro) {
++        static const SettingsChoice modes[] = {
++            {0, "VENTANA"}, {1, "PANTALLA COMPLETA"}
++        };
++        const float combo_width = ImGui::CalcTextSize(modes[1].label).x + ImGui::GetFrameHeight() +
++                                  2.0f * ImGui::GetStyle().FramePadding.x;
++        retro_width = std::max(arcade_value_width(), combo_width);
++        // Legacy exclusive fullscreen has the same visible option as borderless.
++        const int current = m->s.fullscreen != 0 ? 1 : 0;
++        const int selected = settings_combo_row("MODO DE PANTALLA", th, "##arcade_fullscreen",
++            modes, IM_ARRAYSIZE(modes), current, retro_width);
++        launcher_model_set_fullscreen(m, selected);
++    }
+     if (arcade_toggle_row(retro ? "ESCALADO ENTERO" : "Escalado entero", th,
+-                          "##arcade_integer", m->s.integer_scale != 0, retro))
++                          "##arcade_integer", m->s.integer_scale != 0, retro_width))
+         launcher_model_toggle_integer_scale(m);
+     if (!retro && arcade_toggle_row("Filtro lineal", th,
+-                          "##arcade_filter", m->s.linear_filter != 0, false))
++                          "##arcade_filter", m->s.linear_filter != 0, 0.0f))
+         launcher_model_toggle_filter(m);
+     if (arcade_toggle_row(retro ? "MOSTRAR FPS" : "Mostrar FPS", th,
+-                          "##arcade_show_fps", m->s.arcade_show_fps != 0, retro))
++                          "##arcade_show_fps", m->s.arcade_show_fps != 0, retro_width))
+         m->s.arcade_show_fps = !m->s.arcade_show_fps;
+     m->s.arcade_target_fps = settings_combo_row(retro ? "LÍMITE DE FPS" : "Límite de FPS", th,
+-        "##arcade_target_fps", targets, 4, m->s.arcade_target_fps, width);
++        "##arcade_target_fps", targets, IM_ARRAYSIZE(targets), m->s.arcade_target_fps, retro ? retro_width : px(SETTINGS_CTRL_W));
+     if (!retro && ImGui::IsItemHovered(ImGuiHoveredFlags_DelayNormal))
+         ImGui::SetTooltip("La NES mantiene su velocidad original.\n"
+                           "120/180 FPS repiten la imagen; no interpolan.");
+     ImGui::BeginDisabled(m->s.arcade_target_fps != 60);
+     if (arcade_toggle_row(retro ? "VSYNC" : "VSync", th,
+-                          "##arcade_vsync", m->s.vsync != RECOMP_LAUNCHER_VSYNC_OFF, retro))
++                          "##arcade_vsync", m->s.vsync != RECOMP_LAUNCHER_VSYNC_OFF, retro_width))
+         launcher_model_toggle_vsync(m);
+     ImGui::EndDisabled();
+     if (!retro && ImGui::IsItemHovered(ImGuiHoveredFlags_DelayNormal | ImGuiHoveredFlags_AllowWhenDisabled))
+         ImGui::SetTooltip("VSync solo se aplica con el limite de 60 FPS.");
++    return retro_width;
+ }
+ 
+ void draw_display_controls(LauncherModel* m, const LauncherTheme& th) {
+@@ -4585,7 +4585,7 @@
+     const float width = retro ? arcade_value_width() : px(SETTINGS_CTRL_W);
+     if (m->has_arcade_settings &&
+         arcade_toggle_row(retro ? "AUDIO" : "Audio", th, "##arcade_audio",
+-                          m->s.enable_audio != 0, retro))
++                          m->s.enable_audio != 0, retro ? width : 0.0f))
+         m->s.enable_audio = !m->s.enable_audio;
+     // Labels at the card's left edge, controls at its right (row_label_right),
+     // matching DISPLAY. Every control is SETTINGS_CTRL_W wide -- including the
+@@ -4608,7 +4608,7 @@
+     if (m->has_arcade_settings) {
+         if (!retro) ImGui::Spacing();
+         if (arcade_toggle_row(retro ? "MÚSICA DE FONDO" : "Música de fondo", th,
+-                              "##arcade_music", m->s.arcade_music_enabled != 0, retro))
++                              "##arcade_music", m->s.arcade_music_enabled != 0, retro ? width : 0.0f))
+             m->s.arcade_music_enabled = !m->s.arcade_music_enabled;
+         row_label_right(retro ? "VOLUMEN DE MÚSICA" : "Volumen de música", th, width);
+         int change = 0;
+@@ -14153,7 +14153,7 @@
+ constexpr ImU32 arcade_muted = IM_COL32(158, 178, 203, 255);
+ constexpr ImU32 arcade_warm = IM_COL32(255, 170, 97, 255);
+ 
+-enum class ArcadeOptionsPage { Categories, Video, Audio, Controls, Graphics };
++enum class ArcadeOptionsPage { Categories, Audio, Controls, Graphics };
+ 
+ struct ArcadeTitleState {
+     // 0 is the main screen. 1 and 2 are player counts; 3 is credits.
+@@ -14164,6 +14164,8 @@
+     int options_selection = 0;
+     bool focus_options = true;
+     bool options_modal = false;
++    uint32_t original_frame_rgb = 0;
++    float frame_hsv[3] = {};
+ };
+ 
+ struct ArcadeTitleCanvas {
+@@ -14246,12 +14248,24 @@
+     canvas.text("1983 RECOMP", 480, 318, 55, red);
+ }
+ 
+-// Scale the menu in the same 16:15 proportions as the game's 256 × 240 frame.
++// Match the 16:15 proportions of the native 256 × 240 game image.
+ constexpr float arcade_canvas_width = 960.0f;
+ constexpr float arcade_canvas_height = 900.0f;
+ 
+ float arcade_canvas_scale(const ImGuiViewport* vp) {
+     return std::min(vp->Size.x / arcade_canvas_width, vp->Size.y / arcade_canvas_height);
++}
++
++ImU32 arcade_rgb(uint32_t rgb) {
++    return IM_COL32((rgb >> 16) & 255, (rgb >> 8) & 255, rgb & 255, 255);
++}
++
++void draw_arcade_frame(ImDrawList* draw, ImVec2 min, ImVec2 max, ImVec2 inset, uint32_t rgb) {
++    const ImU32 color = arcade_rgb(rgb);
++    draw->AddRectFilled(min, ImVec2(max.x, min.y + inset.y), color);
++    draw->AddRectFilled(ImVec2(min.x, max.y - inset.y), max, color);
++    draw->AddRectFilled(ImVec2(min.x, min.y + inset.y), ImVec2(min.x + inset.x, max.y - inset.y), color);
++    draw->AddRectFilled(ImVec2(max.x - inset.x, min.y + inset.y), ImVec2(max.x, max.y - inset.y), color);
+ }
+ 
+ ImVec2 arcade_canvas_origin(const ImGuiViewport* vp, float scale) {
+@@ -14319,7 +14333,7 @@
+     draw_arcade_marquee(canvas);
+ 
+     static const char* const main[] = {
+-        "1 JUGADOR", "2 JUGADORES", "OPCIONES", "SELECCIONA TU ROM", "SALIR", "CRÉDITOS"
++        "1 JUGADOR", "2 JUGADORES", "OPCIONES", "CARGAR ROM", "SALIR", "CRÉDITOS"
+     };
+     static const char* const modes[] = {"MODO ESTÁNDAR", "MODO ARCADE", "VOLVER AL MENÚ"};
+     static const char* const credits[] = {"VOLVER AL MENÚ"};
+@@ -14351,7 +14365,7 @@
+             if (result > 0) m->action = LNG_ACTION_LAUNCH;
+             else m->arcade_menu_notice = result < 0
+                 ? "No se pudo iniciar la partida. Revisa la ROM local."
+-                : "Selecciona la ROM para jugar.";
++                : "Usa CARGAR ROM desde el menú principal.";
+         }
+         return;
+     }
+@@ -14372,8 +14386,14 @@
+             if (result > 0) {
+                 m->arcade_rom_ready = true;
+                 m->arcade_menu_notice = "ROM local preparada.";
+-            } else if (result < 0) {
+-                m->arcade_menu_notice = "No se pudo preparar la ROM seleccionada.";
++            } else if (result == 0) {
++                m->arcade_menu_notice = "Pon tu ROM en /rom/game.nes";
++            } else if (result == -2) {
++                m->arcade_menu_notice = "La ROM de /rom/game.nes no es compatible.";
++            } else if (result == -3) {
++                m->arcade_menu_notice = "Preparación cancelada.";
++            } else {
++                m->arcade_menu_notice = "No se pudo preparar /rom/game.nes.";
+             }
+             break;
+         }
+@@ -14388,17 +14408,16 @@
+     draw_arcade_marquee(canvas);
+ 
+     static const char* const rows[] = {
+-        "VÍDEO", "AUDIO", "CONTROLES", "GRÁFICOS", "VOLVER AL MENÚ"
++        "AUDIO", "CONTROLES", "GRÁFICOS", "VOLVER AL MENÚ"
+     };
+     static const ArcadeOptionsPage pages[] = {
+-        ArcadeOptionsPage::Video, ArcadeOptionsPage::Audio,
+-        ArcadeOptionsPage::Controls, ArcadeOptionsPage::Graphics
++        ArcadeOptionsPage::Audio, ArcadeOptionsPage::Controls, ArcadeOptionsPage::Graphics
+     };
+     ImGui::PushID("arcade_options");
+     const int activated = draw_arcade_menu_rows(canvas, rows, IM_ARRAYSIZE(rows),
+         state.options_selection, state.focus_options);
+     ImGui::PopID();
+-    if (activated == 4 || arcade_back_pressed()) {
++    if (activated == IM_ARRAYSIZE(pages) || arcade_back_pressed()) {
+         state.focus_selection = true;
+         launcher_model_set_view(m, LNG_VIEW_DASHBOARD);
+     } else if (activated >= 0) {
+@@ -14412,6 +14431,76 @@
+     return m->capturing || m->hk_capturing || m->camera_capturing ||
+            m->defaults_modal_open ||
+            ImGui::IsPopupOpen(nullptr, ImGuiPopupFlags_AnyPopupId | ImGuiPopupFlags_AnyPopupLevel);
++}
++
++void draw_arcade_frame_controls(LauncherModel* m, const LauncherTheme& th, ArcadeTitleState& state,
++                                float width, float scale) {
++    static const SettingsChoice modes[] = {{0, "DESACTIVADO"}, {1, "CLÁSICO"}};
++    m->s.arcade_frame_mode = settings_combo_row("MARCO", th, "##arcade_frame",
++        modes, IM_ARRAYSIZE(modes), m->s.arcade_frame_mode, width);
++
++    constexpr char popup[] = "##arcade_frame_color";
++    ImGui::BeginDisabled(m->s.arcade_frame_mode == 0);
++    row_label_right("COLOR DEL MARCO", th, width);
++    char swatch[32];
++    std::snprintf(swatch, sizeof swatch, "#%06X###frame_color",
++        static_cast<unsigned>(m->s.arcade_frame_rgb));
++    if (ImGui::Button(swatch, ImVec2(width, 0))) {
++        state.original_frame_rgb = m->s.arcade_frame_rgb;
++        const ImVec4 color = ImGui::ColorConvertU32ToFloat4(arcade_rgb(state.original_frame_rgb));
++        ImGui::ColorConvertRGBtoHSV(color.x, color.y, color.z,
++            state.frame_hsv[0], state.frame_hsv[1], state.frame_hsv[2]);
++        ImGui::OpenPopup(popup);
++    }
++    const ImVec2 min = ImGui::GetItemRectMin();
++    const ImVec2 max = ImGui::GetItemRectMax();
++    const float chip = (max.y - min.y) * 0.35f;
++    const float chip_top = (min.y + max.y - chip) * 0.5f;
++    ImGui::GetWindowDrawList()->AddRectFilled(ImVec2(min.x + chip, chip_top),
++        ImVec2(min.x + 2.0f * chip, chip_top + chip), arcade_rgb(m->s.arcade_frame_rgb));
++    ImGui::EndDisabled();
++
++    ImGui::SetNextWindowPos(ImGui::GetMainViewport()->GetCenter(), ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
++    if (ImGui::BeginPopupModal(popup, nullptr, ImGuiWindowFlags_AlwaysAutoResize |
++        ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoSavedSettings)) {
++        ImGui::TextUnformatted("COLOR DEL MARCO");
++        const float diameter = std::clamp(165.0f * scale, 70.0f, 156.0f);
++        const float panel = std::max(diameter, ImGui::CalcTextSize("BRILLO     TONO    SATURACIÓN").x);
++        const ImVec2 pos = ImGui::GetCursorScreenPos();
++        paint_color_disc(ImVec2(pos.x + panel * 0.5f, pos.y + diameter * 0.5f),
++            diameter * 0.5f - 4.0f, state.frame_hsv[0], state.frame_hsv[1]);
++        ImGui::Dummy(ImVec2(panel, diameter));
++
++        static const char* const labels[] = {"TONO", "SATURACIÓN", "BRILLO"};
++        bool changed = false;
++        for (int i = 0; i < IM_ARRAYSIZE(labels); ++i) {
++            ImGui::PushID(i);
++            ImGui::TextUnformatted(labels[i]);
++            ImGui::SetNextItemWidth(panel);
++            int value = static_cast<int>(std::round(state.frame_hsv[i] * (i == 0 ? 360 : 100)));
++            const int range = i == 0 ? 360 : 100;
++            if (ImGui::SliderInt("##component", &value, 0, range, "%d", ImGuiSliderFlags_NoInput)) {
++                state.frame_hsv[i] = static_cast<float>(value) / range;
++                changed = true;
++            }
++            if (i == 0) ImGui::SetItemDefaultFocus();
++            ImGui::PopID();
++        }
++        if (changed) {
++            ImVec4 color(0, 0, 0, 1);
++            ImGui::ColorConvertHSVtoRGB(state.frame_hsv[0], state.frame_hsv[1], state.frame_hsv[2],
++                                       color.x, color.y, color.z);
++            m->s.arcade_frame_rgb = (static_cast<uint32_t>(std::round(color.x * 255)) << 16) |
++                                    (static_cast<uint32_t>(std::round(color.y * 255)) << 8) |
++                                    static_cast<uint32_t>(std::round(color.z * 255));
++        }
++        const bool accept = ImGui::Button("APLICAR");
++        ImGui::SameLine();
++        const bool cancel = ImGui::Button("CANCELAR") || arcade_back_pressed();
++        if (cancel) m->s.arcade_frame_rgb = state.original_frame_rgb;
++        if (accept || cancel) ImGui::CloseCurrentPopup();
++        ImGui::EndPopup();
++    }
+ }
+ 
+ void draw_arcade_options_detail(LauncherModel* m, const LauncherTheme& th,
+@@ -14429,7 +14518,6 @@
+ 
+     const char* label = "";
+     switch (state.options) {
+-        case ArcadeOptionsPage::Video: label = "VÍDEO"; break;
+         case ArcadeOptionsPage::Audio: label = "AUDIO"; break;
+         case ArcadeOptionsPage::Controls:
+             label = controller ? (m->cfg_player == 0 ? "CONTROLES J1" : "CONTROLES J2") : "CONTROLES";
+@@ -14441,24 +14529,23 @@
+     const ArcadeTitleCanvas canvas = arcade_title_canvas();
+     if (canvas.scale <= 0.0f) return;
+     const float side = controller ? 114.0f : 200.0f;
+-    const int row_count = state.options == ArcadeOptionsPage::Video ? 2 :
+-                          state.options == ArcadeOptionsPage::Controls ? 3 : 5;
++    const bool graphics = state.options == ArcadeOptionsPage::Graphics;
++    const int row_count = graphics ? 8 : state.options == ArcadeOptionsPage::Controls ? 3 : 5;
++    const float font_size = std::max(14.0f, 25.0f * canvas.scale);
+     canvas.text(label, 480, 102, 48, arcade_warm);
+     canvas.rect(side, 150, 960.0f - 2.0f * side, 2, IM_COL32(255, 176, 43, 160));
+-    if (state.options == ArcadeOptionsPage::Graphics) {
+-        canvas.text("La NES mantiene su velocidad original.", 480, 650, 22, arcade_muted);
+-        canvas.text("120/180 FPS repiten la imagen sin interpolarla.", 480, 680, 22, arcade_muted);
+-        if (m->s.arcade_target_fps != 60)
+-            canvas.text("VSync está disponible a 60 FPS.", 480, 710, 22, arcade_muted);
+-    }
+-    canvas.text("FLECHAS / D-PAD   ·   ENTER / A   ·   ESC / B", 480, 848, 19, arcade_muted);
++    canvas.text("FLECHAS / D-PAD   ·   ENTER / A   ·   ESC / B", 480, 848,
++                font_size / canvas.scale, arcade_muted);
+ 
+     ImGui::PushID(label);
+     if (g_arcade_title_font) ImGui::PushFont(g_arcade_title_font);
+-    ImGui::SetWindowFontScale(std::max(14.0f, 25.0f * canvas.scale) / ImGui::GetFontSize());
++    ImGui::SetWindowFontScale(font_size / ImGui::GetFontSize());
+     const float rows_height = ImGui::GetFrameHeight() +
+-        static_cast<float>(row_count) * ImGui::GetFrameHeightWithSpacing();
+-    const float top = controller ? 188.0f : 440.0f - rows_height / (2.0f * canvas.scale);
++        static_cast<float>(row_count - 1) * ImGui::GetFrameHeightWithSpacing();
++    // Reserve the third note row so the controls stay still as the FPS changes.
++    const float notes_height = graphics ? 3.0f * ImGui::GetTextLineHeightWithSpacing() : 0.0f;
++    const float top = controller ? 188.0f : std::max(162.0f,
++        440.0f - (rows_height + notes_height) / (2.0f * canvas.scale));
+     const ImVec2 start = canvas.point(side, top);
+     const ImVec2 end = canvas.point(960.0f - side, 744);
+     ImGui::SetCursorScreenPos(start);
+@@ -14473,9 +14560,6 @@
+         } else {
+             if (first) ImGui::SetKeyboardFocusHere();
+             switch (state.options) {
+-                case ArcadeOptionsPage::Video:
+-                    draw_arcade_video_controls(m, th);
+-                    break;
+                 case ArcadeOptionsPage::Audio:
+                     draw_audio_controls(m, th, false);
+                     break;
+@@ -14489,9 +14573,11 @@
+                         state.focus_options = true;
+                     }
+                     break;
+-                case ArcadeOptionsPage::Graphics:
+-                    draw_arcade_graphics_controls(m, th);
++                case ArcadeOptionsPage::Graphics: {
++                    const float width = draw_arcade_graphics_controls(m, th);
++                    draw_arcade_frame_controls(m, th, state, width, canvas.scale);
+                     break;
++                }
+                 case ArcadeOptionsPage::Categories:
+                     break;
+             }
+@@ -14500,6 +14586,22 @@
+                 (ImGui::GetContentRegionAvail().x - back_width) * 0.5f);
+             if (ImGui::Button("VOLVER", ImVec2(back_width, ImGui::GetFrameHeight())))
+                 back();
++            if (graphics) {
++                const char* const notes[] = {
++                    "La NES mantiene su velocidad.",
++                    "120/180 FPS repiten cuadros sin interpolar.",
++                    "VSync está disponible a 60 FPS."
++                };
++                const int count = m->s.arcade_target_fps == 60 ? 2 : IM_ARRAYSIZE(notes);
++                for (int i = 0; i < count; ++i) {
++                    const float avail = ImGui::GetContentRegionAvail().x;
++                    const float width = ImGui::CalcTextSize(notes[i]).x;
++                    ImGui::SetCursorPosX(ImGui::GetCursorPosX() + std::max(0.0f, (avail - width) * 0.5f));
++                    ImGui::PushTextWrapPos(0.0f);
++                    ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(arcade_muted), "%s", notes[i]);
++                    ImGui::PopTextWrapPos();
++                }
++            }
+         }
+         draw_restore_defaults_modal(m);
+     }
+@@ -14522,8 +14624,8 @@
+     const bool title_screen = m->view == LNG_VIEW_DASHBOARD;
+     const bool categories = m->view == LNG_VIEW_SETTINGS && title.options == ArcadeOptionsPage::Categories;
+     const float scale = arcade_canvas_scale(vp);
+-    ImGui::SetNextWindowPos(title_screen ? vp->Pos : arcade_canvas_origin(vp, scale));
+-    ImGui::SetNextWindowSize(title_screen ? vp->Size : ImVec2(arcade_canvas_width * scale, arcade_canvas_height * scale));
++    ImGui::SetNextWindowPos(vp->Pos);
++    ImGui::SetNextWindowSize(vp->Size);
+     ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0, 0));
+     ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, 0.0f);
+     ImGui::PushStyleVar(ImGuiStyleVar_FrameBorderSize, 1.0f);
+@@ -14533,14 +14635,14 @@
+     ImGui::PushStyleColor(ImGuiCol_Button, IM_COL32(24, 20, 13, 255));
+     ImGui::PushStyleColor(ImGuiCol_ButtonHovered, IM_COL32(54, 38, 15, 255));
+     ImGui::PushStyleColor(ImGuiCol_ButtonActive, IM_COL32(76, 50, 17, 255));
+-    ImGui::PushStyleColor(ImGuiCol_Border, title_screen ? IM_COL32(98, 223, 239, 85) : IM_COL32(255, 176, 43, 105));
++    ImGui::PushStyleColor(ImGuiCol_Border, IM_COL32(255, 176, 43, 105));
+     ImGui::PushStyleColor(ImGuiCol_NavCursor, arcade_warm);
+-    if (!title_screen) ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0.0f);
++    ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0.0f);
+     ImGui::Begin("##arcade_screen", nullptr,
+         ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove |
+         ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoSavedSettings |
+         ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse);
+-    if (!title_screen) ImGui::PopStyleVar();
++    ImGui::PopStyleVar();
+     if (title_screen) draw_arcade_title_screen(m, title);
+     else if (categories) draw_arcade_options_categories(m, title);
+     else {
+@@ -14575,6 +14677,13 @@
+     ImGui::End();
+     ImGui::PopStyleColor(7);
+     ImGui::PopStyleVar(4);
++    if (m->s.arcade_frame_mode == 1 && scale > 0.0f) {
++        const ImVec2 size(arcade_canvas_width * scale, arcade_canvas_height * scale);
++        const ImVec2 min = arcade_canvas_origin(vp, scale);
++        const float thickness = 3.0f * size.y / 270.0f;
++        draw_arcade_frame(ImGui::GetForegroundDrawList(), min,
++            ImVec2(min.x + size.x, min.y + size.y), ImVec2(thickness, thickness), m->s.arcade_frame_rgb);
++    }
+ }
+ 
+ void draw_ui(LauncherModel* m, const LauncherTheme& th, int logical_w, int logical_h,
+@@ -15494,6 +15603,23 @@
+             LNG_ImplSDL_ProcessEvent(&ev);
+         } while (SDL_PollEvent(&ev));
+ 
++#if !defined(LNG_SDL3)
++        if (m->arcade_menu_action && !p->should_quit) {
++            const bool fullscreen = (SDL_GetWindowFlags(p->window) & SDL_WINDOW_FULLSCREEN) != 0;
++            const bool requested = m->s.fullscreen != 0;
++            if (requested != fullscreen) {
++                if (requested) {
++                    launcher_platform_refresh_metrics(p);
++                    p->windowed_w = p->logical_w;
++                    p->windowed_h = p->logical_h;
++                }
++                if (SDL_SetWindowFullscreen(p->window, requested ? SDL_WINDOW_FULLSCREEN_DESKTOP : 0) != 0) {
++                    std::fprintf(stderr, "[arcade] No se pudo cambiar el modo de pantalla: %s\n", SDL_GetError());
++                    launcher_model_set_fullscreen(m, fullscreen ? 1 : 0);
++                }
++            }
++        }
++#endif
+         launcher_platform_refresh_metrics(p);
+         /* Also when a never-seen emoji was registered last frame: the atlas
+          * is static, so it is rebuilt once here, before NewFrame. */
+@@ -15621,10 +15747,15 @@
+                     const ImVec2 size(width * scale, height * scale);
+                     const ImVec2 min(vp->Pos.x + std::round((vp->Size.x - size.x) * 0.5f),
+                                      vp->Pos.y + std::round((vp->Size.y - size.y) * 0.5f));
++                    const ImVec2 max(min.x + size.x, min.y + size.y);
+                     ImDrawList* background = ImGui::GetBackgroundDrawList();
+-                    background->AddRectFilled(vp->Pos,
+-                        ImVec2(vp->Pos.x + vp->Size.x, vp->Pos.y + vp->Size.y), IM_COL32_BLACK);
+-                    background->AddImage(tid(attract_texture), min, ImVec2(min.x + size.x, min.y + size.y));
++                    if (m->s.arcade_frame_mode == 1) {
++                        const ImVec2 edge(3 * scale * width / height, 3 * scale);
++                        // Clip the bezel at the window edges, independent of the picture fit.
++                        draw_arcade_frame(background, ImVec2(min.x - edge.x, min.y - edge.y),
++                            ImVec2(max.x + edge.x, max.y + edge.y), edge, m->s.arcade_frame_rgb);
++                    }
++                    background->AddImage(tid(attract_texture), min, max);
+                 }
+             }
+             if (!showing_demo) {
+@@ -15664,7 +15795,8 @@
+ 
+         glViewport(0, 0, p->pixel_w, p->pixel_h);
+         const LngColor bg = th->background;
+-        glClearColor(bg.r, bg.g, bg.b, bg.a);
++        if (m->arcade_menu_action) glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
++        else glClearColor(bg.r, bg.g, bg.b, bg.a);
+         glClear(GL_COLOR_BUFFER_BIT);
+         ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
+         if (launch_commit.job.pending()) {
+diff --git a/src/common/backends/imgui/runtime_ui_imgui.cpp b/src/common/backends/imgui/runtime_ui_imgui.cpp
+--- a/src/common/backends/imgui/runtime_ui_imgui.cpp
++++ b/src/common/backends/imgui/runtime_ui_imgui.cpp
+@@ -3,6 +3,7 @@
+ 
+ #include "recomp_runtime_ui_internal.h"
+ #include "launcher_theme.h"
++#include "arcade_color_disc.h"
+ 
+ #include "imgui.h"
+ 
+@@ -325,32 +326,6 @@
+     }
+ }
+ 
+-void paint_color_disc(ImVec2 center,float radius,float hue,float saturation) {
+-    constexpr float tau=6.28318530718f;
+-    ImDrawList *draw=ImGui::GetWindowDrawList();
+-    const ImVec2 uv=ImGui::GetFontTexUvWhitePixel();
+-    constexpr int segments=120;
+-    draw->PrimReserve(segments*3,segments*3);
+-    for (int i=0;i<segments;++i) {
+-        const float a=float(i)/segments,b=float(i+1)/segments;
+-        float ar,ag,ab,br,bg,bb;
+-        ImGui::ColorConvertHSVtoRGB(a,1,1,ar,ag,ab);
+-        ImGui::ColorConvertHSVtoRGB(b,1,1,br,bg,bb);
+-        const unsigned base=draw->_VtxCurrentIdx;
+-        draw->PrimWriteIdx((ImDrawIdx)base); draw->PrimWriteIdx((ImDrawIdx)(base+1)); draw->PrimWriteIdx((ImDrawIdx)(base+2));
+-        draw->PrimWriteVtx(center,uv,IM_COL32_WHITE);
+-        draw->PrimWriteVtx(ImVec2(center.x+std::cos(a*tau)*radius,center.y+std::sin(a*tau)*radius),uv,
+-            ImGui::ColorConvertFloat4ToU32(ImVec4(ar,ag,ab,1)));
+-        draw->PrimWriteVtx(ImVec2(center.x+std::cos(b*tau)*radius,center.y+std::sin(b*tau)*radius),uv,
+-            ImGui::ColorConvertFloat4ToU32(ImVec4(br,bg,bb,1)));
+-    }
+-    draw->AddCircle(center,radius,IM_COL32(110,125,145,255),segments,1.0f);
+-    const ImVec2 marker(center.x+std::cos(hue*tau)*saturation*radius,
+-                        center.y+std::sin(hue*tau)*saturation*radius);
+-    draw->AddCircle(marker,6,IM_COL32(0,0,0,255),20,3.0f);
+-    draw->AddCircle(marker,5,IM_COL32_WHITE,20,2.0f);
+-}
+-
+ /* A true hue/saturation disc. Radius chooses saturation; brightness has its
+  * own bar, so no small triangle needs to be targeted. */
+ bool color_disc(const char *id,float &hue,float &saturation,float diameter,int &dragging) {
+@@ -500,7 +475,17 @@
+                 ImGui::Dummy(ImVec2(diameter,diameter));
+                 ImGui::TableNextColumn();
+                 center_color_item(diameter);
+-                draw_color_preview(ui,item,diameter-ImGui::GetTextLineHeightWithSpacing(),ui->color_draft);
++                const float preview_size = std::max(1.0f, diameter - ImGui::GetTextLineHeightWithSpacing());
++                if (grouped) draw_color_preview(ui,item,preview_size,ui->color_draft);
++                else {
++                    ImGui::TextUnformatted("Vista previa");
++                    const ImVec2 corner = ImGui::GetCursorScreenPos();
++                    const ImVec2 end(corner.x + preview_size, corner.y + preview_size);
++                    ImDrawList *draw = ImGui::GetWindowDrawList();
++                    draw->AddRectFilled(corner, end, preview_rgb(ui->color_draft[0]));
++                    draw->AddRect(corner, end, IM_COL32_WHITE);
++                    ImGui::Dummy(ImVec2(preview_size, preview_size));
++                }
+                 ImGui::EndTable();
+             }
+             ImGui::Separator();
+@@ -705,15 +690,16 @@
+         draw->AddRectFilled(point(x, y), point(x + w, y + h), color);
+     }
+ 
++    float fit_text(const char *label, float size, float limit) const {
++        const float measured = font->CalcTextSizeA(size * scale, FLT_MAX, 0, label).x;
++        const float max_width = limit * scale;
++        return measured > max_width ? size * max_width / measured : size;
++    }
++
+     float text(const char *label, float x, float y, float size, ImU32 color,
+                float align = 0.5f, float limit = 770.0f) const {
+-        float pixels = size * scale;
+-        ImVec2 bounds = font->CalcTextSizeA(pixels, FLT_MAX, 0, label);
+-        const float max_width = limit * scale;
+-        if (bounds.x > max_width) {
+-            pixels *= max_width / bounds.x;
+-            bounds = font->CalcTextSizeA(pixels, FLT_MAX, 0, label);
+-        }
++        const float pixels = fit_text(label, size, limit) * scale;
++        const ImVec2 bounds = font->CalcTextSizeA(pixels, FLT_MAX, 0, label);
+         const ImVec2 anchor = point(x, y);
+         draw->AddText(font, pixels,
+             ImVec2(std::round(anchor.x - bounds.x * align), std::round(anchor.y - bounds.y * 0.5f)),
+@@ -794,6 +780,9 @@
+             canvas.text(name, 0.0f, 250.0f, 40.0f, pause_white);
+         }
+ 
++        constexpr float menu_size = 64.0f;
++        constexpr float detail_size = 38.0f;
++        constexpr float hint_size = 25.0f;
+         const float pitch = std::max(1.0f, std::round(72.0f * scale));
+         const float first_y = std::round(
+             center.y - (static_cast<float>(visible_count) - 1.0f) * pitch * 0.5f);
+@@ -814,17 +803,29 @@
+             float left;
+             if (item && (item->type == RECOMP_RUNTIME_UI_BOOL ||
+                          item->type == RECOMP_RUNTIME_UI_CHOICE ||
+-                         item->type == RECOMP_RUNTIME_UI_INT)) {
+-                char value[96];
+-                value_text(ui, item, value, sizeof(value));
+-                pause_uppercase(value);
++                         item->type == RECOMP_RUNTIME_UI_INT ||
++                         item->type == RECOMP_RUNTIME_UI_COLOR)) {
+                 char display_value[104];
+-                std::snprintf(display_value, sizeof(display_value), "< %s >", value);
+-                left = canvas.text(name, -350.0f, y, 38.0f, color, 0.0f, 430.0f);
+-                canvas.text(display_value, 350.0f, y, 38.0f,
+-                            enabled ? pause_white : pause_muted, 1.0f, 245.0f);
++                if (item->type == RECOMP_RUNTIME_UI_COLOR) {
++                    int rgb = 0;
++                    if (recomp_runtime_ui_current_value(ui, item, &rgb))
++                        std::snprintf(display_value, sizeof(display_value), "#%06X", static_cast<unsigned>(rgb));
++                    else
++                        std::snprintf(display_value, sizeof(display_value), "-");
++                } else {
++                    char value[96];
++                    value_text(ui, item, value, sizeof(value));
++                    pause_uppercase(value);
++                    std::snprintf(display_value, sizeof(display_value), "< %s >", value);
++                }
++                constexpr float column_width = 320.0f;
++                const float size = std::min(canvas.fit_text(name, detail_size, column_width),
++                                            canvas.fit_text(display_value, detail_size, column_width));
++                left = canvas.text(name, -350.0f, y, size, color, 0.0f, column_width);
++                canvas.text(display_value, 350.0f, y, size,
++                            enabled ? pause_white : pause_muted, 1.0f, column_width);
+             } else {
+-                left = canvas.text(name, 0.0f, y, root ? 64.0f : categories ? 70.0f : 38.0f, color);
++                left = canvas.text(name, 0.0f, y, root || categories ? menu_size : detail_size, color);
+             }
+             if (row == ui->row_index) canvas.cursor(left - 47.0f, y);
+         }
+@@ -833,10 +834,10 @@
+             const char *status = ui->status;
+             if (!std::strcmp(status, "Done")) status = "";
+             else if (!std::strcmp(status, "Saved")) status = "GUARDADO";
+-            canvas.text(status, 0.0f, 896.0f, 25.0f, pause_white);
++            canvas.text(status, 0.0f, 896.0f, hint_size, pause_white);
+             recomp_runtime_ui_advance_status(ui, ImGui::GetIO().DeltaTime * 60.0f);
+         } else if (!root && !categories) {
+-            canvas.text("ENTER / A     |     ESC / B", 0.0f, 894.0f, 24.0f, pause_muted);
++            canvas.text("ENTER / A     |     ESC / B", 0.0f, 896.0f, hint_size, pause_muted);
+         }
+     }
+     ImGui::End();
+diff --git a/src/common/launcher_ng_capi.c b/src/common/launcher_ng_capi.c
+--- a/src/common/launcher_ng_capi.c
++++ b/src/common/launcher_ng_capi.c
+@@ -205,6 +205,9 @@
+         return RECOMP_LAUNCHER_RESULT_UNAVAILABLE;
+     }
+ 
++    plat.windowed_w = window_width;
++    plat.windowed_h = window_height;
++
+     /* Same icon the host's game window carries — see GameInfo.window_icon_path.
+      * Applied before the model is built so the window is never briefly shown
+      * under the placeholder icon. */
+@@ -229,7 +232,12 @@
+ 
+     LngAction act = launcher_backend_run(&plat, &model, &theme);
+ 
+-    launcher_window_size_save(window_size_path, plat.logical_w, plat.logical_h);
++#if !defined(LNG_SDL3)
++    if (game && game->arcade_menu_action && (SDL_GetWindowFlags(plat.window) & SDL_WINDOW_FULLSCREEN))
++        launcher_window_size_save(window_size_path, plat.windowed_w, plat.windowed_h);
++    else
++#endif
++        launcher_window_size_save(window_size_path, plat.logical_w, plat.logical_h);
+     launcher_platform_close(&plat);
+     launcher_boot_timing_mark("rui:platform_closed");
+ 
+diff --git a/src/common/launcher_platform.h b/src/common/launcher_platform.h
+--- a/src/common/launcher_platform.h
++++ b/src/common/launcher_platform.h
+@@ -34,6 +34,7 @@
+ 
+     // Logical (DPI-independent) UI size — what layout & hit-testing use.
+     int   logical_w, logical_h;
++    int   windowed_w, windowed_h; // retained arcade window geometry
+     // Physical framebuffer size in pixels — what glViewport uses.
+     int   pixel_w, pixel_h;
+     // Content scale from SDL (1.0, 1.25, 1.5, 1.75, 2.0, ...). Backends multiply
+diff --git a/src/recomp_launcher.h b/src/recomp_launcher.h
+--- a/src/recomp_launcher.h
++++ b/src/recomp_launcher.h
+@@ -1579,6 +1579,9 @@
+     /* ARCADE_MUSIC_V080: optional project-owned PCM overlay. */
+     int  arcade_music_enabled;
+     int  arcade_music_volume;
++    /* Bezel used for the space outside the game picture. */
++    int  arcade_frame_mode;     /* 0 off, 1 classic */
++    uint32_t arcade_frame_rgb;  /* RGB24 */
+ };
+ #define RECOMP_LAUNCHER_HAS_ZAPPER_SETTINGS 1
+ 
+@@ -2421,8 +2424,9 @@
+                         char* out, size_t out_size);
+     void*              rom_describe_ctx;
+     int                has_arcade_settings;
+-    /* Optional integrated arcade menu. -1 selects a ROM, 0..3 start a mode.
+-     * Positive return means ready, zero means missing/cancelled, negative error. */
++    /* Optional integrated arcade menu. -1 loads the local ROM, 0..3 start a mode.
++     * Positive means ready, 0 missing, -1 general error. For a local ROM load,
++     * -2 means incompatible and -3 means preparation was cancelled. */
+     int                (*arcade_menu_action)(int action);
+     int                arcade_rom_ready;
+     /* Optional local attract mode; non-null frame is 256 × 240 ARGB8888. */
+diff --git a/src/common/backends/imgui/arcade_color_disc.h b/src/common/backends/imgui/arcade_color_disc.h
+new file mode 100644
+--- /dev/null
++++ b/src/common/backends/imgui/arcade_color_disc.h
+@@ -0,0 +1,30 @@
++#pragma once
++
++#include "imgui.h"
++#include <cmath>
++
++inline void paint_color_disc(ImVec2 center,float radius,float hue,float saturation) {
++    constexpr float tau=6.28318530718f;
++    ImDrawList *draw=ImGui::GetWindowDrawList();
++    const ImVec2 uv=ImGui::GetFontTexUvWhitePixel();
++    constexpr int segments=120;
++    draw->PrimReserve(segments*3,segments*3);
++    for (int i=0;i<segments;++i) {
++        const float a=float(i)/segments,b=float(i+1)/segments;
++        float ar,ag,ab,br,bg,bb;
++        ImGui::ColorConvertHSVtoRGB(a,1,1,ar,ag,ab);
++        ImGui::ColorConvertHSVtoRGB(b,1,1,br,bg,bb);
++        const unsigned base=draw->_VtxCurrentIdx;
++        draw->PrimWriteIdx((ImDrawIdx)base); draw->PrimWriteIdx((ImDrawIdx)(base+1)); draw->PrimWriteIdx((ImDrawIdx)(base+2));
++        draw->PrimWriteVtx(center,uv,IM_COL32_WHITE);
++        draw->PrimWriteVtx(ImVec2(center.x+std::cos(a*tau)*radius,center.y+std::sin(a*tau)*radius),uv,
++            ImGui::ColorConvertFloat4ToU32(ImVec4(ar,ag,ab,1)));
++        draw->PrimWriteVtx(ImVec2(center.x+std::cos(b*tau)*radius,center.y+std::sin(b*tau)*radius),uv,
++            ImGui::ColorConvertFloat4ToU32(ImVec4(br,bg,bb,1)));
++    }
++    draw->AddCircle(center,radius,IM_COL32(110,125,145,255),segments,1.0f);
++    const ImVec2 marker(center.x+std::cos(hue*tau)*saturation*radius,
++                        center.y+std::sin(hue*tau)*saturation*radius);
++    draw->AddCircle(marker,6,IM_COL32(0,0,0,255),20,3.0f);
++    draw->AddCircle(marker,5,IM_COL32_WHITE,20,2.0f);
++}

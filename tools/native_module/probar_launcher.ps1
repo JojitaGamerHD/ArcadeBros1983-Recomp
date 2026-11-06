@@ -99,7 +99,7 @@ Write-Host '1/6 Compilando el motor generico con menu integrado, sin generar cod
     'ArcadePrepare','NESRecomp','--parallel','1') 'compilar-herramientas')
 
 Write-Host '2/6 Preparando el portable generico y verificando sus dependencias...'
-New-Item -ItemType Directory -Path $portable | Out-Null
+New-Item -ItemType Directory -Path $portable,(Join-Path $portable 'rom') | Out-Null
 Copy-Item -LiteralPath $kitAnterior -Destination $kit -Recurse
 $juego=Join-Path $kit 'ArcadeNativeHost.exe'
 foreach ($nombre in @('ArcadeNativeHost.exe','ArcadeNativeHost.lib','ArcadePrepare.exe','NESRecomp.exe','SDL2.dll')) {

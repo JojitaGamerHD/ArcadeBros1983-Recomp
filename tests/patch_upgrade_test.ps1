@@ -3,7 +3,7 @@ param([Parameter(Mandatory=$true)][string]$Root,
 $ErrorActionPreference = 'Stop'
 $ast = [Management.Automation.Language.Parser]::ParseFile(
     (Join-Path $Root 'tools/preparar_dependencias.ps1'), [ref]$null, [ref]$null)
-foreach ($name in @('Verificar-Comando', 'Probar-ParcheAplicado', 'Aplicar-Parche')) {
+foreach ($name in @('Verificar-Comando', 'Probar-ParcheAplicado', 'Aplicar-Parche', 'Aplicar-ParchesMenu')) {
     $node = $ast.Find({ param($n)
         $n -is [Management.Automation.Language.FunctionDefinitionAst] -and $n.Name -eq $name
     }, $true)
@@ -37,12 +37,25 @@ foreach ($case in @(
     Aplicar-Parche $fixture $current $case[0] $previous
     git -C $fixture apply --reverse $current
     Verificar-Comando 'Fallo la aplicacion limpia o la idempotencia.'
-    Aplicar-Parche $fixture $current $case[0]
     $menu = Join-Path $patchRoot 'arcade-v1.0.2-menu.patch'
-    Aplicar-Parche $fixture $menu $case[0]
-    Aplicar-Parche $fixture $menu $case[0]
+    $ajustes = Join-Path $patchRoot 'arcade-v1.0.2-ajustes.patch'
+    Aplicar-ParchesMenu $fixture $current $menu $ajustes $case[0] $previous
+    Aplicar-ParchesMenu $fixture $current $menu $ajustes $case[0] $previous
+    git -C $fixture apply --reverse $ajustes
+    Verificar-Comando 'Fallo la aplicacion limpia o la idempotencia de los ajustes.'
     git -C $fixture apply --reverse $menu
-    Verificar-Comando 'Fallo la aplicacion o la idempotencia del menu integrado.'
+    Verificar-Comando 'Los ajustes alteraron la capa del menu publicado.'
+    git -C $fixture apply --reverse $current
+    Verificar-Comando 'El parche del menu altero la base de v1.0.1.'
+
+    # Reproduce an existing developer checkout of the published menu.
+    Aplicar-Parche $fixture $current $case[0]
+    Aplicar-Parche $fixture $menu $case[0]
+    Aplicar-ParchesMenu $fixture $current $menu $ajustes $case[0] $previous
+    git -C $fixture apply --reverse $ajustes
+    Verificar-Comando 'No se pudieron actualizar los ajustes sobre el menu publicado.'
+    git -C $fixture apply --reverse $menu
+    Verificar-Comando 'No se pudo restablecer el menu publicado.'
     git -C $fixture apply --reverse $current
     Verificar-Comando 'El parche del menu altero la base de v1.0.1.'
     foreach ($old in $previous) {
@@ -55,5 +68,5 @@ foreach ($case in @(
         Verificar-Comando 'No se pudo restablecer la copia de prueba.'
     }
     if ([IO.File]::ReadAllText($sentinel) -ne 'conservar') { throw 'Se altero un archivo ajeno al parche.' }
-    Write-Output ("PASS $($case[0]): limpio, idempotente y migracion desde $($previous.Count) parches anteriores.")
+    Write-Output ("PASS $($case[0]): limpio, idempotente y actualizacion desde el menu publicado y $($previous.Count) bases anteriores.")
 }

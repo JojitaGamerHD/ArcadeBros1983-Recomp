@@ -9,7 +9,7 @@
 
 El menú principal se abre con
 `Bin/ArcadeNativeHost.exe` antes de importar la ROM. El menú reúne los
-cuatro modos de juego, Opciones, Seleccionar ROM y Salir. La partida y la
+cuatro modos de juego, Opciones, Cargar ROM y Salir. La partida y la
 pausa se muestran en esa misma ventana.
 
 El repositorio contiene fuentes, scripts y parches. El ZIP contiene el motor
@@ -27,9 +27,10 @@ ArcadeBros1983-Recomp-v1.0.2-Windows-x64.zip
 ```
 
 1. Extrae el ZIP completo en una carpeta con permiso de escritura.
-2. Abre `Bin/ArcadeNativeHost.exe` y selecciona tu ROM de Mario Bros. (NES).
-3. Espera a que termine la preparación y elige jugadores y modo.
-4. En las siguientes aperturas se reutiliza el módulo preparado.
+2. Guarda tu ROM compatible de Mario Bros. (NES) como `rom/game.nes` en la
+   carpeta extraída.
+3. Abre `Bin/ArcadeNativeHost.exe` y elige **Cargar ROM**.
+4. Cuando termine la preparación, elige jugadores y modo.
 
 Requisitos del paquete: **Windows 10 versión 1903 o posterior, o Windows 11,
 x64**, componentes multimedia de Windows y un controlador gráfico compatible
@@ -42,8 +43,9 @@ La revisión de ROM admitida se identifica por su SHA256 completo:
 a2a0aa437a735cd36ed29a8e7c5b3dfa10590c6203e893f1668c7995bad2b309
 ```
 
-Puedes elegir cualquier nombre de archivo para esa ROM. El selector verifica
-su contenido. El proyecto no proporciona archivos ni enlaces de descarga de ROMs.
+Al cargar la ROM se verifica su contenido. En aperturas posteriores se puede
+reutilizar el módulo preparado. El proyecto no proporciona archivos ni enlaces
+de descarga de ROMs.
 
 La release incluye un archivo `.zip.sha256` y el paquete lleva
 `MANIFIESTO-SHA256.txt`, con las huellas de sus archivos originales.
@@ -55,8 +57,8 @@ La release incluye un archivo `.zip.sha256` y el paquete lleva
 - Fanfarria y demostración originales desde la ROM local. Al terminar la partida se vuelve al menú integrado.
 - Ajustes, controles personalizados, rueda de colores, ocho presets y récords persistentes.
 
-Para actualizar, extrae el ZIP en una carpeta nueva y copia `Datos` de tu
-instalación anterior con el programa cerrado.
+Para actualizar, cierra el programa, extrae el ZIP en una carpeta nueva y
+copia `Datos` y tu archivo `rom/game.nes` de la instalación anterior.
 
 ## Cambios de v1.0.1
 
@@ -102,7 +104,11 @@ launcher, donde se ha comprobado el uso de un mando Xbox en el entorno de
 desarrollo. **Esc** abre la pausa y **F11** cambia la pantalla completa con
 los atajos predeterminados.
 
-Pantalla, Gráficos y Audio comparten sus ajustes entre el menú de inicio y la pausa.
+Gráficos y Audio comparten sus ajustes entre el menú de inicio y la pausa.
+En **Gráficos → Marco** puedes activar el marco clásico y elegir su color
+con la rueda. El marco viene desactivado y sigue la proporción 16:15 de
+la imagen original de 256 × 240 píxeles. Se dibuja en el espacio
+disponible alrededor de la imagen, conservando su tamaño.
 El menú de pausa permanece fijo; la ventana del juego se puede redimensionar.
 Los cambios de FPS, filtro o volumen conservan su tamaño.
 
@@ -146,6 +152,7 @@ original de la release; los archivos añadidos para jugar quedan en tu copia loc
 ArcadeBros1983Recomp/
 ├── Bin/                         motor, herramientas, recursos y avisos
 │   └── ArcadeNativeHost.exe     ejecutable del juego
+├── rom/                         carpeta donde el jugador añade game.nes
 └── Datos/                       creado al usar el programa
     ├── Cache/                   ROM, código generado y módulo privados
     ├── ROM/                     copia de ROM para futuras versiones

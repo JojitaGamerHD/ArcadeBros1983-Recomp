@@ -1,0 +1,231 @@
+diff --git a/runner/cyc/cyc_sdl.c b/runner/cyc/cyc_sdl.c
+--- a/runner/cyc/cyc_sdl.c
++++ b/runner/cyc/cyc_sdl.c
+@@ -1265,6 +1265,41 @@
+         235, 235, 235
+     );
+ }
++#ifdef ARCADE_NATIVE_MENU
++static void draw_picture_frame(void)
++{
++    float scale_x, scale_y;
++    SDL_RenderGetScale(s_ren, &scale_x, &scale_y);
++    /* SDL stores the viewport in output pixels but its getter divides by
++     * the current logical scale. Read and restore it at unit scale so a
++     * fractional fit cannot shift the original picture on subsequent draws. */
++    SDL_RenderSetScale(s_ren, 1.0f, 1.0f);
++    SDL_Rect viewport;
++    SDL_RenderGetViewport(s_ren, &viewport);
++    SDL_RenderSetViewport(s_ren, NULL);
++
++    const int edge_x = SDL_max(1, (int)(3.2f * scale_x + 0.5f));
++    const int edge_y = SDL_max(1, (int)(3.0f * scale_y + 0.5f));
++    const int left = viewport.x - edge_x;
++    const int right = viewport.x + viewport.w;
++    const int top = viewport.y - edge_y;
++    const int bottom = viewport.y + viewport.h;
++    const int width = viewport.w + 2 * edge_x;
++    const SDL_Rect strips[] = {
++        { left, top, width, edge_y },
++        { left, bottom, width, edge_y },
++        { left, viewport.y, edge_x, viewport.h },
++        { right, viewport.y, edge_x, viewport.h }
++    };
++    const uint32_t rgb = s_set.frame_rgb;
++    SDL_SetRenderDrawColor(s_ren, (Uint8)(rgb >> 16), (Uint8)(rgb >> 8), (Uint8)rgb, 255);
++    /* The full output viewport clips edges with no letterbox space. */
++    SDL_RenderFillRects(s_ren, strips, (int)SDL_arraysize(strips));
++    SDL_RenderSetViewport(s_ren, &viewport);
++    SDL_RenderSetScale(s_ren, scale_x, scale_y);
++}
++#endif
++
+ static void show(bool loading, const char *toast_title, const char *toast_body)
+ {
+     int w, h;
+@@ -1290,7 +1325,10 @@
+     SDL_UpdateTexture(s_tex, NULL, pic, w * 4);
+     SDL_SetRenderDrawColor(s_ren, 0, 0, 0, 255);
+     SDL_RenderClear(s_ren);
+-    SDL_Rect dst = { 0, 0, picture_w(), picture_h() };
++#ifdef ARCADE_NATIVE_MENU
++    if (arcade_menu_active() && s_set.frame_mode == 1) draw_picture_frame();
++#endif
++    const SDL_Rect dst = { 0, 0, picture_w(), picture_h() };
+     SDL_RenderCopy(s_ren, s_tex, NULL, &dst);
+     CycZapperState gun;
+     cyc_zapper_state(&gun);
+diff --git a/runner/cyc/cyc_ui_launcher.c b/runner/cyc/cyc_ui_launcher.c
+--- a/runner/cyc/cyc_ui_launcher.c
++++ b/runner/cyc/cyc_ui_launcher.c
+@@ -65,6 +65,8 @@
+     io->linear_filter = s->linear_filter;
+     /* ARCADE_OPTIONS_V070: shared with the in-game settings. */
+     io->arcade_show_fps = s->show_fps;
++    io->arcade_frame_mode = s->frame_mode;
++    io->arcade_frame_rgb = s->frame_rgb;
+     io->arcade_target_fps = s->fps_target;
+     io->arcade_music_enabled = s->music_enabled;
+     io->arcade_music_volume = s->music_volume;
+@@ -106,6 +108,10 @@
+     s->integer_scale = io->integer_scale != 0;
+     s->linear_filter = io->linear_filter != 0;
+     s->show_fps = io->arcade_show_fps != 0;
++    if (io->arcade_frame_mode == 0 || io->arcade_frame_mode == 1)
++        s->frame_mode = io->arcade_frame_mode;
++    if (io->arcade_frame_rgb <= UINT32_C(0xFFFFFF))
++        s->frame_rgb = io->arcade_frame_rgb;
+     s->music_enabled = io->arcade_music_enabled != 0;
+     s->music_volume = io->arcade_music_volume < 0 ? 0 : io->arcade_music_volume > 100 ? 100 : io->arcade_music_volume;
+     const int target = io->arcade_target_fps;
+diff --git a/runner/cyc/cyc_ui_menu.c b/runner/cyc/cyc_ui_menu.c
+--- a/runner/cyc/cyc_ui_menu.c
++++ b/runner/cyc/cyc_ui_menu.c
+@@ -291,6 +291,7 @@
+ static void arcade_pause_options(const CycHostExtras *extras)
+ {
+     static const char *const fullscreen[] = { "Ventana", "Pantalla completa" };
++    static const char *const frames[] = { "Desactivado", "Clásico" };
+     static const char *const devices[] = { "Desactivado", "Teclado", "Mando" };
+     static const char *const player_pages[] = {
+         "Pausa/Opciones/Controles/Jugador 1", "Pausa/Opciones/Controles/Jugador 2"
+@@ -298,7 +299,6 @@
+     static const char *const view_labels[] = { "Nativo", "16:9 fijo", "Adaptativo" };
+     static const char *view_choices[3];
+     static int view_values[3];
+-    const char *video = "Pausa/Opciones/Vídeo";
+     const char *audio = "Pausa/Opciones/Audio";
+     const char *graphics = "Pausa/Opciones/Gráficos";
+     const char *colors = "Pausa/Opciones/Colores";
+@@ -310,10 +310,6 @@
+ 
+     add(RECOMP_RUNTIME_UI_KEY_RESUME, "Pausa", "Reanudar", NULL,
+         RECOMP_RUNTIME_UI_ACTION, 0, 0, 0, NULL, 0, NULL);
+-    add(RECOMP_RUNTIME_UI_KEY_FULLSCREEN, video, "Modo de pantalla", NULL,
+-        RECOMP_RUNTIME_UI_CHOICE, 0, 1, 1, fullscreen, 2, NULL);
+-    arcade_pause_back(video);
+-
+     add(RECOMP_RUNTIME_UI_KEY_AUDIO, audio, "Audio del juego", NULL,
+         RECOMP_RUNTIME_UI_BOOL, 0, 1, 1, NULL, 0, NULL);
+     add(RECOMP_RUNTIME_UI_KEY_VOLUME, audio, "Volumen", NULL,
+@@ -330,6 +326,8 @@
+     }
+     arcade_pause_back("Pausa/Opciones/Controles");
+ 
++    add(RECOMP_RUNTIME_UI_KEY_FULLSCREEN, graphics, "Modo de pantalla", NULL,
++        RECOMP_RUNTIME_UI_CHOICE, 0, 1, 1, fullscreen, 2, NULL);
+     add(RECOMP_RUNTIME_UI_KEY_INTEGER_SCALE, graphics, "Escalado entero", NULL,
+         RECOMP_RUNTIME_UI_BOOL, 0, 1, 1, NULL, 0, NULL);
+     if (extras && extras->view_modes && extras->set_view_mode) {
+@@ -344,6 +342,10 @@
+             RECOMP_RUNTIME_UI_CHOICE, 0, 2, 1, view_choices, count, view_values);
+     }
+     arcade_pause_append(extras_items, extras_count, NULL, graphics);
++    add("cyc.arcade.frame_mode", graphics, "Marco", NULL,
++        RECOMP_RUNTIME_UI_CHOICE, 0, 1, 1, frames, 2, NULL);
++    add("cyc.arcade.frame_rgb", graphics, "Color del marco", NULL,
++        RECOMP_RUNTIME_UI_COLOR, 0, 0xffffff, 1, NULL, 0, NULL);
+     arcade_pause_back(graphics);
+ 
+     arcade_pause_append(extras_items, extras_count, "Colores", colors);
+@@ -406,6 +408,10 @@
+     else if (is_key(it, RECOMP_RUNTIME_UI_KEY_WINDOW_SCALE)) *out = s->window_scale;
+     else if (is_key(it, RECOMP_RUNTIME_UI_KEY_INTEGER_SCALE)) *out = s->integer_scale;
+     else if (is_key(it, RECOMP_RUNTIME_UI_KEY_LINEAR_FILTER)) *out = s->linear_filter;
++#ifdef ARCADE_NATIVE_MENU
++    else if (is_key(it, "cyc.arcade.frame_mode")) *out = s->frame_mode;
++    else if (is_key(it, "cyc.arcade.frame_rgb")) *out = (int)s->frame_rgb;
++#endif
+     else if (is_key(it, "cyc.arcade.show_fps")) *out = s->show_fps;
+     else if (is_key(it, "cyc.arcade.target_fps")) *out = s->fps_target;
+     else if (is_key(it, "cyc.arcade.vsync")) *out = s->vsync;
+@@ -449,6 +455,13 @@
+     else if (is_key(it, RECOMP_RUNTIME_UI_KEY_WINDOW_SCALE)) s->window_scale = v < 1 ? 1 : v > 8 ? 8 : v;
+     else if (is_key(it, RECOMP_RUNTIME_UI_KEY_INTEGER_SCALE)) s->integer_scale = v != 0;
+     else if (is_key(it, RECOMP_RUNTIME_UI_KEY_LINEAR_FILTER)) s->linear_filter = v != 0;
++#ifdef ARCADE_NATIVE_MENU
++    else if (is_key(it, "cyc.arcade.frame_mode")) s->frame_mode = v != 0;
++    else if (is_key(it, "cyc.arcade.frame_rgb")) {
++        if (v < 0 || v > 0xffffff) return 0;
++        s->frame_rgb = (uint32_t)v;
++    }
++#endif
+     else if (is_key(it, "cyc.arcade.show_fps")) s->show_fps = v != 0;
+     else if (is_key(it, "cyc.arcade.vsync")) s->vsync = v != 0;
+     else if (is_key(it, "cyc.arcade.target_fps")) {
+diff --git a/runner/cyc/cyc_settings.c b/runner/cyc/cyc_settings.c
+--- a/runner/cyc/cyc_settings.c
++++ b/runner/cyc/cyc_settings.c
+@@ -20,6 +20,7 @@
+     s->integer_scale = 1;
+     s->linear_filter = 0;
+     s->show_fps = 0;
++    s->frame_rgb = CYC_DEFAULT_FRAME_RGB;
+     s->fps_target = 60;
+     s->vsync = 0;
+     s->audio_enabled = 1;
+@@ -75,6 +76,16 @@
+     long x = strtol(v, &end, 10);
+     if (end == v || *trim(end)) return false;
+     *out = (int)x;
++    return true;
++}
++
++static bool parse_rgb24(const char *v, uint32_t *out)
++{
++    if (*v == '#') ++v;
++    if (strlen(v) != 6) return false;
++    for (int i = 0; i < 6; ++i)
++        if (!isxdigit((unsigned char)v[i])) return false;
++    *out = (uint32_t)strtoul(v, NULL, 16);
+     return true;
+ }
+ 
+@@ -130,6 +141,12 @@
+             else if (eq_ci(key, "LinearFilter")) bad = !parse_int(val, &v) || (s->linear_filter = v != 0, 0);
+             else if (eq_ci(key, "VSync")) bad = !parse_int(val, &v) || (s->vsync = v != 0, 0);
+             else if (eq_ci(key, "ShowFPS")) bad = !parse_int(val, &v) || (s->show_fps = v != 0, 0);
++            else if (eq_ci(key, "FrameMode")) {
++                if ((val[0] == '0' || val[0] == '1') && !val[1])
++                    s->frame_mode = val[0] - '0';
++                else bad = true;
++            }
++            else if (eq_ci(key, "FrameColor")) bad = !parse_rgb24(val, &s->frame_rgb);
+             else if (eq_ci(key, "TargetFPS")) {
+                 bad = !parse_int(val, &v);
+                 if (!bad) {
+@@ -226,6 +243,8 @@
+             s->window_scale, s->fullscreen, s->integer_scale, s->linear_filter, s->vsync);
+     fprintf(f,"HdPackEnabled = %d\nHdPackDir = %s\n",s->hdpack_enabled,s->hdpack_dir);
+     fprintf(f, "ShowFPS = %d\n", s->show_fps);
++    fprintf(f, "FrameMode = %d\nFrameColor = #%06X\n", s->frame_mode,
++            (unsigned)s->frame_rgb);
+     fprintf(f, "TargetFPS = %d\n", s->fps_target);
+     fprintf(f, "[Audio]\nEnabled = %d\nVolume = %d\n", s->audio_enabled, s->volume);
+     fprintf(f, "MusicEnabled = %d\nMusicVolume = %d\n", s->music_enabled, s->music_volume);
+diff --git a/runner/cyc/cyc_settings.h b/runner/cyc/cyc_settings.h
+--- a/runner/cyc/cyc_settings.h
++++ b/runner/cyc/cyc_settings.h
+@@ -25,10 +25,13 @@
+ #include "cyc_input.h"
+ #include "../../common/nes_fds_hle.h"
+ #include <stdbool.h>
++#include <stdint.h>
+ #include <stdio.h>
+ #ifdef __cplusplus
+ extern "C" {
+ #endif
++
++#define CYC_DEFAULT_FRAME_RGB UINT32_C(0xFFB02B)
+ 
+ typedef struct CycSettings {
+     int  window_scale;      /* 1..8 */
+@@ -36,6 +39,8 @@
+     int  integer_scale;     /* bool */
+     int  linear_filter;     /* bool */
+     int  show_fps;          /* bool */
++    int  frame_mode;        /* 0 off, 1 classic */
++    uint32_t frame_rgb;     /* RGB24 */
+     int  fps_target;        /* 60, 120, 180 */
+     int  vsync;             /* bool: sync presents to the display refresh */
+     int  audio_enabled;     /* bool */

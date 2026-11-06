@@ -10,8 +10,8 @@ se puede indicar su directorio con `-Compilador`.
 
 El resultado contiene ZIP, SHA256, manifiesto de archivos y una copia extraida
 limpia. El script comprueba la lista de archivos permitidos y todos los hashes
-dentro del ZIP y después de extraerlo. Ejecuta `Bin/ArcadeNativeHost.exe` de la
-copia extraída para probar el menú.
+dentro del ZIP y después de extraerlo. La carpeta `rom` se entrega vacía.
+Ejecuta `Bin/ArcadeNativeHost.exe` de la copia extraída para probar el menú.
 
 Las siguientes secciones conservan las pruebas progresivas que validan la
 separacion del motor, la importacion y la interfaz.
@@ -49,10 +49,12 @@ música opcional y suavizado experimental. Genera una carpeta
 `build/l102-.../portable` para pruebas locales.
 
 `Bin/ArcadeNativeHost.exe` abre el menú principal sin ROM y conserva la misma
-ventana al comenzar una partida o al volver desde la pausa. Seleccionar ROM
-muestra el progreso de la preparación y permite cancelar el importador. En
-aperturas posteriores se reutiliza el módulo si el kit, la DLL y la ROM
-coinciden con el recibo local. `Bin/kit-id.txt` identifica la versión del kit.
+ventana al comenzar una partida o al volver desde la pausa. Coloca tu ROM
+compatible en `rom/game.nes`, junto a la carpeta `Bin` del portable, y elige
+**Cargar ROM**. El menú indica si falta el archivo. La preparación muestra el
+progreso y permite cancelar el importador. En aperturas posteriores se
+reutiliza el módulo si el kit, la DLL y la ROM coinciden con el recibo local.
+`Bin/kit-id.txt` identifica la versión del kit.
 
 `Bin` contiene el motor y las herramientas genericas. `Datos/Cache` contiene
 la ROM y la DLL privadas; `Datos/config.ini` y `Datos/Records` guardan ajustes

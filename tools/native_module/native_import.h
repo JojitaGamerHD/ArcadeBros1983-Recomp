@@ -6,6 +6,8 @@ extern "C" {
 #endif
 
 typedef enum {
+    ARCADE_IMPORT_CANCELLED = -3,
+    ARCADE_IMPORT_INVALID = -2,
     ARCADE_IMPORT_ERROR = -1,
     ARCADE_IMPORT_MISSING = 0,
     ARCADE_IMPORT_READY = 1
@@ -22,7 +24,7 @@ typedef struct {
  * lookup also returns the settings and data paths when there is no ROM. */
 ArcadeImportStatus arcade_import_cached(ArcadeImportPaths *paths);
 ArcadeImportStatus arcade_import_restore(void *owner, ArcadeImportPaths *paths);
-ArcadeImportStatus arcade_import_select(void *owner, ArcadeImportPaths *paths);
+ArcadeImportStatus arcade_import_load(void *owner, ArcadeImportPaths *paths);
 
 /* Returns -1 on normal startup, or the exit code for --prepare-only. */
 int arcade_import_prepare_only(void);

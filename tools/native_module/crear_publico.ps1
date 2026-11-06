@@ -36,6 +36,7 @@ $sdk=Join-Path $build 'sdk'
 $nombre='ArcadeBros1983-Recomp-v'+$Version+'-Windows-x64'
 $stage=Join-Path (Join-Path $build 'stage') $nombre
 $kit=Join-Path $stage 'Bin'
+$romRelativo='rom'
 $system32=Join-Path $env:SystemRoot 'System32'
 $utf8=[Text.UTF8Encoding]::new($false)
 
@@ -144,7 +145,7 @@ Write-Host '2/6 Compilando los ejecutables genericos, sin consultar una ROM...'
 if (@(Get-ChildItem -LiteralPath $sdk -File -Recurse | Where-Object {$_.Extension -cne '.h'}).Count) { throw 'El SDK generico contiene archivos distintos de headers.' }
 
 Write-Host '3/6 Montando una carpeta nueva con herramientas, assets y avisos...'
-New-Item -ItemType Directory -Path $kit,(Join-Path $kit 'compiler/bin'),(Join-Path $kit 'compiler/lib/clang') | Out-Null
+New-Item -ItemType Directory -Path $kit,(Join-Path $kit 'compiler/bin'),(Join-Path $kit 'compiler/lib/clang'),(Join-Path $stage $romRelativo) | Out-Null
 foreach ($f in @('ArcadeNativeHost.exe','ArcadeNativeHost.lib','ArcadePrepare.exe','NESRecomp.exe','SDL2.dll')) {
     Copy-Item -LiteralPath (Join-Path $dev ('Release/'+$f)) -Destination (Join-Path $kit $f)
 }
@@ -185,6 +186,8 @@ $zip=Join-Path $build ($nombre+'.zip')
 [IO.Compression.ZipFile]::CreateFromDirectory($stage,$zip,[IO.Compression.CompressionLevel]::Optimal,$true)
 $dirs=New-Object 'Collections.Generic.HashSet[string]' ([StringComparer]::Ordinal)
 [void]$dirs.Add($nombre)
+$entradaRom=$nombre+'/'+$romRelativo
+[void]$dirs.Add($entradaRom)
 foreach ($rel in $esperados.Keys) {
     $parent=$nombre+'/'+$rel
     while ($parent.Contains('/')) { $parent=$parent.Substring(0,$parent.LastIndexOf('/')); [void]$dirs.Add($parent) }
@@ -215,6 +218,7 @@ try {
         [void]$vistosArchivos.Add($rel)
     }
     if ($vistosArchivos.Count -ne $esperados.Count) { throw 'El ZIP no contiene todos los archivos del manifiesto.' }
+    if (!$vistos.Contains($entradaRom)) { throw 'El ZIP no contiene la carpeta rom.' }
 } finally { $archivoZip.Dispose() }
 $zipSha=(Get-FileHash -LiteralPath $zip -Algorithm SHA256).Hash.ToLowerInvariant()
 [IO.File]::WriteAllText(($zip+'.sha256'),$zipSha+'  '+[IO.Path]::GetFileName($zip)+"`n",$utf8)
@@ -230,6 +234,9 @@ foreach ($f in $extraidos) {
     if (!$esperados.ContainsKey($f.Path) -or $f.SHA256 -cne $esperados[$f.Path].SHA256 -or $f.Bytes -ne $esperados[$f.Path].Bytes) { throw ('Archivo extraido distinto: '+$f.Path) }
 }
 if (Test-Path -LiteralPath (Join-Path $copia 'Datos')) { throw 'La extraccion publica contiene Datos.' }
+$romExtraida=Join-Path $copia $romRelativo
+if (!(Test-Path -LiteralPath $romExtraida -PathType Container) -or
+    @(Get-ChildItem -LiteralPath $romExtraida -Force).Count) { throw 'La carpeta rom extraida debe existir y estar vacia.' }
 
 Write-Host '6/6 Guardando el resultado de la candidata publica...'
 $resumen=[ordered]@{Zip=$zip;Sha256=$zipSha;CarpetaPrueba=$copia;Juego=(Join-Path $copia 'Bin/ArcadeNativeHost.exe');

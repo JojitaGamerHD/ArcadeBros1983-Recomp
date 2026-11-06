@@ -3,7 +3,6 @@
 #define WIN32_LEAN_AND_MEAN
 #define NOMINMAX
 #include <windows.h>
-#include <commdlg.h>
 #include <commctrl.h>
 #include <shellapi.h>
 #include <objbase.h>
@@ -244,22 +243,6 @@ std::optional<fs::path> reusable_cache(const fs::path& cache_root, const std::st
         if (!hex64(recorded_hash) || sha256(cache / L"ArcadeLocalModule.dll") != recorded_hash) return {};
         return cache;
     } catch (...) { return {}; }
-}
-
-fs::path pick_rom(HWND owner) {
-    std::vector<wchar_t> path(32768, L'\0');
-    OPENFILENAMEW dialog{};
-    dialog.lStructSize = sizeof(dialog);
-    dialog.hwndOwner = owner;
-    dialog.lpstrFile = path.data();
-    dialog.nMaxFile = static_cast<DWORD>(path.size());
-    dialog.lpstrFilter = L"ROM de NES (*.nes)\0*.nes\0Todos los archivos (*.*)\0*.*\0\0";
-    dialog.lpstrTitle = L"Selecciona tu ROM de Mario Bros. (1983)";
-    dialog.Flags = OFN_FILEMUSTEXIST | OFN_PATHMUSTEXIST | OFN_NOCHANGEDIR;
-    if (GetOpenFileNameW(&dialog)) return fs::path(path.data());
-    DWORD code = CommDlgExtendedError();
-    if (code) throw Failure{1, L"No se pudo abrir el selector de ROM." + windows_error(code), {}};
-    throw Cancelled{};
 }
 
 class Progress {
@@ -527,9 +510,9 @@ Prepared prepare(HWND owner, bool headless, const fs::path& rom, const fs::path&
     return {cache, false};
 }
 
-fs::path data_directory(const fs::path& kit) {
+fs::path package_directory(const fs::path& kit) {
     const bool packaged = CompareStringOrdinal(kit.filename().c_str(), -1, L"Bin", -1, TRUE) == CSTR_EQUAL;
-    return (packaged ? kit.parent_path() : kit) / L"Datos";
+    return packaged ? kit.parent_path() : kit;
 }
 
 void set_paths(ArcadeImportPaths& paths, const fs::path& data, const fs::path& cache = {}) {
@@ -551,16 +534,17 @@ std::wstring failure_message(const Failure& failure) {
     return message;
 }
 
-enum class ImportAction { Lookup, Restore, Select };
+enum class ImportAction { Lookup, Restore, Load };
 
 ArcadeImportStatus import_paths(HWND owner, ArcadeImportPaths& paths, ImportAction action) {
     paths = {};
     try {
         const fs::path kit = executable_directory();
-        const fs::path data = data_directory(kit);
+        const fs::path package = package_directory(kit);
+        const fs::path data = package / L"Datos";
         set_paths(paths, data);
         ensure_directory(data);
-        if (action != ImportAction::Select) {
+        if (action != ImportAction::Load) {
             if (plain_file(kit / L"kit-id.txt")) {
                 if (auto cache = reusable_cache(data / L"Cache", kit_id(kit))) {
                     set_paths(paths, data, *cache);
@@ -569,20 +553,23 @@ ArcadeImportStatus import_paths(HWND owner, ArcadeImportPaths& paths, ImportActi
             }
             if (action == ImportAction::Lookup) return ARCADE_IMPORT_MISSING;
         }
-        const fs::path rom = action == ImportAction::Select ? pick_rom(owner) : data / L"ROM/Mario Bros..nes";
+        const fs::path rom = action == ImportAction::Load
+            ? package / L"rom/game.nes" : data / L"ROM/Mario Bros..nes";
+        if (action == ImportAction::Load && !plain_file(rom)) return ARCADE_IMPORT_MISSING;
         if (action == ImportAction::Restore && !compatible_rom(rom)) return ARCADE_IMPORT_MISSING;
         set_paths(paths, data, prepare(owner, false, rom, kit, data).cache);
         return ARCADE_IMPORT_READY;
     } catch (const Cancelled&) {
-        return ARCADE_IMPORT_MISSING;
+        return action == ImportAction::Load ? ARCADE_IMPORT_CANCELLED : ARCADE_IMPORT_MISSING;
     } catch (const Failure& failure) {
+        if (action == ImportAction::Load && failure.code == 2) return ARCADE_IMPORT_INVALID;
         const std::wstring message = failure_message(failure);
-        if (action == ImportAction::Lookup) std::cerr << utf8(message) << '\n';
-        else MessageBoxW(owner, message.c_str(), kTitle, MB_OK | MB_ICONERROR);
+        if (action == ImportAction::Restore) MessageBoxW(owner, message.c_str(), kTitle, MB_OK | MB_ICONERROR);
+        else std::cerr << utf8(message) << '\n';
     } catch (const std::exception&) {
         const wchar_t* message = L"No se pudo completar la operacion. Comprueba los permisos y extrae el ZIP completo.";
-        if (action == ImportAction::Lookup) std::cerr << utf8(message) << '\n';
-        else MessageBoxW(owner, message, kTitle, MB_OK | MB_ICONERROR);
+        if (action == ImportAction::Restore) MessageBoxW(owner, message, kTitle, MB_OK | MB_ICONERROR);
+        else std::cerr << utf8(message) << '\n';
     }
     return ARCADE_IMPORT_ERROR;
 }
@@ -596,8 +583,8 @@ ArcadeImportStatus arcade_import_restore(void* owner, ArcadeImportPaths* paths) 
     return import_paths(static_cast<HWND>(owner), *paths, ImportAction::Restore);
 }
 
-ArcadeImportStatus arcade_import_select(void* owner, ArcadeImportPaths* paths) {
-    return import_paths(static_cast<HWND>(owner), *paths, ImportAction::Select);
+ArcadeImportStatus arcade_import_load(void* owner, ArcadeImportPaths* paths) {
+    return import_paths(static_cast<HWND>(owner), *paths, ImportAction::Load);
 }
 
 int arcade_import_prepare_only(void) {

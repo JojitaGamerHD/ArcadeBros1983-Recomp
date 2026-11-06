@@ -37,7 +37,7 @@ int arcade_menu_action(int action)
 {
     HWND owner = menu_owner();
     ArcadeImportPaths paths = {0};
-    ArcadeImportStatus status = action < 0 ? arcade_import_select(owner, &paths)
+    ArcadeImportStatus status = action < 0 ? arcade_import_load(owner, &paths)
                                            : arcade_import_restore(owner, &paths);
     if (status != ARCADE_IMPORT_READY) return status;
     rom_ready = true;
