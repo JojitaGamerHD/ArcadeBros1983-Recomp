@@ -33,6 +33,8 @@ principal o cerrar el juego. F11 cambia la pantalla completa.
 En Gráficos puedes activar el Marco clásico y cambiar su color. El marco
 viene desactivado. Sigue la proporción de la imagen original de 256 × 240
 píxeles y usa el espacio disponible alrededor de ella.
+En Gráficos > Filtro visual puedes activar Grid y ajustar su intensidad.
+La cuadrícula aparece en la partida y la demo a partir de 2× de escala.
 Al terminar la secuencia de fin de partida vuelves al menú principal.
 60 FPS es la opción recomendada. Los modos 120/180 son experimentales:
 la lógica y la velocidad de NES permanecen aproximadamente a 60 FPS.

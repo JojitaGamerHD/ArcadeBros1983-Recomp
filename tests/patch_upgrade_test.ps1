@@ -39,8 +39,14 @@ foreach ($case in @(
     Verificar-Comando 'Fallo la aplicacion limpia o la idempotencia.'
     $menu = Join-Path $patchRoot 'arcade-v1.0.2-menu.patch'
     $ajustes = Join-Path $patchRoot 'arcade-v1.0.2-ajustes.patch'
-    Aplicar-ParchesMenu $fixture $current $menu $ajustes $case[0] $previous
-    Aplicar-ParchesMenu $fixture $current $menu $ajustes $case[0] $previous
+    $grid = Join-Path $patchRoot 'arcade-v1.0.3-grid.patch'
+    Aplicar-ParchesMenu $fixture $current $menu $ajustes $grid $case[0] $previous
+    Aplicar-ParchesMenu $fixture $current $menu $ajustes $grid $case[0] $previous
+    git -C $fixture apply --reverse $grid
+    Verificar-Comando 'Fallo la aplicacion limpia o la idempotencia de Grid.'
+    Aplicar-ParchesMenu $fixture $current $menu $ajustes $grid $case[0] $previous
+    git -C $fixture apply --reverse $grid
+    Verificar-Comando 'No se pudo actualizar Grid desde v1.0.2.'
     git -C $fixture apply --reverse $ajustes
     Verificar-Comando 'Fallo la aplicacion limpia o la idempotencia de los ajustes.'
     git -C $fixture apply --reverse $menu
@@ -51,7 +57,9 @@ foreach ($case in @(
     # Reproduce an existing developer checkout of the published menu.
     Aplicar-Parche $fixture $current $case[0]
     Aplicar-Parche $fixture $menu $case[0]
-    Aplicar-ParchesMenu $fixture $current $menu $ajustes $case[0] $previous
+    Aplicar-ParchesMenu $fixture $current $menu $ajustes $grid $case[0] $previous
+    git -C $fixture apply --reverse $grid
+    Verificar-Comando 'No se pudo aplicar Grid sobre el menu publicado.'
     git -C $fixture apply --reverse $ajustes
     Verificar-Comando 'No se pudieron actualizar los ajustes sobre el menu publicado.'
     git -C $fixture apply --reverse $menu

@@ -1,5 +1,5 @@
 
-# Arcade Bros 1983 Recomp v1.0.2
+# Arcade Bros 1983 Recomp v1.0.3
 # Prepara NESRecomp y recomp-ui sin sobrescribir cambios locales.
 
 $ErrorActionPreference = 'Stop'
@@ -19,6 +19,8 @@ $menuMotor = Join-Path $proyecto 'patches\nesrecomp\arcade-v1.0.2-menu.patch'
 $menuUI = Join-Path $proyecto 'patches\recomp-ui\arcade-v1.0.2-menu.patch'
 $ajustesMotor = Join-Path $proyecto 'patches\nesrecomp\arcade-v1.0.2-ajustes.patch'
 $ajustesUI = Join-Path $proyecto 'patches\recomp-ui\arcade-v1.0.2-ajustes.patch'
+$gridMotor = Join-Path $proyecto 'patches\nesrecomp\arcade-v1.0.3-grid.patch'
+$gridUI = Join-Path $proyecto 'patches\recomp-ui\arcade-v1.0.3-grid.patch'
 
 function Verificar-Comando {
     param([string]$mensaje)
@@ -79,27 +81,31 @@ function Aplicar-ParchesMenu {
         [string]$base,
         [string]$menu,
         [string]$ajustes,
+        [string]$grid,
         [string]$nombre,
         [string[]]$basesAnteriores = @()
     )
 
     # Las capas nuevas pueden cambiar el contexto de una capa anterior.
     # Comprobar primero la mas reciente evita intentar reaplicar la base.
-    if (Probar-ParcheAplicado $carpeta $ajustes) {
-        Write-Host "Los ajustes de $nombre ya estan aplicados." -ForegroundColor Green
+    if (Probar-ParcheAplicado $carpeta $grid) {
+        Write-Host "El parche Grid de $nombre ya esta aplicado." -ForegroundColor Green
         return
     }
-    if (!(Probar-ParcheAplicado $carpeta $menu)) {
-        Aplicar-Parche $carpeta $base $nombre $basesAnteriores
-        Aplicar-Parche $carpeta $menu "Menu nativo $nombre"
+    if (!(Probar-ParcheAplicado $carpeta $ajustes)) {
+        if (!(Probar-ParcheAplicado $carpeta $menu)) {
+            Aplicar-Parche $carpeta $base $nombre $basesAnteriores
+            Aplicar-Parche $carpeta $menu "Menu nativo $nombre"
+        }
+        Aplicar-Parche $carpeta $ajustes "Ajustes del menu $nombre"
     }
-    Aplicar-Parche $carpeta $ajustes "Ajustes del menu $nombre"
+    Aplicar-Parche $carpeta $grid "Grid $nombre"
 }
 
-Write-Host "`n=== PREPARANDO DEPENDENCIAS v1.0.2 ===" -ForegroundColor Cyan
+Write-Host "`n=== PREPARANDO DEPENDENCIAS v1.0.3 ===" -ForegroundColor Cyan
 
 # 1. Comprobar los parches
-foreach ($parche in @($parcheMotor, $parcheUI, $menuMotor, $menuUI, $ajustesMotor, $ajustesUI)) {
+foreach ($parche in @($parcheMotor, $parcheUI, $menuMotor, $menuUI, $ajustesMotor, $ajustesUI, $gridMotor, $gridUI)) {
     if (!(Test-Path $parche -PathType Leaf)) {
         throw "No se encontro el parche: $parche"
     }
@@ -137,7 +143,7 @@ if ($actualMotor -ne $revisionMotor) {
     throw 'NESRecomp tiene una revision diferente. No se modificara automaticamente.'
 }
 
-Aplicar-ParchesMenu $motor $parcheMotor $menuMotor $ajustesMotor 'NESRecomp' @(
+Aplicar-ParchesMenu $motor $parcheMotor $menuMotor $ajustesMotor $gridMotor 'NESRecomp' @(
     (Join-Path $proyecto 'patches\nesrecomp\arcade-v1.0.1-editor.patch'),
     (Join-Path $proyecto 'patches\nesrecomp\arcade-v1.0.1-colores.patch'),
     (Join-Path $proyecto 'patches\nesrecomp\arcade-v1.0.1.patch'),
@@ -164,7 +170,7 @@ if ($actualUI -ne $revisionUI) {
     throw 'recomp-ui tiene una revision diferente. No se modificara automaticamente.'
 }
 
-Aplicar-ParchesMenu $ui $parcheUI $menuUI $ajustesUI 'recomp-ui' @(
+Aplicar-ParchesMenu $ui $parcheUI $menuUI $ajustesUI $gridUI 'recomp-ui' @(
     (Join-Path $proyecto 'patches\recomp-ui\arcade-v1.0.1-colores.patch'),
     (Join-Path $proyecto 'patches\recomp-ui\arcade-v1.0.1.patch'),
     (Join-Path $proyecto 'patches\recomp-ui\arcade-v1.0.patch'))

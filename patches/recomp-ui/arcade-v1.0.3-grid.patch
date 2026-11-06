@@ -1,0 +1,125 @@
+diff --git a/src/common/backends/imgui/launcher_imgui.cpp b/src/common/backends/imgui/launcher_imgui.cpp
+--- a/src/common/backends/imgui/launcher_imgui.cpp
++++ b/src/common/backends/imgui/launcher_imgui.cpp
+@@ -32,6 +32,9 @@
+ 
+ #include "imgui.h"
+ #include "arcade_color_disc.h"
++#ifdef ARCADE_NATIVE_MENU
++#include "arcade_grid.h"
++#endif
+ #include "launcher_nav.h"
+ #if defined(LNG_SDL3)
+   #include "imgui_impl_sdl3.h"
+@@ -14268,6 +14271,32 @@
+     draw->AddRectFilled(ImVec2(max.x - inset.x, min.y + inset.y), ImVec2(max.x, max.y - inset.y), color);
+ }
+ 
++#ifdef ARCADE_NATIVE_MENU
++void draw_arcade_demo_grid(ImDrawList* draw, ImVec2 min, ImVec2 max,
++                           int source_width, int source_height, int intensity) {
++    const int alpha = arcade_grid_alpha(intensity);
++    if (!alpha) return;
++    const ImVec2 density = ImGui::GetIO().DisplayFramebufferScale;
++    const int left = static_cast<int>(std::round(min.x * density.x));
++    const int top = static_cast<int>(std::round(min.y * density.y));
++    const int width = static_cast<int>(std::round(max.x * density.x)) - left;
++    const int height = static_cast<int>(std::round(max.y * density.y)) - top;
++    if (!arcade_grid_visible(width, height, source_width, source_height)) return;
++
++    const ImU32 color = IM_COL32(0, 0, 0, alpha);
++    for (int x = 1; x < source_width; ++x) {
++        const int line = left + arcade_grid_offset(width, x, source_width);
++        draw->AddRectFilled(ImVec2(line / density.x, min.y),
++                            ImVec2((line + 1) / density.x, max.y), color);
++    }
++    for (int y = 1; y < source_height; ++y) {
++        const int line = top + arcade_grid_offset(height, y, source_height);
++        draw->AddRectFilled(ImVec2(min.x, line / density.y),
++                            ImVec2(max.x, (line + 1) / density.y), color);
++    }
++}
++#endif
++
+ ImVec2 arcade_canvas_origin(const ImGuiViewport* vp, float scale) {
+     return ImVec2(vp->Pos.x + (vp->Size.x - arcade_canvas_width * scale) * 0.5f,
+                   vp->Pos.y + (vp->Size.y - arcade_canvas_height * scale) * 0.5f);
+@@ -14503,6 +14532,18 @@
+     }
+ }
+ 
++void draw_arcade_grid_controls(LauncherModel* m, const LauncherTheme& th, float width) {
++    static const SettingsChoice filters[] = {{0, "SIN FILTRO"}, {1, "GRID"}};
++    m->s.arcade_visual_filter = settings_combo_row("FILTRO VISUAL", th, "##arcade_visual_filter",
++        filters, IM_ARRAYSIZE(filters), m->s.arcade_visual_filter, width);
++    ImGui::BeginDisabled(m->s.arcade_visual_filter != 1);
++    row_label_right("INTENSIDAD GRID", th, width);
++    ImGui::SetNextItemWidth(width);
++    ImGui::SliderInt("##arcade_grid_intensity", &m->s.arcade_grid_intensity, 0, 100, "%d%%",
++                    ImGuiSliderFlags_NoInput | ImGuiSliderFlags_AlwaysClamp);
++    ImGui::EndDisabled();
++}
++
+ void draw_arcade_options_detail(LauncherModel* m, const LauncherTheme& th,
+                                ArcadeTitleState& state) {
+     const bool controller = m->view == LNG_VIEW_CONTROLLER;
+@@ -14530,7 +14571,7 @@
+     if (canvas.scale <= 0.0f) return;
+     const float side = controller ? 114.0f : 200.0f;
+     const bool graphics = state.options == ArcadeOptionsPage::Graphics;
+-    const int row_count = graphics ? 8 : state.options == ArcadeOptionsPage::Controls ? 3 : 5;
++    const int row_count = graphics ? 10 : state.options == ArcadeOptionsPage::Controls ? 3 : 5;
+     const float font_size = std::max(14.0f, 25.0f * canvas.scale);
+     canvas.text(label, 480, 102, 48, arcade_warm);
+     canvas.rect(side, 150, 960.0f - 2.0f * side, 2, IM_COL32(255, 176, 43, 160));
+@@ -14540,6 +14581,11 @@
+     ImGui::PushID(label);
+     if (g_arcade_title_font) ImGui::PushFont(g_arcade_title_font);
+     ImGui::SetWindowFontScale(font_size / ImGui::GetFontSize());
++    if (graphics) {
++        const ImVec2 padding = ImGui::GetStyle().FramePadding;
++        const float vertical = std::min(padding.y, std::max(4.0f, std::round(padding.y * canvas.scale)));
++        ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(padding.x, vertical));
++    }
+     const float rows_height = ImGui::GetFrameHeight() +
+         static_cast<float>(row_count - 1) * ImGui::GetFrameHeightWithSpacing();
+     // Reserve the third note row so the controls stay still as the FPS changes.
+@@ -14576,6 +14622,7 @@
+                 case ArcadeOptionsPage::Graphics: {
+                     const float width = draw_arcade_graphics_controls(m, th);
+                     draw_arcade_frame_controls(m, th, state, width, canvas.scale);
++                    draw_arcade_grid_controls(m, th, width);
+                     break;
+                 }
+                 case ArcadeOptionsPage::Categories:
+@@ -14615,6 +14662,7 @@
+     }
+     ImGui::SetWindowFontScale(1.0f);
+     if (g_arcade_title_font) ImGui::PopFont();
++    if (graphics) ImGui::PopStyleVar();
+     ImGui::PopID();
+     state.options_modal = arcade_options_editing(m);
+ }
+@@ -15756,6 +15804,10 @@
+                             ImVec2(max.x + edge.x, max.y + edge.y), edge, m->s.arcade_frame_rgb);
+                     }
+                     background->AddImage(tid(attract_texture), min, max);
++#ifdef ARCADE_NATIVE_MENU
++                    if (m->s.arcade_visual_filter == 1)
++                        draw_arcade_demo_grid(background, min, max, width, height, m->s.arcade_grid_intensity);
++#endif
+                 }
+             }
+             if (!showing_demo) {
+diff --git a/src/recomp_launcher.h b/src/recomp_launcher.h
+--- a/src/recomp_launcher.h
++++ b/src/recomp_launcher.h
+@@ -1582,6 +1582,8 @@
+     /* Bezel used for the space outside the game picture. */
+     int  arcade_frame_mode;     /* 0 off, 1 classic */
+     uint32_t arcade_frame_rgb;  /* RGB24 */
++    int  arcade_visual_filter;  /* 0 off, 1 Grid */
++    int  arcade_grid_intensity; /* 0..100 */
+ };
+ #define RECOMP_LAUNCHER_HAS_ZAPPER_SETTINGS 1
+ 
