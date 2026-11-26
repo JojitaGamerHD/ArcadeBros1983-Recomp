@@ -14,7 +14,7 @@ if(NOT EXISTS "${CYC}/cyc.cmake")
 endif()
 option(ARCADE_PREPARE_MODULE "Generate a private module from the local ROM" ON)
 option(ARCADE_WINDOWED_HOST "Build the generic SDL host with its integrated menu" OFF)
-set(ARCADE_RELEASE_VERSION "1.0.3" CACHE STRING "Arcade Bros release version")
+set(ARCADE_RELEASE_VERSION "1.0.4" CACHE STRING "Arcade Bros release version")
 if(ARCADE_WINDOWED_HOST AND ARCADE_PREPARE_MODULE)
     message(FATAL_ERROR "ARCADE_WINDOWED_HOST requires ARCADE_PREPARE_MODULE=OFF; the public host must not generate ROM code.")
 endif()
@@ -86,8 +86,13 @@ if(ARCADE_WINDOWED_HOST)
             "${ARCADE_ROOT}/assets/fonts/OFL-PixelifySans.txt"
             "$<TARGET_FILE_DIR:ArcadeNativeHost>/assets/fonts/OFL-PixelifySans.txt"
         COMMAND "${CMAKE_COMMAND}" -E copy_if_different
+            "${ARCADE_ROOT}/assets/fonts/Super Mario Bros. NES.ttf"
+            "${ARCADE_ROOT}/assets/fonts/OFL-SuperMarioBrosNES.txt"
+            "$<TARGET_FILE_DIR:ArcadeNativeHost>/assets/fonts"
+        COMMAND "${CMAKE_COMMAND}" -E copy_if_different
             "${ARCADE_ROOT}/assets/img/arcade_bros_1983.png"
-            "$<TARGET_FILE_DIR:ArcadeNativeHost>/assets/img/arcade_bros_1983.png"
+            "${ARCADE_ROOT}/assets/img/mario_bros_titulo.png"
+            "$<TARGET_FILE_DIR:ArcadeNativeHost>/assets/img"
         VERBATIM)
     # User music remains private; no local OST is copied into the public host.
 endif()

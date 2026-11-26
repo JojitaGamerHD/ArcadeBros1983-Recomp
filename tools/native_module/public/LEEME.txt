@@ -4,7 +4,8 @@ ARCADE BROS 1983 RECOMP — WINDOWS X64
 2. Guarda tu ROM compatible de Mario Bros. (NES) como rom\game.nes en
    la carpeta extraída, junto a la carpeta Bin.
 3. Abre Bin\ArcadeNativeHost.exe y elige Cargar ROM en el menú principal.
-4. Al terminar la preparación, elige 1 jugador A/B o 2 jugadores A/B.
+4. Al terminar la preparación, elige 1 jugador o 2 jugadores y después
+   Modo estándar o Modo arcade.
    La partida empieza en la misma ventana del menú.
    Una vez preparada la ROM, su fanfarria de título suena en el menú.
    Si dejas el menú principal en reposo, verás la demostración original.
@@ -26,13 +27,15 @@ componentes multimedia de Windows. Las ediciones Windows N necesitan Media
 Feature Pack para esta aplicación.
 Controlador gráfico con OpenGL 3.3 para el menú principal.
 Navega por el menú con las flechas o la cruceta, confirma con Enter o A
-y vuelve con Esc o B. En Opciones > Controles, elige J1 o J2 para configurar
-el teclado y los mandos antes de importar la ROM.
-Esc abre Pausa. Desde allí puedes reanudar, abrir Opciones, volver al menú
-principal o cerrar el juego. F11 cambia la pantalla completa.
+y vuelve con Esc o B. Una flecha indica qué opción está seleccionada.
+En Opciones > Controles, elige el jugador para configurar el teclado
+y los mandos antes de importar la ROM.
+Esc abre el cuadro de pausa sobre la partida. Desde allí puedes reanudar,
+abrir Opciones, volver al menú principal o cerrar el juego. F11 cambia
+la pantalla completa.
 En Gráficos puedes activar el Marco clásico y cambiar su color. El marco
 viene desactivado. Sigue la proporción de la imagen original de 256 × 240
-píxeles y usa el espacio disponible alrededor de ella.
+píxeles y deja espacio para los cuatro lados dentro de la ventana.
 En Gráficos > Filtro visual puedes activar Grid y ajustar su intensidad.
 La cuadrícula aparece en la partida y la demo a partir de 2× de escala.
 Al terminar la secuencia de fin de partida vuelves al menú principal.
@@ -69,9 +72,10 @@ que la ROM coincide con la revisión admitida.
 Esc cancela una asignación de control y Retroceso la borra. Los conflictos
 se indican en pantalla. En Pausa, abre Opciones y después Colores para
 editar a Mario o Luigi.
-Cada editor muestra el personaje y sus tres tonos. Elige con el disco de
-color y la barra Brillo. Listo guarda los tres colores. Cancelar o Esc
-restaura los valores anteriores del personaje. Se mantienen ocho presets.
+Cada editor muestra el personaje y sus tres tonos. Ajusta el matiz, la
+saturación y el brillo con las flechas o la cruceta. Enter o A guarda
+los cambios. Esc o B restaura los valores anteriores del personaje.
+Hay ocho presets disponibles.
 Primero entra en una partida para capturar la referencia desde tu ROM.
 Los ajustes y presets quedan en Datos/config.ini.
 

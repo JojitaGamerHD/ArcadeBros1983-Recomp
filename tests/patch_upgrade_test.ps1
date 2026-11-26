@@ -40,6 +40,14 @@ foreach ($case in @(
     $menu = Join-Path $patchRoot 'arcade-v1.0.2-menu.patch'
     $ajustes = Join-Path $patchRoot 'arcade-v1.0.2-ajustes.patch'
     $grid = Join-Path $patchRoot 'arcade-v1.0.3-grid.patch'
+    $diseno = Join-Path $patchRoot 'arcade-diseno-menus.patch'
+    Aplicar-ParchesMenu $fixture $current $menu $ajustes $grid $case[0] $previous -diseno $diseno
+    Aplicar-ParchesMenu $fixture $current $menu $ajustes $grid $case[0] $previous -diseno $diseno
+    git -C $fixture apply --reverse $diseno
+    Verificar-Comando 'Fallo la aplicacion limpia o la idempotencia del diseno de menus.'
+    Aplicar-ParchesMenu $fixture $current $menu $ajustes $grid $case[0] $previous -diseno $diseno
+    git -C $fixture apply --reverse $diseno
+    Verificar-Comando 'No se pudo actualizar el diseno desde v1.0.3.'
     Aplicar-ParchesMenu $fixture $current $menu $ajustes $grid $case[0] $previous
     Aplicar-ParchesMenu $fixture $current $menu $ajustes $grid $case[0] $previous
     git -C $fixture apply --reverse $grid

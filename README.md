@@ -5,7 +5,7 @@
 [![Estado](https://img.shields.io/badge/estado-Completo-blue)](https://github.com/JojitaGamerHD/ArcadeBros1983-Recomp)
 [![Plataforma](https://img.shields.io/badge/plataforma-Windows%20x64-blue)](https://github.com/JojitaGamerHD/ArcadeBros1983-Recomp)
 
-**Versión estable v1.0.3** · [Descargar para Windows x64](https://github.com/JojitaGamerHD/ArcadeBros1983-Recomp/releases/download/v1.0.3/ArcadeBros1983-Recomp-v1.0.3-Windows-x64.zip)
+**Versión estable v1.0.4** · [Descargar para Windows x64](https://github.com/JojitaGamerHD/ArcadeBros1983-Recomp/releases/download/v1.0.4/ArcadeBros1983-Recomp-v1.0.4-Windows-x64.zip)
 
 El menú principal se abre con
 `Bin/ArcadeNativeHost.exe` antes de importar la ROM. El menú reúne los
@@ -19,7 +19,7 @@ sin fines comerciales y sin afiliación con Nintendo.
 
 ## Descargar y jugar
 
-Descarga `ArcadeBros1983-Recomp-v1.0.3-Windows-x64.zip`. [Release v1.0.3 y archivo SHA-256](https://github.com/JojitaGamerHD/ArcadeBros1983-Recomp/releases/tag/v1.0.3)
+Descarga `ArcadeBros1983-Recomp-v1.0.4-Windows-x64.zip`. [Release v1.0.4 y archivo SHA-256](https://github.com/JojitaGamerHD/ArcadeBros1983-Recomp/releases/tag/v1.0.4)
 
 1. Extrae el ZIP completo en una carpeta con permiso de escritura.
 2. Guarda tu ROM compatible de Mario Bros. (NES) como `rom/game.nes` en la
@@ -47,6 +47,13 @@ La release incluye un archivo `.zip.sha256` y el paquete lleva
 
 Para actualizar, cierra el programa, extrae el ZIP en una carpeta nueva y
 copia `Datos` y tu archivo `rom/game.nes` de la instalación anterior.
+
+## Cambios de v1.0.4
+
+- Menús centrados y proporcionales, con texto blanco de tamaño uniforme y una flecha que indica la opción seleccionada.
+- El encabezado con el logo de Mario Bros., JojitaGamerHD y Arcade Bros 1983 Recomp se comparte entre el menú principal y sus opciones, y se conserva al volver de una partida.
+- La pausa y sus opciones aparecen en un cuadro con borde blanco que deja visible la partida alrededor.
+- El marco clásico tiene las mismas dimensiones en el menú y en la partida. Sus cuatro lados quedan visibles con el escalado entero activado o desactivado.
 
 ## Cambios de v1.0.3
 
@@ -105,12 +112,11 @@ y mandos. **Esc** abre la pausa y **F11** cambia la pantalla completa con los
 atajos predeterminados.
 
 Gráficos y Audio comparten sus ajustes entre el menú de inicio y la pausa.
-En **Gráficos → Marco** puedes activar el marco clásico y elegir su color
-con la rueda. El marco viene desactivado y sigue la proporción 16:15 de
-la imagen original de 256 × 240 píxeles. Se dibuja en el espacio
-disponible alrededor de la imagen, conservando su tamaño.
-El menú de pausa permanece fijo; la ventana del juego se puede redimensionar.
-Los cambios de FPS, filtro o volumen conservan su tamaño.
+En **Gráficos → Marco** puedes activar el marco clásico y ajustar su color
+en **Color marco**. El marco viene desactivado. Sigue la proporción 16:15
+de la imagen original de 256 × 240 píxeles y deja espacio para los cuatro
+lados dentro de la ventana. Al redimensionar la ventana, la pausa se
+mantiene centrada sobre la partida.
 
 **60 FPS es la opción inicial y recomendada.** Los modos 120/180 conservan su
 suavizado visual experimental en escenas compatibles. La lógica, velocidad

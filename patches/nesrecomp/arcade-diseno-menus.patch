@@ -1,0 +1,220 @@
+diff --git a/runner/cyc/cyc_sdl.c b/runner/cyc/cyc_sdl.c
+index a629225..e95b0dc 100644
+--- a/runner/cyc/cyc_sdl.c
++++ b/runner/cyc/cyc_sdl.c
+@@ -80,6 +80,7 @@
+ #ifdef CYC_WITH_RECOMP_UI
+ #include "cyc_ui.h"
+ #ifdef ARCADE_NATIVE_MENU
++#include "arcade_frame.h"
+ #include "arcade_grid.h"
+ #include "native_menu.h"
+ #include "native_mode.h"
+@@ -469,6 +470,19 @@ static void apply_picture_scale(void)
+                      ? SDL_TRUE : SDL_FALSE;
+     if (SDL_RenderGetIntegerScale(s_ren) != integer)
+         SDL_RenderSetIntegerScale(s_ren, integer);
++#ifdef ARCADE_NATIVE_MENU
++    if (arcade_menu_active() && s_set.frame_mode == 1 && ow > 0 && oh > 0) {
++        const int w = picture_w(), h = logical_h();
++        const ArcadeRect picture = arcade_fit_picture(arcade_frame_layout(ow, oh).inner,
++                                                       w, h, s_set.integer_scale);
++        if (picture.w > 0 && picture.h > 0) {
++            const SDL_Rect viewport = {picture.x, picture.y, picture.w, picture.h};
++            SDL_RenderSetScale(s_ren, 1.0f, 1.0f);
++            SDL_RenderSetViewport(s_ren, &viewport);
++            SDL_RenderSetScale(s_ren, (float)picture.w / w, (float)picture.h / h);
++        }
++    }
++#endif
+ }
+ 
+ static void apply_settings(void)
+@@ -1269,32 +1283,26 @@ static void arcade_fps_dibujar(void)
+ #ifdef ARCADE_NATIVE_MENU
+ static void draw_picture_frame(void)
+ {
++    int w = 0, h = 0;
++    SDL_GetRendererOutputSize(s_ren, &w, &h);
++    const ArcadeFrame frame = arcade_frame_layout(w, h);
++    if (!frame.border) return;
++
+     float scale_x, scale_y;
+     SDL_RenderGetScale(s_ren, &scale_x, &scale_y);
+-    /* SDL stores the viewport in output pixels but its getter divides by
+-     * the current logical scale. Read and restore it at unit scale so a
+-     * fractional fit cannot shift the original picture on subsequent draws. */
++    /* Read and restore the physical viewport at unit scale. */
+     SDL_RenderSetScale(s_ren, 1.0f, 1.0f);
+     SDL_Rect viewport;
+     SDL_RenderGetViewport(s_ren, &viewport);
+     SDL_RenderSetViewport(s_ren, NULL);
+ 
+-    const int edge_x = SDL_max(1, (int)(3.2f * scale_x + 0.5f));
+-    const int edge_y = SDL_max(1, (int)(3.0f * scale_y + 0.5f));
+-    const int left = viewport.x - edge_x;
+-    const int right = viewport.x + viewport.w;
+-    const int top = viewport.y - edge_y;
+-    const int bottom = viewport.y + viewport.h;
+-    const int width = viewport.w + 2 * edge_x;
+-    const SDL_Rect strips[] = {
+-        { left, top, width, edge_y },
+-        { left, bottom, width, edge_y },
+-        { left, viewport.y, edge_x, viewport.h },
+-        { right, viewport.y, edge_x, viewport.h }
+-    };
++    ArcadeRect edges[4];
++    arcade_frame_edges(frame, edges);
++    SDL_Rect strips[4];
++    for (int i = 0; i < 4; ++i)
++        strips[i] = (SDL_Rect){edges[i].x, edges[i].y, edges[i].w, edges[i].h};
+     const uint32_t rgb = s_set.frame_rgb;
+     SDL_SetRenderDrawColor(s_ren, (Uint8)(rgb >> 16), (Uint8)(rgb >> 8), (Uint8)rgb, 255);
+-    /* The full output viewport clips edges with no letterbox space. */
+     SDL_RenderFillRects(s_ren, strips, (int)SDL_arraysize(strips));
+     SDL_RenderSetViewport(s_ren, &viewport);
+     SDL_RenderSetScale(s_ren, scale_x, scale_y);
+@@ -1400,12 +1408,16 @@ static void show(bool loading, const char *toast_title, const char *toast_body)
+         uint32_t *px = (uint32_t *)malloc((size_t)ow * (size_t)oh * 4);
+         /* ReadPixels(NULL) reads only the current picture viewport. Capture
+          * the whole window, including pillarboxes and the full-size menu. */
++        float scale_x, scale_y;
++        SDL_RenderGetScale(s_ren, &scale_x, &scale_y);
++        SDL_RenderSetScale(s_ren, 1.0f, 1.0f);
+         SDL_Rect viewport;
+         SDL_RenderGetViewport(s_ren, &viewport);
+         SDL_RenderSetViewport(s_ren, NULL);
+         bool ok = px && SDL_RenderReadPixels(s_ren, NULL, SDL_PIXELFORMAT_ARGB8888, px, ow * 4) == 0 &&
+                   cyc_write_png(s_ui_shot, px, ow, oh);
+         SDL_RenderSetViewport(s_ren, &viewport);
++        SDL_RenderSetScale(s_ren, scale_x, scale_y);
+         free(px);
+         char q[1100], fl[1200];
+         cyc_tcp_quote(s_ui_shot, q, sizeof(q));
+diff --git a/runner/cyc/cyc_ui_imgui.cpp b/runner/cyc/cyc_ui_imgui.cpp
+index 3dcbe76..bb29051 100644
+--- a/runner/cyc/cyc_ui_imgui.cpp
++++ b/runner/cyc/cyc_ui_imgui.cpp
+@@ -63,6 +63,9 @@ extern "C" bool cyc_ui_init(SDL_Window *win, SDL_Renderer *ren, const CycUiHost
+             arcade_base
+         );
+ 
++        char menu_font_path[2048];
++        const int menu_length = std::snprintf(menu_font_path, sizeof(menu_font_path),
++            "%sassets/fonts/Super Mario Bros. NES.ttf", arcade_base);
+         SDL_free(arcade_base);
+ 
+         if (n > 0 && n < (int)sizeof(arcade_path)) {
+@@ -72,11 +75,20 @@ extern "C" bool cyc_ui_init(SDL_Window *win, SDL_Renderer *ren, const CycUiHost
+                 &arcade_font_config,
+                 io.Fonts->GetGlyphRangesDefault()
+             );
+-            if (arcade_font && recomp_runtime_ui_uses_console_input(cyc_ui_runtime())) {
++            if (recomp_runtime_ui_uses_console_input(cyc_ui_runtime())) {
++                const char* pause_path = arcade_font ? arcade_path : nullptr;
++                if (menu_length > 0 && menu_length < (int)sizeof(menu_font_path)) {
++                    if (FILE* menu_file = std::fopen(menu_font_path, "rb")) {
++                        std::fclose(menu_file);
++                        if (!arcade_font) io.Fonts->AddFontDefault();
++                        pause_path = menu_font_path;
++                    }
++                }
+                 ImFontConfig pause_config = arcade_font_config;
+                 std::snprintf(pause_config.Name, sizeof(pause_config.Name), "%s", "Arcade Pause");
+-                io.Fonts->AddFontFromFileTTF(arcade_path, 48.0f, &pause_config,
+-                                             io.Fonts->GetGlyphRangesDefault());
++                if (pause_path)
++                    io.Fonts->AddFontFromFileTTF(pause_path, 36.0f, &pause_config,
++                                                 io.Fonts->GetGlyphRangesDefault());
+             }
+         }
+     }
+@@ -85,7 +97,7 @@ extern "C" bool cyc_ui_init(SDL_Window *win, SDL_Renderer *ren, const CycUiHost
+         std::fprintf(stderr,
+             "[arcade ui] fuente Pixelify Sans cargada\n");
+     } else {
+-        io.Fonts->AddFontDefault();
++        if (io.Fonts->Fonts.empty()) io.Fonts->AddFontDefault();
+         std::fprintf(stderr,
+             "[arcade ui] fuente no disponible; usando fuente normal\n");
+     }
+@@ -149,8 +161,12 @@ extern "C" void cyc_ui_render(void)
+     // the picture's logical size and viewport come back for the next frame.
+     int lw = 0, lh = 0;
+     SDL_Rect viewport{};
++    float scale_x, scale_y;
+     SDL_RenderGetLogicalSize(s_ren, &lw, &lh);
++    SDL_RenderGetScale(s_ren, &scale_x, &scale_y);
++    SDL_RenderSetScale(s_ren, 1.0f, 1.0f);
+     SDL_RenderGetViewport(s_ren, &viewport);
++    SDL_RenderSetScale(s_ren, scale_x, scale_y);
+     int x0 = 0, y0 = 0, x1 = 0, y1 = 0;
+ #if SDL_VERSION_ATLEAST(2, 0, 18)
+     if (lw > 0 && lh > 0) {
+@@ -178,8 +194,9 @@ extern "C" void cyc_ui_render(void)
+     ImGui::Render();
+     ImGui_ImplSDLRenderer2_RenderDrawData(ImGui::GetDrawData(), s_ren);
+     SDL_RenderSetLogicalSize(s_ren, lw, lh);
+-    // SDL recalculates its letterbox in output pixels. Reapplying the
+-    // rounded logical viewport would move it on a fractional scale.
+-    if (lw <= 0 || lh <= 0) SDL_RenderSetViewport(s_ren, &viewport);
++    // Restore the exact picture viewport, including any inset for the frame.
++    SDL_RenderSetScale(s_ren, 1.0f, 1.0f);
++    SDL_RenderSetViewport(s_ren, &viewport);
++    SDL_RenderSetScale(s_ren, scale_x, scale_y);
+     SDL_SetRenderDrawBlendMode(s_ren, SDL_BLENDMODE_NONE);
+ }
+diff --git a/runner/cyc/cyc_ui_launcher.c b/runner/cyc/cyc_ui_launcher.c
+index 9dccc00..688f48c 100644
+--- a/runner/cyc/cyc_ui_launcher.c
++++ b/runner/cyc/cyc_ui_launcher.c
+@@ -239,17 +239,15 @@ snprintf(titulo_port, sizeof(titulo_port),
+ 
+ gi.name = titulo_port;
+ gi.credits_text =
+-    "ARCADE BROS 1983 RECOMP\n\n"
+-    "Port desarrollado por JojitaGamerHD\n"
+-    "GitHub: https://github.com/JojitaGamerHD\n\n"
+-    "JUEGO ORIGINAL\n"
+-    "Mario Bros. (1983) - Nintendo\n\n"
+-    "HERRAMIENTAS UTILIZADAS\n"
+-    "NESRecomp - Matthew Stanley (mstan)\n"
+-    "https://github.com/mstan/nesrecomp\n\n"
+-    "recomp-ui - RetroPortingToolKit\n"
+-    "https://github.com/RetroPortingToolKit/recomp-ui\n\n"
+-    "Proyecto independiente, no afiliado a Nintendo.";
++    "PORT DESARROLLADO POR\n"
++    "JOJITAGAMERHD\n\n"
++    "JUEGO ORIGINAL: MARIO BROS.\n"
++    "(1983) - NINTENDO\n\n"
++    "HERRAMIENTAS UTILIZADAS\n\n"
++    "NESRECOMP:     MATTHEW STANLEY\n"
++    "RECOMP-UI: RETROPORTINGTOOLKIT\n\n"
++    "PROYECTO INDEPENDIENTE, NO\n"
++    "AFILIADO A NINTENDO";
+ #ifdef NES_HOST_HAS_RECOMP_UI
+     gi.netplay=nes_host_lobby_init(name,*rom_path);
+     gi.netplay_supported=gi.netplay!=NULL;
+diff --git a/runner/cyc/cyc_ui_menu.c b/runner/cyc/cyc_ui_menu.c
+index bcbc49e..5b1629b 100644
+--- a/runner/cyc/cyc_ui_menu.c
++++ b/runner/cyc/cyc_ui_menu.c
+@@ -343,14 +343,14 @@ static void arcade_pause_options(const CycHostExtras *extras)
+             RECOMP_RUNTIME_UI_CHOICE, 0, 2, 1, view_choices, count, view_values);
+     }
+     arcade_pause_append(extras_items, extras_count, NULL, graphics);
+-    add("cyc.arcade.visual_filter", graphics, "Filtro visual", NULL,
+-        RECOMP_RUNTIME_UI_CHOICE, 0, 1, 1, filters, 2, NULL);
+-    add("cyc.arcade.grid_intensity", graphics, "Intensidad de Grid", NULL,
+-        RECOMP_RUNTIME_UI_INT, 0, 100, 5, NULL, 0, NULL);
+     add("cyc.arcade.frame_mode", graphics, "Marco", NULL,
+         RECOMP_RUNTIME_UI_CHOICE, 0, 1, 1, frames, 2, NULL);
+     add("cyc.arcade.frame_rgb", graphics, "Color del marco", NULL,
+         RECOMP_RUNTIME_UI_COLOR, 0, 0xffffff, 1, NULL, 0, NULL);
++    add("cyc.arcade.visual_filter", graphics, "Filtro visual", NULL,
++        RECOMP_RUNTIME_UI_CHOICE, 0, 1, 1, filters, 2, NULL);
++    add("cyc.arcade.grid_intensity", graphics, "Intensidad de Grid", NULL,
++        RECOMP_RUNTIME_UI_INT, 0, 100, 5, NULL, 0, NULL);
+     arcade_pause_back(graphics);
+ 
+     arcade_pause_append(extras_items, extras_count, "Colores", colors);

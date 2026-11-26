@@ -1,13 +1,13 @@
 param(
     [string]$Compilador,
     [string]$Python,
-    [string]$Version='1.0.3'
+    [string]$Version='1.0.4'
 )
 $ErrorActionPreference='Stop'
 # Windows PowerShell targets an older .NET compatibility profile by default.
 [AppContext]::SetSwitch('Switch.System.IO.Compression.ZipFile.UseBackslash',$false)
 $raiz=(Resolve-Path -LiteralPath (Join-Path $PSScriptRoot '../..')).Path
-if ($Version -notmatch '^\d+\.\d+\.\d+(?:-[0-9A-Za-z]+(?:[.-][0-9A-Za-z]+)*)?(?:\+[0-9A-Za-z]+(?:[.-][0-9A-Za-z]+)*)?$') { throw 'La version debe tener formato SemVer, por ejemplo 1.0.3.' }
+if ($Version -notmatch '^\d+\.\d+\.\d+(?:-[0-9A-Za-z]+(?:[.-][0-9A-Za-z]+)*)?(?:\+[0-9A-Za-z]+(?:[.-][0-9A-Za-z]+)*)?$') { throw 'La version debe tener formato SemVer, por ejemplo 1.0.4.' }
 $engine=Join-Path $raiz 'deps/nesrecomp-arcade'
 $publico=Join-Path $PSScriptRoot 'public'
 foreach ($p in @(
@@ -95,7 +95,8 @@ $archivosBin=@('ArcadeNativeHost.exe','ArcadeNativeHost.lib','ArcadePrepare.exe'
     'game.toml','module_entry.c','protocol.h','kit-id.txt','compiler/bin/clang.exe','compiler/bin/lld-link.exe')
 $assets=@('assets/fonts/LatoLatin-Bold.ttf','assets/fonts/LatoLatin-Regular.ttf','assets/fonts/NotoSansSymbols2-Regular.ttf',
     'assets/fonts/OpenMoji-black-glyf.ttf','assets/fonts/PixelifySans.ttf','assets/fonts/OFL-PixelifySans.txt',
-    'assets/img/arcade_bros_1983.png','assets/img/brand_mark.tga','assets/img/brand_nes.tga','assets/img/flags.png',
+    'assets/fonts/Super Mario Bros. NES.ttf','assets/fonts/OFL-SuperMarioBrosNES.txt',
+    'assets/img/arcade_bros_1983.png','assets/img/mario_bros_titulo.png','assets/img/brand_mark.tga','assets/img/brand_nes.tga','assets/img/flags.png',
     'assets/img/pad_nes.tga','assets/img/verdict_bad.tga','assets/img/verdict_none.tga','assets/img/verdict_ok.tga','assets/img/verdict_warn.tga')
 function Permitido([string]$Relativo) {
     if ($Relativo -cin @('LEEME.txt','SOURCES.txt','MANIFIESTO-SHA256.txt')) { return $true }

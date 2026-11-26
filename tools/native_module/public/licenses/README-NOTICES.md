@@ -19,16 +19,19 @@ avisos originales dentro de `Bin/compiler/lib/clang/23/include`.
 | xxHash, expresiones regulares, MD5, BLAKE3 | Componentes de LLVM Support en llvmorg-23.1.4 | LLVM-xxHash-BSD.txt; LLVM-regex-BSD.txt; LLVM-MD5-NOTICE.txt; LLVM-BLAKE3-LICENSE.txt |
 | zlib 1.3.2, Zstandard 1.5.7, libxml2 2.9.12 | Dependencias estaticas declaradas por el script oficial Windows de LLVM 23.1.4 | zlib-1.3.2-LICENSE.txt; zstd-1.5.7-BSD.txt; libxml2-2.9.12-Copyright.txt; libxml2-*-NOTICE.txt |
 | Pixelify Sans | Fuente del proyecto Arcade Bros | PixelifySans-OFL.txt |
+| Super Mario Bros. NES | TheWolfBunny, basada en KonaM de igorcbarros (FontStruct) | ../assets/fonts/OFL-SuperMarioBrosNES.txt |
 | LatoLatin Regular y Bold | Subconjunto Latin de Lato 2.015 distribuido por recomp-ui | LatoLatin-OFL.txt; recomp-ui-FONTS-NOTICE.md |
 | Noto Sans Symbols 2 | Fuente distribuida por recomp-ui | NotoSansSymbols2-OFL.txt; recomp-ui-FONTS-NOTICE.md |
 | OpenMoji Black | Fuente distribuida por recomp-ui; OpenMoji, HfG Schwabisch Gmund | OpenMoji-CC-BY-SA-4.0.txt; recomp-ui-FONTS-NOTICE.md |
 | Banderas flags.png | Renderizadas desde Noto Color Emoji, segun el aviso de recomp-ui | NotoColorEmoji-Flags-OFL.txt; recomp-ui-IMAGES-NOTICE.md |
 
 `FONT-METADATA-NOTICE.txt` conserva los avisos de copyright y licencia leidos
-directamente de los cinco archivos TTF de este paquete, sin modificarlos.
+directamente de las cinco fuentes de la versión inicial del paquete.
 Los demas recursos de interfaz de recomp-ui se conservan junto con su licencia
 y avisos. La portada `arcade_bros_1983.png` pertenece a los recursos existentes
 del proyecto Arcade Bros 1983 Recomp.
+El archivo `mario_bros_titulo.png` es el logo de Mario Bros. suministrado para
+la pantalla de título. Mario Bros. y Nintendo son marcas de sus titulares.
 
 NESRecomp y recomp-ui incluyen adaptaciones de Arcade Bros. Las fuentes y los
 parches acumulativos del proyecto se publican en:

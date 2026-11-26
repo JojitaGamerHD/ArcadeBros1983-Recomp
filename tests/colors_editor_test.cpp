@@ -1,6 +1,7 @@
 /* Exercise the shipping palette editor and host event arbitration without
  * showing a window or requiring a ROM or physical input device. */
 #include "cyc_ui_text_input.h"
+#include "arcade_frame.h"
 #include "player_colors.h"
 #include "imgui.h"
 #include "imgui_internal.h"
@@ -213,9 +214,9 @@ static int grouped_editor() {
 }
 
 static int console_palette_editor() {
-    const RecompRuntimeUiItem item={"arcade.color.mario","Colores","Mario","",RECOMP_RUNTIME_UI_PALETTE};
+    const RecompRuntimeUiItem item={"arcade.color.mario","Pausa/Opciones/Colores","Mario","",RECOMP_RUNTIME_UI_PALETTE};
     RecompRuntimeUiConfig config{};
-    config.title="Colores"; config.theme="nes"; config.items=&item; config.item_count=1;
+    config.title="Pausa"; config.theme="nes"; config.items=&item; config.item_count=1;
     config.presentation_flags=RECOMP_RUNTIME_UI_PRESENTATION_CONSOLE_INPUT;
     config.callbacks.get_palette=arcade_colors_get_palette;
     config.callbacks.set_palette=arcade_colors_set_palette;
@@ -223,12 +224,17 @@ static int console_palette_editor() {
     config.callbacks.save=saved;
     RecompRuntimeUi *ui=recomp_runtime_ui_create(&config);
     CHECK(ui && recomp_runtime_ui_uses_console_input(ui));
-    CHECK(recomp_runtime_ui_open_section(ui,"Colores"));
+    CHECK(recomp_runtime_ui_open_section(ui,"Pausa"));
+    CHECK(recomp_runtime_ui_handle_input(ui,RECOMP_RUNTIME_UI_INPUT_ACCEPT,1,0));
+    CHECK(recomp_runtime_ui_handle_input(ui,RECOMP_RUNTIME_UI_INPUT_ACCEPT,1,0));
+    CHECK(std::strcmp(ui->page,"Opciones/Colores")==0);
     uint32_t original[3],actual[3];
     CHECK(arcade_colors_get_palette(nullptr,&item,original));
     const int saves_before=saves;
     ImGuiIO &io=ImGui::GetIO();
     io.DisplaySize=ImVec2(640,480);
+    frame(ui);
+    CHECK(ImGui::FindWindowByName("##arcade-pause")!=nullptr);
     const ImGuiBackendFlags previous_backend = io.BackendFlags;
     io.BackendFlags |= ImGuiBackendFlags_HasGamepad;
     auto press=[&](ImGuiKey key) {
@@ -270,6 +276,102 @@ static int console_palette_editor() {
     CHECK(actual[0]==original[0] && actual[1]==draft && actual[2]==original[2]);
     io.BackendFlags = previous_backend;
     recomp_runtime_ui_destroy(ui);
+    return 0;
+}
+
+static int compact_pause_layout() {
+    const RecompRuntimeUiItem items[] = {
+        {RECOMP_RUNTIME_UI_KEY_RESUME, "Pausa", "Reanudar", "", RECOMP_RUNTIME_UI_ACTION},
+        {RECOMP_RUNTIME_UI_KEY_AUDIO, "Pausa/Opciones/Audio", "Audio", "", RECOMP_RUNTIME_UI_BOOL},
+        {"cyc.return_to_launcher", "Pausa", "Volver al menú principal", "", RECOMP_RUNTIME_UI_ACTION},
+        {"cyc.quit", "Pausa", "Cerrar juego", "", RECOMP_RUNTIME_UI_ACTION},
+    };
+    RecompRuntimeUiConfig config{};
+    config.title = "Pausa";
+    config.theme = "nes";
+    config.items = items;
+    config.item_count = sizeof(items) / sizeof(items[0]);
+    config.presentation_flags = RECOMP_RUNTIME_UI_PRESENTATION_CONSOLE_INPUT;
+    RecompRuntimeUi* ui = recomp_runtime_ui_create(&config);
+    CHECK(ui && recomp_runtime_ui_open_section(ui, "Pausa"));
+
+    SDL_Surface* surface = SDL_CreateRGBSurfaceWithFormat(0, 1152, 1008, 32, SDL_PIXELFORMAT_ARGB8888);
+    CHECK(surface);
+    SDL_Renderer* renderer = SDL_CreateSoftwareRenderer(surface);
+    CHECK(renderer && ImGui_ImplSDLRenderer2_Init(renderer));
+    ImGuiIO& io = ImGui::GetIO();
+    io.DisplaySize = ImVec2(1152, 1008);
+    const ImVec2 origin(64, 24), size(1024, 960);
+    const auto render = [&] {
+        SDL_SetRenderDrawColor(renderer, 24, 54, 78, 255);
+        SDL_RenderClear(renderer);
+        ImGui_ImplSDLRenderer2_NewFrame();
+        ImGui::NewFrame();
+        recomp_runtime_ui_render_imgui_in_rect(ui, origin.x, origin.y, size.x, size.y);
+        ImGui::Render();
+        ImGui_ImplSDLRenderer2_RenderDrawData(ImGui::GetDrawData(), renderer);
+        SDL_RenderPresent(renderer);
+    };
+    const auto pixel = [&](ImVec2 pos) {
+        const auto* bytes = static_cast<const unsigned char*>(surface->pixels);
+        const auto* row = reinterpret_cast<const Uint32*>(bytes + int(pos.y) * surface->pitch);
+        return row[int(pos.x)];
+    };
+    const Uint32 stage = SDL_MapRGBA(surface->format, 24, 54, 78, 255);
+    const Uint32 white = SDL_MapRGBA(surface->format, 255, 255, 255, 255);
+    const Uint32 black = SDL_MapRGBA(surface->format, 0, 0, 0, 255);
+    render();
+    const auto canvas = ArcadeMenuCanvas::inside(origin, size, nullptr, arcade_pause_font());
+    const float edge = canvas.middle - arcade_pause_side / 2;
+    CHECK(pixel(canvas.point(edge - 12, 320)) == stage);
+    CHECK(pixel(canvas.point(canvas.width - edge + 12, 320)) == stage);
+    CHECK(pixel(canvas.point(canvas.middle, arcade_pause_top - 12)) == stage);
+    CHECK(pixel(canvas.point(edge + 2, 320)) == white);
+    CHECK(pixel(canvas.point(edge + 8, 320)) == black);
+    const auto marker = [&](const char* label, float y) {
+        const float scale = canvas.scale;
+        const float text_width = canvas.font->CalcTextSizeA(canvas.body * scale, FLT_MAX, 0, label).x / scale;
+        const float x = canvas.middle - text_width / 2 - canvas.cursor_width - canvas.cursor_gap + 3;
+        return canvas.point(x, y + 1);
+    };
+    const ImVec2 resume = marker("REANUDAR", 392);
+    const ImVec2 options = marker("OPCIONES", 424);
+    CHECK(pixel(resume) == white && pixel(options) == black);
+    CHECK(recomp_runtime_ui_handle_input(ui, RECOMP_RUNTIME_UI_INPUT_DOWN, 1, 0));
+    render();
+    CHECK(pixel(resume) == black && pixel(options) == white);
+    CHECK(recomp_runtime_ui_handle_input(ui, RECOMP_RUNTIME_UI_INPUT_BACK, 1, 0));
+    render();
+    CHECK(!recomp_runtime_ui_is_open(ui) && pixel(canvas.point(edge + 2, 320)) == stage);
+
+    ImGui_ImplSDLRenderer2_Shutdown();
+    SDL_DestroyRenderer(renderer);
+    SDL_FreeSurface(surface);
+    recomp_runtime_ui_destroy(ui);
+    return 0;
+}
+
+static int outer_frame_geometry() {
+    const ArcadeFrame frame = arcade_frame_layout(1920, 1080);
+    CHECK(frame.outer.x == 384 && frame.outer.y == 0);
+    CHECK(frame.outer.w == 1152 && frame.outer.h == 1080 && frame.border == 12);
+    ArcadeRect sides[4];
+    arcade_frame_edges(frame, sides);
+    CHECK(sides[0].y == 0 && sides[0].h == 12 && sides[0].w == 1152);
+    CHECK(sides[1].y == 1068 && sides[1].h == 12 && sides[1].w == 1152);
+    CHECK(sides[2].x == 384 && sides[2].w == 12 && sides[2].h == 1056);
+    CHECK(sides[3].x == 1524 && sides[3].w == 12 && sides[3].h == 1056);
+
+    const ArcadeRect whole = arcade_fit_picture(frame.inner, 256, 240, 1);
+    CHECK(whole.x == 448 && whole.y == 60 && whole.w == 1024 && whole.h == 960);
+    const ArcadeRect fractional = arcade_fit_picture(frame.inner, 256, 240, 0);
+    CHECK(fractional.x == 397 && fractional.y == 12 && fractional.w == 1126 && fractional.h == 1056);
+    const ArcadeFrame narrow = arcade_frame_layout(224, 180);
+    const ArcadeRect fallback = arcade_fit_picture(narrow.inner, 256, 240, 1);
+    CHECK(fallback.w > 0 && fallback.h > 0);
+    CHECK(fallback.x >= narrow.inner.x && fallback.y >= narrow.inner.y);
+    CHECK(fallback.x + fallback.w <= narrow.inner.x + narrow.inner.w);
+    CHECK(fallback.y + fallback.h <= narrow.inner.y + narrow.inner.h);
     return 0;
 }
 
@@ -385,6 +487,28 @@ static int sdl_pointer_bridge() {
         other=cyc_ui_pointer_window_event(nullptr,&event);
         CHECK(other.motion.x==27 && other.motion.y==81);
     }
+    int width, height;
+    CHECK(SDL_GetRendererOutputSize(renderer, &width, &height) == 0);
+    for (int integer : {0, 1}) {
+        const ArcadeRect picture = arcade_fit_picture(arcade_frame_layout(width, height).inner,
+                                                      256, 240, integer);
+        const SDL_Rect viewport{picture.x, picture.y, picture.w, picture.h};
+        CHECK(SDL_RenderSetLogicalSize(renderer, 256, 240) == 0);
+        CHECK(SDL_RenderSetScale(renderer, 1, 1) == 0);
+        CHECK(SDL_RenderSetViewport(renderer, &viewport) == 0);
+        const float scale_x = static_cast<float>(picture.w) / 256;
+        const float scale_y = static_cast<float>(picture.h) / 240;
+        CHECK(SDL_RenderSetScale(renderer, scale_x, scale_y) == 0);
+        cyc_ui_render();
+        float restored_x, restored_y;
+        SDL_RenderGetScale(renderer, &restored_x, &restored_y);
+        CHECK(restored_x == scale_x && restored_y == scale_y);
+        CHECK(SDL_RenderSetScale(renderer, 1, 1) == 0);
+        SDL_Rect restored;
+        SDL_RenderGetViewport(renderer, &restored);
+        CHECK(restored.x == viewport.x && restored.y == viewport.y);
+        CHECK(restored.w == viewport.w && restored.h == viewport.h);
+    }
     cyc_ui_shutdown(); recomp_runtime_ui_destroy(bridge_ui); bridge_ui=nullptr;
     SDL_DestroyRenderer(renderer); SDL_DestroyWindow(window); SDL_Quit();
     ImGui::SetCurrentContext(previous);
@@ -473,6 +597,8 @@ int main() {
     CHECK(disc_controls()==0);
     CHECK(grouped_editor()==0);
     CHECK(console_palette_editor()==0);
+    CHECK(compact_pause_layout()==0);
+    CHECK(outer_frame_geometry()==0);
     CHECK(sdl_pointer_bridge()==0);
     ImGui::DestroyContext();
     std::puts("PASS grouped palettes, stable SDL-scaled mouse clicks/drags, letterboxing, live preview, cancel/save and compact layout.");

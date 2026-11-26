@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.20)
 
-project(ArcadeBros1983Recomp VERSION 1.0.1 LANGUAGES C CXX)
+project(ArcadeBros1983Recomp VERSION 1.0.4 LANGUAGES C CXX)
 
 set(CMAKE_C_STANDARD 11)
 set(CMAKE_CXX_STANDARD 17)
@@ -59,6 +59,10 @@ add_custom_command(TARGET ArcadeBros1983Recomp POST_BUILD
     COMMAND "${CMAKE_COMMAND}" -E copy_if_different
         "${CMAKE_CURRENT_SOURCE_DIR}/assets/fonts/OFL-PixelifySans.txt"
         "$<TARGET_FILE_DIR:ArcadeBros1983Recomp>/assets/fonts/OFL-PixelifySans.txt"
+    COMMAND "${CMAKE_COMMAND}" -E copy_if_different
+        "${CMAKE_CURRENT_SOURCE_DIR}/assets/fonts/Super Mario Bros. NES.ttf"
+        "${CMAKE_CURRENT_SOURCE_DIR}/assets/fonts/OFL-SuperMarioBrosNES.txt"
+        "$<TARGET_FILE_DIR:ArcadeBros1983Recomp>/assets/fonts"
     COMMENT "Copiando tipografia pixelada de Arcade Bros"
     VERBATIM
 )
@@ -70,7 +74,8 @@ add_custom_command(TARGET ArcadeBros1983Recomp POST_BUILD
         "$<TARGET_FILE_DIR:ArcadeBros1983Recomp>/assets/img"
     COMMAND "${CMAKE_COMMAND}" -E copy_if_different
         "${CMAKE_CURRENT_SOURCE_DIR}/assets/img/arcade_bros_1983.png"
-        "$<TARGET_FILE_DIR:ArcadeBros1983Recomp>/assets/img/arcade_bros_1983.png"
-    COMMENT "Copiando portada Arcade Bros 1983"
+        "${CMAKE_CURRENT_SOURCE_DIR}/assets/img/mario_bros_titulo.png"
+        "$<TARGET_FILE_DIR:ArcadeBros1983Recomp>/assets/img"
+    COMMENT "Copiando la portada y el logo de título"
     VERBATIM
 )
