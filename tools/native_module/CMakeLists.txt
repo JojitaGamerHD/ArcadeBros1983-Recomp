@@ -14,7 +14,7 @@ if(NOT EXISTS "${CYC}/cyc.cmake")
 endif()
 option(ARCADE_PREPARE_MODULE "Generate a private module from the local ROM" ON)
 option(ARCADE_WINDOWED_HOST "Build the generic SDL host with its integrated menu" OFF)
-set(ARCADE_RELEASE_VERSION "1.0.4" CACHE STRING "Arcade Bros release version")
+set(ARCADE_RELEASE_VERSION "1.0.5" CACHE STRING "Arcade Bros release version")
 if(ARCADE_WINDOWED_HOST AND ARCADE_PREPARE_MODULE)
     message(FATAL_ERROR "ARCADE_WINDOWED_HOST requires ARCADE_PREPARE_MODULE=OFF; the public host must not generate ROM code.")
 endif()
@@ -79,6 +79,7 @@ if(ARCADE_WINDOWED_HOST)
         COMMAND "${CMAKE_COMMAND}" -E make_directory
             "$<TARGET_FILE_DIR:ArcadeNativeHost>/assets/fonts"
             "$<TARGET_FILE_DIR:ArcadeNativeHost>/assets/img"
+            "$<TARGET_FILE_DIR:ArcadeNativeHost>/assets/music"
         COMMAND "${CMAKE_COMMAND}" -E copy_if_different
             "${ARCADE_ROOT}/assets/fonts/PixelifySans.ttf"
             "$<TARGET_FILE_DIR:ArcadeNativeHost>/assets/fonts/PixelifySans.ttf"
@@ -93,8 +94,10 @@ if(ARCADE_WINDOWED_HOST)
             "${ARCADE_ROOT}/assets/img/arcade_bros_1983.png"
             "${ARCADE_ROOT}/assets/img/mario_bros_titulo.png"
             "$<TARGET_FILE_DIR:ArcadeNativeHost>/assets/img"
+        COMMAND "${CMAKE_COMMAND}" -E copy_if_different
+            "${ARCADE_ROOT}/assets/music/overworld-theme.wav"
+            "$<TARGET_FILE_DIR:ArcadeNativeHost>/assets/music/overworld-theme.wav"
         VERBATIM)
-    # User music remains private; no local OST is copied into the public host.
 endif()
 
 # Generic developer tools: neither target reads or embeds a ROM.

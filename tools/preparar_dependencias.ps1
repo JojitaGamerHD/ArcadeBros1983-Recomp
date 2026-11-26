@@ -1,5 +1,5 @@
 
-# Arcade Bros 1983 Recomp v1.0.4
+# Arcade Bros 1983 Recomp v1.0.5
 # Prepara NESRecomp y recomp-ui sin sobrescribir cambios locales.
 
 $ErrorActionPreference = 'Stop'
@@ -23,6 +23,8 @@ $gridMotor = Join-Path $proyecto 'patches\nesrecomp\arcade-v1.0.3-grid.patch'
 $gridUI = Join-Path $proyecto 'patches\recomp-ui\arcade-v1.0.3-grid.patch'
 $disenoMotor = Join-Path $proyecto 'patches\nesrecomp\arcade-diseno-menus.patch'
 $disenoUI = Join-Path $proyecto 'patches\recomp-ui\arcade-diseno-menus.patch'
+$filtrosMotor = Join-Path $proyecto 'patches\nesrecomp\arcade-v1.0.5-filtros.patch'
+$filtrosUI = Join-Path $proyecto 'patches\recomp-ui\arcade-v1.0.5-filtros.patch'
 
 function Verificar-Comando {
     param([string]$mensaje)
@@ -86,33 +88,37 @@ function Aplicar-ParchesMenu {
         [string]$grid,
         [string]$nombre,
         [string[]]$basesAnteriores = @(),
-        [string]$diseno
+        [string]$diseno,
+        [string]$filtros
     )
 
     # Las capas nuevas pueden cambiar el contexto de una capa anterior.
     # Comprobar primero la mas reciente evita intentar reaplicar la base.
-    if ($diseno -and (Probar-ParcheAplicado $carpeta $diseno)) {
-        Write-Host "El diseno de menus de $nombre ya esta aplicado." -ForegroundColor Green
+    if ($filtros -and (Probar-ParcheAplicado $carpeta $filtros)) {
+        Write-Host "Los filtros de $nombre ya estan aplicados." -ForegroundColor Green
         return
     }
-    if (!(Probar-ParcheAplicado $carpeta $grid)) {
-        if (!(Probar-ParcheAplicado $carpeta $ajustes)) {
-            if (!(Probar-ParcheAplicado $carpeta $menu)) {
-                Aplicar-Parche $carpeta $base $nombre $basesAnteriores
-                Aplicar-Parche $carpeta $menu "Menu nativo $nombre"
+    if (!$diseno -or !(Probar-ParcheAplicado $carpeta $diseno)) {
+        if (!(Probar-ParcheAplicado $carpeta $grid)) {
+            if (!(Probar-ParcheAplicado $carpeta $ajustes)) {
+                if (!(Probar-ParcheAplicado $carpeta $menu)) {
+                    Aplicar-Parche $carpeta $base $nombre $basesAnteriores
+                    Aplicar-Parche $carpeta $menu "Menu nativo $nombre"
+                }
+                Aplicar-Parche $carpeta $ajustes "Ajustes del menu $nombre"
             }
-            Aplicar-Parche $carpeta $ajustes "Ajustes del menu $nombre"
+            Aplicar-Parche $carpeta $grid "Grid $nombre"
         }
-        Aplicar-Parche $carpeta $grid "Grid $nombre"
+        if ($diseno) { Aplicar-Parche $carpeta $diseno "Diseno de menus $nombre" }
     }
-    if ($diseno) { Aplicar-Parche $carpeta $diseno "Diseno de menus $nombre" }
+    if ($filtros) { Aplicar-Parche $carpeta $filtros "Filtros visuales $nombre" }
 }
 
-Write-Host "`n=== PREPARANDO DEPENDENCIAS v1.0.4 ===" -ForegroundColor Cyan
+Write-Host "`n=== PREPARANDO DEPENDENCIAS v1.0.5 ===" -ForegroundColor Cyan
 
 # 1. Comprobar los parches
 foreach ($parche in @($parcheMotor, $parcheUI, $menuMotor, $menuUI, $ajustesMotor, $ajustesUI,
-                     $gridMotor, $gridUI, $disenoMotor, $disenoUI)) {
+                     $gridMotor, $gridUI, $disenoMotor, $disenoUI, $filtrosMotor, $filtrosUI)) {
     if (!(Test-Path $parche -PathType Leaf)) {
         throw "No se encontro el parche: $parche"
     }
@@ -154,7 +160,7 @@ Aplicar-ParchesMenu $motor $parcheMotor $menuMotor $ajustesMotor $gridMotor 'NES
     (Join-Path $proyecto 'patches\nesrecomp\arcade-v1.0.1-editor.patch'),
     (Join-Path $proyecto 'patches\nesrecomp\arcade-v1.0.1-colores.patch'),
     (Join-Path $proyecto 'patches\nesrecomp\arcade-v1.0.1.patch'),
-    (Join-Path $proyecto 'patches\nesrecomp\arcade-v0.9.patch')) -diseno $disenoMotor
+    (Join-Path $proyecto 'patches\nesrecomp\arcade-v0.9.patch')) -diseno $disenoMotor -filtros $filtrosMotor
 
 # 3. Preparar recomp-ui
 if (!(Test-Path (Join-Path $ui '.git'))) {
@@ -180,7 +186,7 @@ if ($actualUI -ne $revisionUI) {
 Aplicar-ParchesMenu $ui $parcheUI $menuUI $ajustesUI $gridUI 'recomp-ui' @(
     (Join-Path $proyecto 'patches\recomp-ui\arcade-v1.0.1-colores.patch'),
     (Join-Path $proyecto 'patches\recomp-ui\arcade-v1.0.1.patch'),
-    (Join-Path $proyecto 'patches\recomp-ui\arcade-v1.0.patch')) -diseno $disenoUI
+    (Join-Path $proyecto 'patches\recomp-ui\arcade-v1.0.patch')) -diseno $disenoUI -filtros $filtrosUI
 
 # 4. Compilar el recompilador de NES
 $carpetaBuild = Join-Path $motor 'build\recompiler'

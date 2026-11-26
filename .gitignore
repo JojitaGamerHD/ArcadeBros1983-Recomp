@@ -27,4 +27,5 @@ Datos/
 /deps/
 
 # Musica local del usuario
-/assets/music/
+/assets/music/*
+!/assets/music/overworld-theme.wav

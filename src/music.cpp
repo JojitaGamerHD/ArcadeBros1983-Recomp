@@ -140,6 +140,12 @@ int load(const wchar_t *path) {
                  static_cast<double>(music.size()) / kOutputRate);
     return 1;
 }
+
+bool load_if_present(const wchar_t *path) {
+    const DWORD attributes = GetFileAttributesW(path);
+    return attributes != INVALID_FILE_ATTRIBUTES &&
+           !(attributes & FILE_ATTRIBUTE_DIRECTORY) && load(path);
+}
 }
 
 extern "C" int arcade_music_load_utf8(const char *path) {
@@ -161,16 +167,14 @@ extern "C" int arcade_music_load_default(void) {
         // A privately supplied track stays outside the generic Bin/ package.
         wchar_t local[32768];
         const DWORD length = GetFullPathNameW(L"Music\\stage1.m4a", 32768, local, nullptr);
-        if (length && length < 32768) {
-            const DWORD attributes = GetFileAttributesW(local);
-            if (attributes != INVALID_FILE_ATTRIBUTES && !(attributes & FILE_ATTRIBUTE_DIRECTORY))
-                return load(local);
-        }
+        if (length && length < 32768 && load_if_present(local)) return 1;
         std::wstring path(file, n);
         const size_t slash = path.find_last_of(L"\\/");
         if (slash == std::wstring::npos) return 0;
         path.resize(slash + 1);
-        path += L"assets\\music\\stage1.m4a";
+        path += L"assets\\music\\";
+        if (load_if_present((path + L"stage1.m4a").c_str())) return 1;
+        path += L"overworld-theme.wav";
         return load(path.c_str());
     } catch (...) { music.clear(); cursor = 0; return 0; }
 }

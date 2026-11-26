@@ -5,7 +5,7 @@
 [![Estado](https://img.shields.io/badge/estado-Completo-blue)](https://github.com/JojitaGamerHD/ArcadeBros1983-Recomp)
 [![Plataforma](https://img.shields.io/badge/plataforma-Windows%20x64-blue)](https://github.com/JojitaGamerHD/ArcadeBros1983-Recomp)
 
-**Versión estable v1.0.4** · [Descargar para Windows x64](https://github.com/JojitaGamerHD/ArcadeBros1983-Recomp/releases/download/v1.0.4/ArcadeBros1983-Recomp-v1.0.4-Windows-x64.zip)
+**Versión estable v1.0.5** · [Descargar para Windows x64](https://github.com/JojitaGamerHD/ArcadeBros1983-Recomp/releases/download/v1.0.5/ArcadeBros1983-Recomp-v1.0.5-Windows-x64.zip)
 
 El menú principal se abre con
 `Bin/ArcadeNativeHost.exe` antes de importar la ROM. El menú reúne los
@@ -13,13 +13,13 @@ cuatro modos de juego, Opciones, Cargar ROM y Salir. La partida y la
 pausa se muestran en esa misma ventana.
 
 El repositorio contiene fuentes, scripts y parches. El ZIP contiene el motor
-y las herramientas genéricas. Cada jugador aporta su propia ROM compatible
-y, si quiere música de fondo, una pista local. El proyecto es independiente,
+y las herramientas genéricas. Cada jugador aporta su propia ROM compatible.
+El proyecto es independiente,
 sin fines comerciales y sin afiliación con Nintendo.
 
 ## Descargar y jugar
 
-Descarga `ArcadeBros1983-Recomp-v1.0.4-Windows-x64.zip`. [Release v1.0.4 y archivo SHA-256](https://github.com/JojitaGamerHD/ArcadeBros1983-Recomp/releases/tag/v1.0.4)
+Descarga `ArcadeBros1983-Recomp-v1.0.5-Windows-x64.zip`. [Release v1.0.5 y archivo SHA-256](https://github.com/JojitaGamerHD/ArcadeBros1983-Recomp/releases/tag/v1.0.5)
 
 1. Extrae el ZIP completo en una carpeta con permiso de escritura.
 2. Guarda tu ROM compatible de Mario Bros. (NES) como `rom/game.nes` en la
@@ -47,6 +47,12 @@ La release incluye un archivo `.zip.sha256` y el paquete lleva
 
 Para actualizar, cierra el programa, extrae el ZIP en una carpeta nueva y
 copia `Datos` y tu archivo `rom/game.nes` de la instalación anterior.
+
+## Cambios de v1.0.5
+
+- Filtros **Scanlines**, **CRT** y **Nítido** para la partida y la demo, disponibles desde el menú principal y la pausa.
+- **Grid**, **Scanlines** y **CRT** guardan intensidades independientes. El nombre del ajuste sigue al filtro activo.
+- **Overworld Theme**, de Louswan, viene incluida bajo CC0 1.0. **Música de fondo** permite activarla y una pista personal en `Datos/Music/stage1.m4a` tiene prioridad. [Fuente y licencia de la pista](https://opengameart.org/content/overworld-theme-0)
 
 ## Cambios de v1.0.4
 
@@ -118,6 +124,13 @@ de la imagen original de 256 × 240 píxeles y deja espacio para los cuatro
 lados dentro de la ventana. Al redimensionar la ventana, la pausa se
 mantiene centrada sobre la partida.
 
+En la v1.0.5, **Gráficos → Filtro visual** ofrece **Ninguno**, **Grid**,
+**Scanlines**, **CRT** y **Nítido** para la partida y la demo. Grid,
+Scanlines y CRT guardan su intensidad por separado. La cuadrícula y las
+líneas aparecen a partir de 2× de escala. La máscara de color de CRT
+se añade a partir de 3× de escala horizontal. Nítido ajusta los bordes
+de los píxeles cuando la escala es fraccionaria.
+
 **60 FPS es la opción inicial y recomendada.** Los modos 120/180 conservan su
 suavizado visual experimental en escenas compatibles. La lógica, velocidad
 y audio de NES mantienen su ritmo original. El contador de presentación
@@ -127,30 +140,26 @@ de 180 imágenes diferentes por segundo.
 
 ## Música de fondo opcional
 
-Coloca una pista M4A/MP4 compatible con Media Foundation en la ruta recomendada:
+Desde la v1.0.5, activa **Opciones → Audio → Música de fondo** para escuchar
+*Overworld Theme* de Louswan. La pista viene incluida bajo CC0 1.0.
+[Fuente y licencia de la pista](https://opengameart.org/content/overworld-theme-0)
+
+Para usar tu propia música, guarda un archivo M4A compatible con Media
+Foundation con este nombre en la carpeta extraída.
 
 ```text
 Datos/Music/stage1.m4a
 ```
 
-También se conserva esta alternativa, comprobada durante la prueba del ZIP:
-
-```text
-Bin/assets/music/stage1.m4a
-```
-
-Se busca primero `Datos/Music`. Después de añadir la pista, activa
-**Audio → Música de fondo** y ajusta **Volumen de música**. Una configuración
-nueva inicia la música desactivada, con volumen independiente de 35 %.
+El archivo personal tiene prioridad sobre la pista incluida. Esta ruta
+también sirve en la v1.0.4. El ajuste está desactivado al instalar y
+**Volumen de música** comienza en 35 %.
 
 La pista empieza después de la introducción original de cada fase y se repite
 en bucle. Continúa al perder una vida y durante la espera de reaparición.
 Game Over la detiene; el menú de pausa conserva su posición. Los efectos y
-volúmenes de NES se mantienen. Si la pista falta o no puede decodificarse,
-se conserva el audio original.
-
-El ZIP público no incluye la pista. Para compartir el programa utiliza el ZIP
-original de la release; los archivos añadidos para jugar quedan en tu copia local.
+volúmenes de NES se mantienen. Para volver a la pista incluida, mueve tu
+archivo personal fuera de `Datos/Music` y reinicia el juego.
 
 ## Carpetas del portable
 

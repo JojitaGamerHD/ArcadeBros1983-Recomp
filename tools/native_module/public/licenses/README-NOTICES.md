@@ -24,6 +24,7 @@ avisos originales dentro de `Bin/compiler/lib/clang/23/include`.
 | Noto Sans Symbols 2 | Fuente distribuida por recomp-ui | NotoSansSymbols2-OFL.txt; recomp-ui-FONTS-NOTICE.md |
 | OpenMoji Black | Fuente distribuida por recomp-ui; OpenMoji, HfG Schwabisch Gmund | OpenMoji-CC-BY-SA-4.0.txt; recomp-ui-FONTS-NOTICE.md |
 | Banderas flags.png | Renderizadas desde Noto Color Emoji, segun el aviso de recomp-ui | NotoColorEmoji-Flags-OFL.txt; recomp-ui-IMAGES-NOTICE.md |
+| Overworld Theme (versión alternativa) | Louswan, [OpenGameArt](https://opengameart.org/content/overworld-theme-0) | [CC0 1.0 Universal](https://creativecommons.org/publicdomain/zero/1.0/) |
 
 `FONT-METADATA-NOTICE.txt` conserva los avisos de copyright y licencia leidos
 directamente de las cinco fuentes de la versión inicial del paquete.

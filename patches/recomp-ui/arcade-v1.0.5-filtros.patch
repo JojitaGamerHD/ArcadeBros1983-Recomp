@@ -1,0 +1,400 @@
+diff --git a/src/common/backends/imgui/launcher_imgui.cpp b/src/common/backends/imgui/launcher_imgui.cpp
+--- a/src/common/backends/imgui/launcher_imgui.cpp
++++ b/src/common/backends/imgui/launcher_imgui.cpp
+@@ -35,6 +35,7 @@
+ #include "arcade_menu_canvas.h"
+ #ifdef ARCADE_NATIVE_MENU
+ #include "arcade_grid.h"
++#include "cyc_arcade_filter.h"
+ #endif
+ #include "launcher_nav.h"
+ #if defined(LNG_SDL3)
+@@ -14240,27 +14241,41 @@
+ }
+ 
+ #ifdef ARCADE_NATIVE_MENU
+-void draw_arcade_demo_grid(ImDrawList* draw, ImVec2 min, ImVec2 max,
+-                           int source_width, int source_height, int intensity) {
++void draw_arcade_demo_filter(ImDrawList* draw, const ArcadeDrawable& drawable, ArcadeRect picture,
++                             int source_width, int source_height, int filter, int intensity) {
+     const int alpha = arcade_grid_alpha(intensity);
+     if (!alpha) return;
+-    const ImVec2 density = ImGui::GetIO().DisplayFramebufferScale;
+-    const int left = static_cast<int>(std::round(min.x * density.x));
+-    const int top = static_cast<int>(std::round(min.y * density.y));
+-    const int width = static_cast<int>(std::round(max.x * density.x)) - left;
+-    const int height = static_cast<int>(std::round(max.y * density.y)) - top;
+-    if (!arcade_grid_visible(width, height, source_width, source_height)) return;
+-
+-    const ImU32 color = IM_COL32(0, 0, 0, alpha);
+-    for (int x = 1; x < source_width; ++x) {
+-        const int line = left + arcade_grid_offset(width, x, source_width);
+-        draw->AddRectFilled(ImVec2(line / density.x, min.y),
+-                            ImVec2((line + 1) / density.x, max.y), color);
+-    }
+-    for (int y = 1; y < source_height; ++y) {
+-        const int line = top + arcade_grid_offset(height, y, source_height);
+-        draw->AddRectFilled(ImVec2(min.x, line / density.y),
+-                            ImVec2(max.x, (line + 1) / density.y), color);
++    const int width = picture.w, height = picture.h;
++    const auto fill = [&](int x, int y, int w, int h, ImU32 color) {
++        draw->AddRectFilled(drawable.point(picture.x + x, picture.y + y),
++                            drawable.point(picture.x + x + w, picture.y + y + h), color);
++    };
++    if (filter == ARCADE_FILTER_GRID) {
++        if (!arcade_grid_visible(width, height, source_width, source_height)) return;
++        const ImU32 color = IM_COL32(0, 0, 0, alpha);
++        for (int x = 1; x < source_width; ++x)
++            fill(arcade_grid_offset(width, x, source_width), 0, 1, height, color);
++        for (int y = 1; y < source_height; ++y)
++            fill(0, arcade_grid_offset(height, y, source_height), width, 1, color);
++        return;
++    }
++    if (height / 2 < source_height) return;
++    const bool crt = filter == ARCADE_FILTER_CRT;
++    const ImU32 bands = IM_COL32(0, 0, 0, crt ? alpha * 3 / 4 : alpha);
++    for (int y = 0; y < source_height; ++y) {
++        const int bottom = arcade_grid_offset(height, y + 1, source_height);
++        const int band = arcade_scanline_width(bottom - arcade_grid_offset(height, y, source_height));
++        fill(0, bottom - band, width, band, bands);
++    }
++    if (crt && width / 3 >= source_width) {
++        const int gain = arcade_crt_mask_gain(intensity);
++        const ImU32 mask[] = {
++            IM_COL32(255, gain, gain, 255), IM_COL32(gain, 255, gain, 255), IM_COL32(gain, gain, 255, 255)
++        };
++        draw->AddCallback([](const ImDrawList*, const ImDrawCmd*) { launcher_gl_modulate(); }, nullptr);
++        for (int x = 0; x < width; ++x)
++            fill(x, 0, 1, height, mask[x % 3]);
++        draw->AddCallback(ImDrawCallback_ResetRenderState, nullptr);
+     }
+ }
+ #endif
+@@ -14506,40 +14521,56 @@
+         5 * rows.value("VOLUMEN DE MÚSICA:", value, y + rows.canvas.row), 0, 100);
+ }
+ 
+-void draw_arcade_graphics(LauncherModel* m, ArcadeOptionsRows& rows, ArcadeTitleState& state) {
++int draw_arcade_graphics(LauncherModel* m, ArcadeOptionsRows& rows, ArcadeTitleState& state) {
+     float y = arcade_first_row;
+-    if (rows.value("MODO DE PANTALLA:", m->s.fullscreen ? "COMPLETA" : "VENTANA", y, true))
++    const auto option = [&](const char* label, const char* value, float at, bool enabled = true) {
++        return rows.value(label, value, at, true, enabled, 0, 620, 894);
++    };
++    if (option("MODO DE PANTALLA:", m->s.fullscreen ? "COMPLETA" : "VENTANA", y))
+         launcher_model_set_fullscreen(m, !m->s.fullscreen);
+-    if (rows.value("ESCALADO ENTERO:", arcade_yes_no(m->s.integer_scale), y += rows.canvas.row, true))
++    if (option("ESCALADO ENTERO:", arcade_yes_no(m->s.integer_scale), y += rows.canvas.row))
+         launcher_model_toggle_integer_scale(m);
+-    if (rows.value("MOSTRAR FPS:", arcade_yes_no(m->s.arcade_show_fps), y += rows.canvas.row, true))
++    if (option("MOSTRAR FPS:", arcade_yes_no(m->s.arcade_show_fps), y += rows.canvas.row))
+         m->s.arcade_show_fps = !m->s.arcade_show_fps;
+     constexpr int rates[] = {30, 60, 120, 180};
+     const int* rate = std::find(std::begin(rates), std::end(rates), m->s.arcade_target_fps);
+     const int index = rate == std::end(rates) ? 1 : int(rate - std::begin(rates));
+     char value[16];
+     std::snprintf(value, sizeof(value), "%d", rates[index]);
+-    const int delta = rows.value("LÍMITE DE FPS:", value, y += rows.canvas.row, true);
++    const int delta = option("LÍMITE DE FPS:", value, y += rows.canvas.row);
+     if (delta) m->s.arcade_target_fps = rates[(index + delta + 4) % 4];
+-    if (rows.value("VSYNC:", arcade_yes_no(m->s.vsync != RECOMP_LAUNCHER_VSYNC_OFF),
+-                   y += rows.canvas.row, true, m->s.arcade_target_fps == 60))
++    if (option("VSYNC:", arcade_yes_no(m->s.vsync != RECOMP_LAUNCHER_VSYNC_OFF),
++               y += rows.canvas.row, m->s.arcade_target_fps == 60))
+         launcher_model_toggle_vsync(m);
+-    if (rows.value("MARCO:", m->s.arcade_frame_mode ? "CLÁSICO" : "NO", y += rows.canvas.row, true))
++    if (option("MARCO:", m->s.arcade_frame_mode ? "CLÁSICO" : "NO", y += rows.canvas.row))
+         m->s.arcade_frame_mode = !m->s.arcade_frame_mode;
+     std::snprintf(value, sizeof(value), "#%06X", static_cast<unsigned>(m->s.arcade_frame_rgb));
+     if (rows.value("COLOR MARCO:", value, y += rows.canvas.row, true, m->s.arcade_frame_mode != 0,
+-                   arcade_rgb(m->s.arcade_frame_rgb), 597, 835, false)) {
++                   arcade_rgb(m->s.arcade_frame_rgb), 620, 894, false)) {
+         state.original_frame_rgb = m->s.arcade_frame_rgb;
+         const ImVec4 rgb = ImGui::ColorConvertU32ToFloat4(arcade_rgb(m->s.arcade_frame_rgb));
+         ImGui::ColorConvertRGBtoHSV(rgb.x, rgb.y, rgb.z, state.frame_hsv[0], state.frame_hsv[1], state.frame_hsv[2]);
+         state.options = ArcadeOptionsPage::FrameColor;
+         state.focus_options = true;
+     }
+-    if (rows.value("FILTRO VISUAL:", m->s.arcade_visual_filter ? "GRID" : "NINGUNO", y += rows.canvas.row, true))
+-        m->s.arcade_visual_filter = !m->s.arcade_visual_filter;
+-    arcade_percent(value, m->s.arcade_grid_intensity);
+-    m->s.arcade_grid_intensity = std::clamp(m->s.arcade_grid_intensity + 5 *
+-        rows.value("INTENSIDAD GRID:", value, y + rows.canvas.row, true, m->s.arcade_visual_filter != 0), 0, 100);
++#ifdef ARCADE_NATIVE_MENU
++    int& filter = m->s.arcade_visual_filter;
++    if (!arcade_filter_valid(filter)) filter = ARCADE_FILTER_NONE;
++    const int change = option("FILTRO VISUAL:", arcade_filter_names[filter], y += rows.canvas.row);
++    filter = (filter + change + ARCADE_FILTER_COUNT) % ARCADE_FILTER_COUNT;
++    int* intensity = arcade_filter_intensity(filter, &m->s.arcade_grid_intensity,
++                                            &m->s.arcade_scanline_intensity, &m->s.arcade_crt_intensity);
++    if (intensity) {
++        char label[40];
++        std::snprintf(label, sizeof(label), "%s:", arcade_filter_intensity_name(filter));
++        arcade_percent(value, *intensity);
++        *intensity = std::clamp(*intensity + 5 * option(label, value, y + rows.canvas.row), 0, 100);
++        return 9;
++    }
++    return 8;
++#else
++    return 7;
++#endif
+ }
+ 
+ void draw_arcade_frame_color(LauncherModel* m, ArcadeOptionsRows& rows, ArcadeTitleState& state) {
+@@ -14774,7 +14805,7 @@
+     switch (page) {
+         case ArcadeOptionsPage::Audio: draw_arcade_audio(m, rows); last = 4; break;
+         case ArcadeOptionsPage::Controls: draw_arcade_controls(m, rows, state); last = 5; break;
+-        case ArcadeOptionsPage::Graphics: draw_arcade_graphics(m, rows, state); last = 9; break;
++        case ArcadeOptionsPage::Graphics: last = draw_arcade_graphics(m, rows, state); break;
+         case ArcadeOptionsPage::FrameColor:
+             draw_arcade_frame_color(m, rows, state); last = 4; extra_gap = canvas.gap; break;
+         case ArcadeOptionsPage::Bindings: draw_arcade_bindings(m, rows); last = 5; break;
+@@ -15618,7 +15649,7 @@
+         unsigned char* pixels = launcher_image_load_rgba(asset("assets/img/mario_bros_titulo.png").c_str(),
+                                                           &width, &height);
+         if (pixels) {
+-            launcher_texture_update_pixels(&g_arcade_title_logo, pixels, width, height);
++            launcher_texture_update_pixels(&g_arcade_title_logo, pixels, width, height, false);
+             launcher_image_free(pixels);
+         }
+     }
+@@ -15668,6 +15699,9 @@
+     bool first_present_marked = false;
+     LauncherTexture attract_texture{};
+     std::vector<unsigned char> attract_rgba;
++#ifdef ARCADE_NATIVE_MENU
++    std::vector<uint32_t> attract_sharp;
++#endif
+     bool showing_demo = false;
+     SDL_Scancode dismissed_key = SDL_SCANCODE_UNKNOWN;
+ 
+@@ -15900,29 +15934,46 @@
+                 m->arcade_menu_attract(m->s.enable_audio, m->s.volume, at_main && !input_active) : nullptr;
+             if (demo) {
+                 constexpr int width = 256, height = 240;
+-                attract_rgba.resize(width * height * 4);
+-                for (int i = 0; i < width * height; ++i) {
++                const ArcadeDrawable drawable{*ImGui::GetMainViewport()};
++                const ArcadeRect pixels = drawable.pixels();
++                const ArcadeFrame layout = arcade_frame_layout(pixels.w, pixels.h);
++                const bool framed = m->s.arcade_frame_mode == 1;
++                const ArcadeRect picture = arcade_fit_picture(framed ? layout.inner : pixels,
++                    width, height, m->s.integer_scale);
++                int texture_width = width, texture_height = height;
++                bool linear = false;
++#ifdef ARCADE_NATIVE_MENU
++                const int filter = m->s.arcade_visual_filter;
++                linear = filter == ARCADE_FILTER_SHARP &&
++                         arcade_sharp_fractional(picture.w, picture.h, width, height);
++                if (linear && picture.w >= width && picture.h >= height) {
++                    texture_width *= 2;
++                    texture_height *= 2;
++                    attract_sharp.resize(texture_width * texture_height);
++                    arcade_expand_2x(attract_sharp.data(), texture_width, demo, width, height);
++                    demo = attract_sharp.data();
++                }
++#endif
++                attract_rgba.resize(texture_width * texture_height * 4);
++                for (int i = 0; i < texture_width * texture_height; ++i) {
+                     attract_rgba[4 * i] = static_cast<unsigned char>(demo[i] >> 16);
+                     attract_rgba[4 * i + 1] = static_cast<unsigned char>(demo[i] >> 8);
+                     attract_rgba[4 * i + 2] = static_cast<unsigned char>(demo[i]);
+                     attract_rgba[4 * i + 3] = 255;
+                 }
+-                showing_demo = launcher_texture_update_pixels(&attract_texture, attract_rgba.data(), width, height);
++                showing_demo = launcher_texture_update_pixels(&attract_texture, attract_rgba.data(),
++                                                               texture_width, texture_height, linear);
+                 if (showing_demo) {
+-                    const ArcadeDrawable drawable{*ImGui::GetMainViewport()};
+-                    const ArcadeRect pixels = drawable.pixels();
+-                    const ArcadeFrame layout = arcade_frame_layout(pixels.w, pixels.h);
+-                    const bool framed = m->s.arcade_frame_mode == 1;
+-                    const ArcadeRect picture = arcade_fit_picture(framed ? layout.inner : pixels,
+-                        width, height, m->s.integer_scale);
+                     const ImVec2 min = drawable.point(picture.x, picture.y);
+                     const ImVec2 max = drawable.point(picture.x + picture.w, picture.y + picture.h);
+                     ImDrawList* background = ImGui::GetBackgroundDrawList();
+                     if (framed) draw_arcade_frame(background, drawable, layout, m->s.arcade_frame_rgb);
+                     background->AddImage(tid(attract_texture), min, max);
+ #ifdef ARCADE_NATIVE_MENU
+-                    if (m->s.arcade_visual_filter == 1)
+-                        draw_arcade_demo_grid(background, min, max, width, height, m->s.arcade_grid_intensity);
++                    const int* intensity = arcade_filter_intensity(filter, &m->s.arcade_grid_intensity,
++                        &m->s.arcade_scanline_intensity, &m->s.arcade_crt_intensity);
++                    if (intensity)
++                        draw_arcade_demo_filter(background, drawable, picture, width, height, filter, *intensity);
+ #endif
+                 }
+             }
+diff --git a/src/common/backends/imgui/runtime_ui_imgui.cpp b/src/common/backends/imgui/runtime_ui_imgui.cpp
+--- a/src/common/backends/imgui/runtime_ui_imgui.cpp
++++ b/src/common/backends/imgui/runtime_ui_imgui.cpp
+@@ -5,6 +5,9 @@
+ #include "launcher_theme.h"
+ #include "arcade_color_disc.h"
+ #include "arcade_menu_canvas.h"
++#ifdef ARCADE_NATIVE_MENU
++#include "cyc_arcade_filter.h"
++#endif
+ 
+ #include "imgui.h"
+ 
+@@ -689,7 +692,6 @@
+     if (pause_key(item, "cyc.return_to_launcher")) return "VOLVER AL MENÚ";
+     if (pause_key(item, RECOMP_RUNTIME_UI_KEY_AUDIO)) return "AUDIO";
+     if (pause_key(item, "cyc.arcade.frame_rgb")) return "COLOR MARCO";
+-    if (pause_key(item, "cyc.arcade.grid_intensity")) return "INTENSIDAD GRID";
+     if (pause_key(item, "arcade.color.enabled")) return "COLORES CUSTOM";
+     if (pause_key(item, "arcade.color.mario")) return "COLORES MARIO";
+     if (pause_key(item, "arcade.color.luigi")) return "COLORES LUIGI";
+@@ -713,10 +715,8 @@
+             std::snprintf(out, sizeof(out), "%s", value ? "COMPLETA" : "VENTANA");
+             return;
+         }
+-        if (pause_key(item, "cyc.arcade.frame_mode") || pause_key(item, "cyc.arcade.visual_filter")) {
+-            const char* name = pause_key(item, "cyc.arcade.frame_mode")
+-                ? (value ? "CLÁSICO" : "NO") : (value ? "GRID" : "NINGUNO");
+-            std::snprintf(out, sizeof(out), "%s", name);
++        if (pause_key(item, "cyc.arcade.frame_mode")) {
++            std::snprintf(out, sizeof(out), "%s", value ? "CLÁSICO" : "NO");
+             return;
+         }
+         if (pause_key(item, "cyc.arcade.target_fps")) {
+@@ -724,7 +724,11 @@
+             return;
+         }
+         if (pause_key(item, RECOMP_RUNTIME_UI_KEY_VOLUME) ||
+-            pause_key(item, "cyc.arcade.music_volume") || pause_key(item, "cyc.arcade.grid_intensity")) {
++            pause_key(item, "cyc.arcade.music_volume")
++#ifdef ARCADE_NATIVE_MENU
++            || pause_key(item, ARCADE_FILTER_INTENSITY_KEY)
++#endif
++        ) {
+             std::snprintf(out, sizeof(out), "%d%%", value);
+             return;
+         }
+@@ -755,7 +759,7 @@
+         canvas.draw = ImGui::GetWindowDrawList();
+         const bool graphics = std::strcmp(ui->page, "Opciones/Gráficos") == 0;
+         float panel_width = arcade_pause_side;
+-        if (graphics) panel_width = 872;
++        if (graphics) panel_width = 912;
+         else if (std::strcmp(ui->page, "Opciones/Colores") == 0) panel_width = 680;
+         else if (ui->page_depth >= 2) panel_width = 816;
+         paint_arcade_pause_panel(canvas, panel_width);
+@@ -771,6 +775,13 @@
+             char folder[96];
+             const RecompRuntimeUiItem* item = recomp_runtime_ui_page_entry(ui, row, folder, sizeof(folder));
+             const char* label = pause_label(item, folder);
++#ifdef ARCADE_NATIVE_MENU
++            char intensity_label[64];
++            if (pause_key(item, ARCADE_FILTER_INTENSITY_KEY)) {
++                recomp_runtime_ui_current_text(ui, item, intensity_label, sizeof(intensity_label));
++                label = intensity_label;
++            }
++#endif
+             if (!label || !*label) continue;
+             const bool enabled = !item || recomp_runtime_ui_item_enabled(ui, item) != 0;
+             const bool selected = enabled && row == ui->row_index;
+@@ -784,9 +795,9 @@
+                 pause_value(ui, item, value, swatch);
+                 if (graphics) {
+                     std::snprintf(name, sizeof(name), "%s:", label);
+-                    canvas.choice(name, 597, y, selected, 1);
+-                    canvas.text(value, 835, y, canvas.white, 1);
+-                    if (swatch) canvas.swatch(847, y, swatch);
++                    canvas.choice(name, 620, y, selected, 1);
++                    canvas.text(value, 894, y, canvas.white, 1);
++                    if (swatch) canvas.swatch(906, y, swatch);
+                 } else {
+                     std::snprintf(name, sizeof(name), "%s: %s", label, value);
+                     canvas.choice(name, canvas.middle, y, selected);
+diff --git a/src/common/launcher_gl.c b/src/common/launcher_gl.c
+--- a/src/common/launcher_gl.c
++++ b/src/common/launcher_gl.c
+@@ -79,17 +79,18 @@
+     return load_impl(path, tolerance < 0 ? 0 : tolerance);
+ }
+ 
+-bool launcher_texture_update_pixels(LauncherTexture* t, const unsigned char* rgba, int w, int h) {
++bool launcher_texture_update_pixels(LauncherTexture* t, const unsigned char* rgba, int w, int h, bool linear) {
+     if (!t || !rgba || w <= 0 || h <= 0) return false;
+     if (!t->id) {
+         glGenTextures(1, &t->id);
+         if (!t->id) return false;
+         glBindTexture(GL_TEXTURE_2D, t->id);
+-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+     } else glBindTexture(GL_TEXTURE_2D, t->id);
++    const GLint filter = linear ? GL_LINEAR : GL_NEAREST;
++    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, filter);
++    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, filter);
+     glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
+     if (t->w != w || t->h != h) {
+         glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, w, h, 0, GL_RGBA, GL_UNSIGNED_BYTE, rgba);
+@@ -98,6 +99,10 @@
+     } else glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, w, h, GL_RGBA, GL_UNSIGNED_BYTE, rgba);
+     glBindTexture(GL_TEXTURE_2D, 0);
+     return true;
++}
++
++void launcher_gl_modulate(void) {
++    glBlendFunc(GL_ZERO, GL_SRC_COLOR);
+ }
+ 
+ void launcher_texture_free(LauncherTexture* t) {
+diff --git a/src/common/launcher_gl.h b/src/common/launcher_gl.h
+--- a/src/common/launcher_gl.h
++++ b/src/common/launcher_gl.h
+@@ -30,7 +30,8 @@
+ // art asset-agnostic instead of hand-editing each game's images.
+ LauncherTexture launcher_texture_load_colorkey(const char* path, int tolerance);
+ 
+-bool launcher_texture_update_pixels(LauncherTexture* t, const unsigned char* rgba, int w, int h);
++bool launcher_texture_update_pixels(LauncherTexture* t, const unsigned char* rgba, int w, int h, bool linear);
++void launcher_gl_modulate(void);
+ void launcher_texture_free(LauncherTexture* t);
+ 
+ // Decode an image file to a tightly-packed RGBA8 buffer, WITHOUT touching GL.
+diff --git a/src/common/recomp_runtime_ui.c b/src/common/recomp_runtime_ui.c
+--- a/src/common/recomp_runtime_ui.c
++++ b/src/common/recomp_runtime_ui.c
+@@ -1,5 +1,8 @@
+ #include "recomp_runtime_ui_internal.h"
+ #include "launcher_theme.h"
++#ifdef ARCADE_NATIVE_MENU
++#include "cyc_arcade_filter.h"
++#endif
+ 
+ #include <stdio.h>
+ #include <stdlib.h>
+@@ -93,6 +96,11 @@
+         const char *rest = NULL;
+         const int rel = path_relation(item_path(&ui->config.items[i]), page, &rest);
+         if (rel == 0) continue;
++#ifdef ARCADE_NATIVE_MENU
++        const RecompRuntimeUiItem *item = &ui->config.items[i];
++        if (rel == 1 && same_text(item->key, ARCADE_FILTER_INTENSITY_KEY) &&
++            !recomp_runtime_ui_item_enabled(ui, item)) continue;
++#endif
+         size_t folder_len = 0;
+         if (rel == 2) {
+             /* One folder row per next component, at its first appearance. */
+diff --git a/src/recomp_launcher.h b/src/recomp_launcher.h
+--- a/src/recomp_launcher.h
++++ b/src/recomp_launcher.h
+@@ -1582,8 +1582,10 @@
+     /* Bezel used for the space outside the game picture. */
+     int  arcade_frame_mode;     /* 0 off, 1 classic */
+     uint32_t arcade_frame_rgb;  /* RGB24 */
+-    int  arcade_visual_filter;  /* 0 off, 1 Grid */
++    int  arcade_visual_filter;  /* 0 off, 1 Grid, 2 Scanlines, 3 CRT, 4 sharp */
+     int  arcade_grid_intensity; /* 0..100 */
++    int  arcade_scanline_intensity;
++    int  arcade_crt_intensity;
+ };
+ #define RECOMP_LAUNCHER_HAS_ZAPPER_SETTINGS 1
+ 

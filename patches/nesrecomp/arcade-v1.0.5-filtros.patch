@@ -1,0 +1,442 @@
+diff --git a/runner/cyc/cyc_arcade_filter.h b/runner/cyc/cyc_arcade_filter.h
+new file mode 100644
+--- /dev/null
++++ b/runner/cyc/cyc_arcade_filter.h
+@@ -0,0 +1,78 @@
++#ifndef CYC_ARCADE_FILTER_H
++#define CYC_ARCADE_FILTER_H
++
++#include <stddef.h>
++#include <stdint.h>
++#include <string.h>
++
++/* The first two values are already stored in v1.0.3/v1.0.4 config.ini files. */
++enum {
++    ARCADE_FILTER_NONE,
++    ARCADE_FILTER_GRID,
++    ARCADE_FILTER_SCANLINES,
++    ARCADE_FILTER_CRT,
++    ARCADE_FILTER_SHARP,
++    ARCADE_FILTER_COUNT
++};
++
++#define ARCADE_FILTER_INTENSITY_KEY "cyc.arcade.filter_intensity"
++
++static const char *const arcade_filter_names[ARCADE_FILTER_COUNT] = {
++    "NINGUNO", "GRID", "SCANLINES", "CRT", "NÍTIDO"
++};
++
++static inline int arcade_filter_valid(int filter)
++{
++    return filter >= ARCADE_FILTER_NONE && filter < ARCADE_FILTER_COUNT;
++}
++
++static inline const char *arcade_filter_intensity_name(int filter)
++{
++    switch (filter) {
++    case ARCADE_FILTER_GRID: return "INTENSIDAD DE GRID";
++    case ARCADE_FILTER_SCANLINES: return "INTENSIDAD LÍNEAS";
++    case ARCADE_FILTER_CRT: return "INTENSIDAD CRT";
++    default: return NULL;
++    }
++}
++
++static inline int *arcade_filter_intensity(int filter, int *grid, int *scanlines, int *crt)
++{
++    switch (filter) {
++    case ARCADE_FILTER_GRID: return grid;
++    case ARCADE_FILTER_SCANLINES: return scanlines;
++    case ARCADE_FILTER_CRT: return crt;
++    default: return NULL;
++    }
++}
++
++static inline int arcade_scanline_width(int row_height)
++{
++    return row_height < 6 ? 1 : row_height / 3;
++}
++
++static inline int arcade_crt_mask_gain(int intensity)
++{
++    return 255 - intensity;
++}
++
++static inline int arcade_sharp_fractional(int width, int height, int source_width, int source_height)
++{
++    return width > 0 && height > 0 &&
++           (width % source_width != 0 || height % source_height != 0);
++}
++
++/* Point-expand once, then let the backend interpolate the fractional stretch. */
++static inline void arcade_expand_2x(uint32_t *dest, size_t pitch,
++                                   const uint32_t *source, int width, int height)
++{
++    for (int y = 0; y < height; ++y) {
++        uint32_t *upper = dest + (size_t)y * 2 * pitch;
++        const uint32_t *row = source + (size_t)y * width;
++        for (int x = 0; x < width; ++x)
++            upper[2 * x] = upper[2 * x + 1] = row[x];
++        memcpy(upper + pitch, upper, (size_t)width * 2 * sizeof(*upper));
++    }
++}
++
++#endif
+diff --git a/runner/cyc/cyc_sdl.c b/runner/cyc/cyc_sdl.c
+--- a/runner/cyc/cyc_sdl.c
++++ b/runner/cyc/cyc_sdl.c
+@@ -82,6 +82,7 @@
+ #ifdef ARCADE_NATIVE_MENU
+ #include "arcade_frame.h"
+ #include "arcade_grid.h"
++#include "cyc_arcade_filter.h"
+ #include "native_menu.h"
+ #include "native_mode.h"
+ #include "cyc_mod.h"
+@@ -280,6 +281,9 @@
+ static int s_applied_picture_w, s_applied_picture_h;
+ static SDL_Renderer *s_ren;
+ static SDL_Texture  *s_tex;
++#ifdef ARCADE_NATIVE_MENU
++static SDL_Texture  *s_sharp_tex;
++#endif
+ static int           s_tex_w, s_tex_h;
+ /* ARCADE_SMOOTH_PRESENT_V090: upload dimensions may exceed logical pixels. */
+ static unsigned      s_picture_scale = 1, s_texture_scale;
+@@ -1308,11 +1312,33 @@
+     SDL_RenderSetScale(s_ren, scale_x, scale_y);
+ }
+ 
+-static void draw_picture_grid(void)
++static void draw_crt_mask(int width, int height, int intensity)
++{
++    const Uint8 gain = (Uint8)arcade_crt_mask_gain(intensity);
++    if (SDL_SetRenderDrawBlendMode(s_ren, SDL_BLENDMODE_MOD) != 0) return;
++    for (int channel = 0; channel < 3; ++channel) {
++        SDL_SetRenderDrawColor(s_ren, channel == 0 ? 255 : gain,
++                              channel == 1 ? 255 : gain, channel == 2 ? 255 : gain, 255);
++        SDL_Rect columns[128];
++        int count = 0;
++        for (int x = channel; x < width; x += 3) {
++            columns[count++] = (SDL_Rect){x, 0, 1, height};
++            if (count == (int)SDL_arraysize(columns)) {
++                SDL_RenderFillRects(s_ren, columns, count);
++                count = 0;
++            }
++        }
++        if (count) SDL_RenderFillRects(s_ren, columns, count);
++    }
++}
++
++static void draw_picture_filter(void)
+ {
+     enum { NES_WIDTH = 256, NES_HEIGHT = 240 };
+-    const int alpha = arcade_grid_alpha(s_set.grid_intensity);
+-    if (!alpha || picture_w() != NES_WIDTH || picture_h() != NES_HEIGHT) return;
++    const int filter = s_set.visual_filter;
++    const int *intensity = arcade_filter_intensity(filter, &s_set.grid_intensity,
++                                                   &s_set.scanline_intensity, &s_set.crt_intensity);
++    if (!intensity || *intensity == 0 || picture_w() != NES_WIDTH || picture_h() != NES_HEIGHT) return;
+ 
+     /* Draw in output pixels within the existing picture viewport. Its
+      * position and the logical coordinates used for input stay unchanged. */
+@@ -1323,24 +1349,52 @@
+     SDL_RenderGetViewport(s_ren, &viewport);
+     const int width = viewport.w;
+     const int height = s_bar ? SDL_min(viewport.h, (int)(NES_HEIGHT * scale_y)) : viewport.h;
+-    if (arcade_grid_visible(width, height, NES_WIDTH, NES_HEIGHT)) {
+-        SDL_Rect lines[NES_WIDTH + NES_HEIGHT - 2];
++    const bool grid = filter == ARCADE_FILTER_GRID;
++    const bool crt = filter == ARCADE_FILTER_CRT;
++    if (grid ? arcade_grid_visible(width, height, NES_WIDTH, NES_HEIGHT) : height / 2 >= NES_HEIGHT) {
++        SDL_Rect lines[NES_WIDTH + NES_HEIGHT];
+         int count = 0;
+-        for (int x = 1; x < NES_WIDTH; ++x)
+-            lines[count++] = (SDL_Rect){arcade_grid_offset(width, x, NES_WIDTH), 0, 1, height};
+-        for (int y = 1; y < NES_HEIGHT; ++y)
+-            lines[count++] = (SDL_Rect){0, arcade_grid_offset(height, y, NES_HEIGHT), width, 1};
++        if (grid) {
++            for (int x = 1; x < NES_WIDTH; ++x)
++                lines[count++] = (SDL_Rect){arcade_grid_offset(width, x, NES_WIDTH), 0, 1, height};
++            for (int y = 1; y < NES_HEIGHT; ++y)
++                lines[count++] = (SDL_Rect){0, arcade_grid_offset(height, y, NES_HEIGHT), width, 1};
++        } else {
++            for (int y = 0; y < NES_HEIGHT; ++y) {
++                const int bottom = arcade_grid_offset(height, y + 1, NES_HEIGHT);
++                const int band = arcade_scanline_width(bottom - arcade_grid_offset(height, y, NES_HEIGHT));
++                lines[count++] = (SDL_Rect){0, bottom - band, width, band};
++            }
++        }
+         SDL_BlendMode blend;
+         Uint8 r, g, b, a;
+         SDL_GetRenderDrawBlendMode(s_ren, &blend);
+         SDL_GetRenderDrawColor(s_ren, &r, &g, &b, &a);
+         SDL_SetRenderDrawBlendMode(s_ren, SDL_BLENDMODE_BLEND);
+-        SDL_SetRenderDrawColor(s_ren, 0, 0, 0, (Uint8)alpha);
++        const int alpha = arcade_grid_alpha(*intensity);
++        SDL_SetRenderDrawColor(s_ren, 0, 0, 0, (Uint8)(crt ? alpha * 3 / 4 : alpha));
+         SDL_RenderFillRects(s_ren, lines, count);
++        if (crt && width / 3 >= NES_WIDTH) draw_crt_mask(width, height, *intensity);
+         SDL_SetRenderDrawColor(s_ren, r, g, b, a);
+         SDL_SetRenderDrawBlendMode(s_ren, blend);
+     }
+     SDL_RenderSetScale(s_ren, scale_x, scale_y);
++}
++
++static bool draw_sharp_picture(const uint32_t *pixels, int w, int h, const SDL_Rect *dest)
++{
++    if (!s_sharp_tex) {
++        s_sharp_tex = SDL_CreateTexture(s_ren, SDL_PIXELFORMAT_ARGB8888,
++                                      SDL_TEXTUREACCESS_STREAMING, w * 2, h * 2);
++        if (!s_sharp_tex) return false;
++        SDL_SetTextureScaleMode(s_sharp_tex, SDL_ScaleModeLinear);
++    }
++    void *expanded;
++    int pitch;
++    if (SDL_LockTexture(s_sharp_tex, NULL, &expanded, &pitch) != 0) return false;
++    arcade_expand_2x(expanded, (size_t)pitch / sizeof(uint32_t), pixels, w, h);
++    SDL_UnlockTexture(s_sharp_tex);
++    return SDL_RenderCopy(s_ren, s_sharp_tex, NULL, dest) == 0;
+ }
+ #endif
+ 
+@@ -1366,16 +1420,37 @@
+     (void)toast_title;
+     (void)toast_body;
+ #endif
+-    SDL_UpdateTexture(s_tex, NULL, pic, w * 4);
+     SDL_SetRenderDrawColor(s_ren, 0, 0, 0, 255);
+     SDL_RenderClear(s_ren);
+ #ifdef ARCADE_NATIVE_MENU
+     if (arcade_menu_active() && s_set.frame_mode == 1) draw_picture_frame();
+ #endif
+     const SDL_Rect dst = { 0, 0, picture_w(), picture_h() };
+-    SDL_RenderCopy(s_ren, s_tex, NULL, &dst);
++    bool drawn = false;
+ #ifdef ARCADE_NATIVE_MENU
+-    if (arcade_menu_active() && s_set.visual_filter == 1) draw_picture_grid();
++    if (arcade_menu_active()) {
++        SDL_ScaleMode scale_mode = s_set.linear_filter ? SDL_ScaleModeLinear : SDL_ScaleModeNearest;
++        if (s_set.visual_filter == ARCADE_FILTER_SHARP) {
++            float scale_x, scale_y;
++            SDL_RenderGetScale(s_ren, &scale_x, &scale_y);
++            const int width = (int)(dst.w * scale_x + 0.5f);
++            const int height = (int)(dst.h * scale_y + 0.5f);
++            const bool fractional = arcade_sharp_fractional(width, height, dst.w, dst.h);
++            scale_mode = fractional ? SDL_ScaleModeLinear : SDL_ScaleModeNearest;
++            if (fractional && w == 256 && h == 240 && width >= w && height >= h)
++                drawn = draw_sharp_picture(pic, w, h, &dst);
++        }
++        SDL_ScaleMode previous;
++        if (!drawn && SDL_GetTextureScaleMode(s_tex, &previous) == 0 && previous != scale_mode)
++            SDL_SetTextureScaleMode(s_tex, scale_mode);
++    }
++#endif
++    if (!drawn) {
++        SDL_UpdateTexture(s_tex, NULL, pic, w * 4);
++        SDL_RenderCopy(s_ren, s_tex, NULL, &dst);
++    }
++#ifdef ARCADE_NATIVE_MENU
++    if (arcade_menu_active()) draw_picture_filter();
+ #endif
+     CycZapperState gun;
+     cyc_zapper_state(&gun);
+@@ -1494,6 +1569,9 @@
+     s_arcade_present_parts = 1;
+     s_picture_scale = 1;
+     s_texture_scale = 0;
++#ifdef ARCADE_NATIVE_MENU
++    s_sharp_tex = NULL;
++#endif
+     /* a path names the game by its file's stem */
+     char title[256];
+     const char *base = title_in, *s1 = strrchr(title_in, '/'), *s2 = strrchr(title_in, '\\');
+@@ -1990,6 +2068,9 @@
+     for (int i = 0; i < s_pad_count; ++i) SDL_GameControllerClose(s_pads[i]);
+     if (s_vpad_joy) SDL_JoystickClose(s_vpad_joy);
+     SDL_DestroyTexture(s_tex);
++#ifdef ARCADE_NATIVE_MENU
++    if (s_sharp_tex) SDL_DestroyTexture(s_sharp_tex);
++#endif
+     SDL_DestroyRenderer(s_ren);
+     if (!shared_window) {
+         SDL_DestroyWindow(s_win);
+diff --git a/runner/cyc/cyc_settings.c b/runner/cyc/cyc_settings.c
+--- a/runner/cyc/cyc_settings.c
++++ b/runner/cyc/cyc_settings.c
+@@ -2,6 +2,7 @@
+  * cyc_settings.c - config.ini for the windowed cycle host (cyc_settings.h).
+  */
+ #include "cyc_settings.h"
++#include "cyc_arcade_filter.h"
+ 
+ #include <ctype.h>
+ #include <stdlib.h>
+@@ -22,6 +23,8 @@
+     s->show_fps = 0;
+     s->frame_rgb = CYC_DEFAULT_FRAME_RGB;
+     s->grid_intensity = 35;
++    s->scanline_intensity = 35;
++    s->crt_intensity = 35;
+     s->fps_target = 60;
+     s->vsync = 0;
+     s->audio_enabled = 1;
+@@ -157,8 +160,10 @@
+                 else bad = true;
+             }
+             else if (eq_ci(key, "FrameColor")) bad = !parse_rgb24(val, &s->frame_rgb);
+-            else if (eq_ci(key, "VisualFilter")) bad = !parse_display_range(val, 1, &s->visual_filter);
++            else if (eq_ci(key, "VisualFilter")) bad = !parse_display_range(val, ARCADE_FILTER_COUNT - 1, &s->visual_filter);
+             else if (eq_ci(key, "GridIntensity")) bad = !parse_display_range(val, 100, &s->grid_intensity);
++            else if (eq_ci(key, "ScanlineIntensity")) bad = !parse_display_range(val, 100, &s->scanline_intensity);
++            else if (eq_ci(key, "CrtIntensity")) bad = !parse_display_range(val, 100, &s->crt_intensity);
+             else if (eq_ci(key, "TargetFPS")) {
+                 bad = !parse_int(val, &v);
+                 if (!bad) {
+@@ -258,6 +263,7 @@
+     fprintf(f, "FrameMode = %d\nFrameColor = #%06X\n", s->frame_mode,
+             (unsigned)s->frame_rgb);
+     fprintf(f, "VisualFilter = %d\nGridIntensity = %d\n", s->visual_filter, s->grid_intensity);
++    fprintf(f, "ScanlineIntensity = %d\nCrtIntensity = %d\n", s->scanline_intensity, s->crt_intensity);
+     fprintf(f, "TargetFPS = %d\n", s->fps_target);
+     fprintf(f, "[Audio]\nEnabled = %d\nVolume = %d\n", s->audio_enabled, s->volume);
+     fprintf(f, "MusicEnabled = %d\nMusicVolume = %d\n", s->music_enabled, s->music_volume);
+diff --git a/runner/cyc/cyc_settings.h b/runner/cyc/cyc_settings.h
+--- a/runner/cyc/cyc_settings.h
++++ b/runner/cyc/cyc_settings.h
+@@ -41,8 +41,10 @@
+     int  show_fps;          /* bool */
+     int  frame_mode;        /* 0 off, 1 classic */
+     uint32_t frame_rgb;     /* RGB24 */
+-    int  visual_filter;     /* 0 off, 1 Grid */
++    int  visual_filter;     /* ARCADE_FILTER_* */
+     int  grid_intensity;     /* 0..100 */
++    int  scanline_intensity;
++    int  crt_intensity;
+     int  fps_target;        /* 60, 120, 180 */
+     int  vsync;             /* bool: sync presents to the display refresh */
+     int  audio_enabled;     /* bool */
+diff --git a/runner/cyc/cyc_ui_launcher.c b/runner/cyc/cyc_ui_launcher.c
+--- a/runner/cyc/cyc_ui_launcher.c
++++ b/runner/cyc/cyc_ui_launcher.c
+@@ -12,6 +12,7 @@
+ #include "native_title_audio.h"
+ #endif
+ #include "cyc_settings.h"
++#include "cyc_arcade_filter.h"
+ #include "cyc_diagnostics.h"
+ 
+ #include "cyc_input.h"
+@@ -69,6 +70,8 @@
+     io->arcade_frame_rgb = s->frame_rgb;
+     io->arcade_visual_filter = s->visual_filter;
+     io->arcade_grid_intensity = s->grid_intensity;
++    io->arcade_scanline_intensity = s->scanline_intensity;
++    io->arcade_crt_intensity = s->crt_intensity;
+     io->arcade_target_fps = s->fps_target;
+     io->arcade_music_enabled = s->music_enabled;
+     io->arcade_music_volume = s->music_volume;
+@@ -114,10 +117,14 @@
+         s->frame_mode = io->arcade_frame_mode;
+     if (io->arcade_frame_rgb <= UINT32_C(0xFFFFFF))
+         s->frame_rgb = io->arcade_frame_rgb;
+-    if (io->arcade_visual_filter == 0 || io->arcade_visual_filter == 1)
++    if (arcade_filter_valid(io->arcade_visual_filter))
+         s->visual_filter = io->arcade_visual_filter;
+     if (io->arcade_grid_intensity >= 0 && io->arcade_grid_intensity <= 100)
+         s->grid_intensity = io->arcade_grid_intensity;
++    if (io->arcade_scanline_intensity >= 0 && io->arcade_scanline_intensity <= 100)
++        s->scanline_intensity = io->arcade_scanline_intensity;
++    if (io->arcade_crt_intensity >= 0 && io->arcade_crt_intensity <= 100)
++        s->crt_intensity = io->arcade_crt_intensity;
+     s->music_enabled = io->arcade_music_enabled != 0;
+     s->music_volume = io->arcade_music_volume < 0 ? 0 : io->arcade_music_volume > 100 ? 100 : io->arcade_music_volume;
+     const int target = io->arcade_target_fps;
+diff --git a/runner/cyc/cyc_ui_menu.c b/runner/cyc/cyc_ui_menu.c
+--- a/runner/cyc/cyc_ui_menu.c
++++ b/runner/cyc/cyc_ui_menu.c
+@@ -7,6 +7,7 @@
+  */
+ #include "cyc_ui.h"
+ #include "cyc_settings.h"
++#include "cyc_arcade_filter.h"
+ 
+ #include "cyc_core.h"
+ #include "cyc_disk_action.h"
+@@ -292,7 +293,6 @@
+ {
+     static const char *const fullscreen[] = { "Ventana", "Pantalla completa" };
+     static const char *const frames[] = { "Desactivado", "Clásico" };
+-    static const char *const filters[] = { "Sin filtro", "Grid" };
+     static const char *const devices[] = { "Desactivado", "Teclado", "Mando" };
+     static const char *const player_pages[] = {
+         "Pausa/Opciones/Controles/Jugador 1", "Pausa/Opciones/Controles/Jugador 2"
+@@ -348,8 +348,9 @@
+     add("cyc.arcade.frame_rgb", graphics, "Color del marco", NULL,
+         RECOMP_RUNTIME_UI_COLOR, 0, 0xffffff, 1, NULL, 0, NULL);
+     add("cyc.arcade.visual_filter", graphics, "Filtro visual", NULL,
+-        RECOMP_RUNTIME_UI_CHOICE, 0, 1, 1, filters, 2, NULL);
+-    add("cyc.arcade.grid_intensity", graphics, "Intensidad de Grid", NULL,
++        RECOMP_RUNTIME_UI_CHOICE, 0, ARCADE_FILTER_COUNT - 1, 1,
++        arcade_filter_names, ARCADE_FILTER_COUNT, NULL);
++    add(ARCADE_FILTER_INTENSITY_KEY, graphics, "Intensidad", NULL,
+         RECOMP_RUNTIME_UI_INT, 0, 100, 5, NULL, 0, NULL);
+     arcade_pause_back(graphics);
+ 
+@@ -415,7 +416,12 @@
+     else if (is_key(it, RECOMP_RUNTIME_UI_KEY_LINEAR_FILTER)) *out = s->linear_filter;
+ #ifdef ARCADE_NATIVE_MENU
+     else if (is_key(it, "cyc.arcade.visual_filter")) *out = s->visual_filter;
+-    else if (is_key(it, "cyc.arcade.grid_intensity")) *out = s->grid_intensity;
++    else if (is_key(it, ARCADE_FILTER_INTENSITY_KEY)) {
++        const int *value = arcade_filter_intensity(s->visual_filter, &s->grid_intensity,
++                                                 &s->scanline_intensity, &s->crt_intensity);
++        if (!value) return 0;
++        *out = *value;
++    }
+     else if (is_key(it, "cyc.arcade.frame_mode")) *out = s->frame_mode;
+     else if (is_key(it, "cyc.arcade.frame_rgb")) *out = (int)s->frame_rgb;
+ #endif
+@@ -464,11 +470,15 @@
+     else if (is_key(it, RECOMP_RUNTIME_UI_KEY_LINEAR_FILTER)) s->linear_filter = v != 0;
+ #ifdef ARCADE_NATIVE_MENU
+     else if (is_key(it, "cyc.arcade.visual_filter")) {
+-        s->visual_filter = v == 1;
++        if (!arcade_filter_valid(v)) return 0;
++        s->visual_filter = v;
+         return 1;
+     }
+-    else if (is_key(it, "cyc.arcade.grid_intensity")) {
+-        s->grid_intensity = v < 0 ? 0 : v > 100 ? 100 : v;
++    else if (is_key(it, ARCADE_FILTER_INTENSITY_KEY)) {
++        int *value = arcade_filter_intensity(s->visual_filter, &s->grid_intensity,
++                                           &s->scanline_intensity, &s->crt_intensity);
++        if (!value || v < 0 || v > 100) return 0;
++        *value = v;
+         return 1;
+     }
+     else if (is_key(it, "cyc.arcade.frame_mode")) s->frame_mode = v != 0;
+@@ -600,7 +610,8 @@
+     if (is_key(it, RECOMP_RUNTIME_UI_KEY_WINDOW_SCALE)) return s_host.settings->fullscreen == 0;
+     if (is_key(it, "cyc.arcade.vsync")) return s_host.settings->fps_target == 60;
+ #ifdef ARCADE_NATIVE_MENU
+-    if (is_key(it, "cyc.arcade.grid_intensity")) return s_host.settings->visual_filter == 1;
++    if (is_key(it, ARCADE_FILTER_INTENSITY_KEY))
++        return arcade_filter_intensity_name(s_host.settings->visual_filter) != NULL;
+ #endif
+     if (mod_row(it)) return mod_enabled(mod_row(it));
+     if (game_row(it) && x && x->menu_callbacks && x->menu_callbacks->is_enabled)
+@@ -611,6 +622,14 @@
+ static int get_text(void *ctx, const RecompRuntimeUiItem *it, char *buf, size_t n)
+ {
+     (void)ctx;
++#ifdef ARCADE_NATIVE_MENU
++    if (is_key(it, ARCADE_FILTER_INTENSITY_KEY)) {
++        const char *label = arcade_filter_intensity_name(s_host.settings->visual_filter);
++        if (!label) return 0;
++        snprintf(buf, n, "%s", label);
++        return 1;
++    }
++#endif
+     const CycHostExtras *x = s_host.extras;
+     return game_row(it) && x && x->menu_callbacks && x->menu_callbacks->get_text &&
+         x->menu_callbacks->get_text(x->menu_callbacks->context, it, buf, n);

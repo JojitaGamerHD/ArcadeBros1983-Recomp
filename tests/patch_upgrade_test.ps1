@@ -41,6 +41,14 @@ foreach ($case in @(
     $ajustes = Join-Path $patchRoot 'arcade-v1.0.2-ajustes.patch'
     $grid = Join-Path $patchRoot 'arcade-v1.0.3-grid.patch'
     $diseno = Join-Path $patchRoot 'arcade-diseno-menus.patch'
+    $filtros = Join-Path $patchRoot 'arcade-v1.0.5-filtros.patch'
+    Aplicar-ParchesMenu $fixture $current $menu $ajustes $grid $case[0] $previous -diseno $diseno -filtros $filtros
+    Aplicar-ParchesMenu $fixture $current $menu $ajustes $grid $case[0] $previous -diseno $diseno -filtros $filtros
+    git -C $fixture apply --reverse $filtros
+    Verificar-Comando 'Fallo la aplicacion limpia o la idempotencia de los filtros.'
+    Aplicar-ParchesMenu $fixture $current $menu $ajustes $grid $case[0] $previous -diseno $diseno -filtros $filtros
+    git -C $fixture apply --reverse $filtros
+    Verificar-Comando 'No se pudo actualizar los filtros desde v1.0.4.'
     Aplicar-ParchesMenu $fixture $current $menu $ajustes $grid $case[0] $previous -diseno $diseno
     Aplicar-ParchesMenu $fixture $current $menu $ajustes $grid $case[0] $previous -diseno $diseno
     git -C $fixture apply --reverse $diseno

@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.20)
 
-project(ArcadeBros1983Recomp VERSION 1.0.4 LANGUAGES C CXX)
+project(ArcadeBros1983Recomp VERSION 1.0.5 LANGUAGES C CXX)
 
 set(CMAKE_C_STANDARD 11)
 set(CMAKE_CXX_STANDARD 17)
@@ -37,7 +37,16 @@ if(WIN32)
     target_link_libraries(ArcadeBrosLauncher PRIVATE comdlg32 bcrypt)
 endif()
 
-# ARCADE_MUSIC_V080: local user audio is optional and never embedded.
+# Background music included with the game.
+add_custom_command(TARGET ArcadeBros1983Recomp POST_BUILD
+    COMMAND "${CMAKE_COMMAND}" -E make_directory
+        "$<TARGET_FILE_DIR:ArcadeBros1983Recomp>/assets/music"
+    COMMAND "${CMAKE_COMMAND}" -E copy_if_different
+        "${CMAKE_CURRENT_SOURCE_DIR}/assets/music/overworld-theme.wav"
+        "$<TARGET_FILE_DIR:ArcadeBros1983Recomp>/assets/music/overworld-theme.wav"
+    VERBATIM)
+
+# Keep supporting local overrides in developer builds.
 if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/assets/music/stage1.m4a")
     add_custom_command(TARGET ArcadeBros1983Recomp POST_BUILD
         COMMAND "${CMAKE_COMMAND}" -E make_directory

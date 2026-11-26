@@ -107,8 +107,8 @@ add_executable(music_mix_test music_mix_test.cpp "${ARCADE_ROOT}/src/music.cpp")
 target_compile_features(music_mix_test PRIVATE cxx_std_17)
 target_include_directories(music_mix_test PRIVATE "${ARCADE_ROOT}/src")
 target_link_libraries(music_mix_test PRIVATE mfplat mfreadwrite mfuuid ole32)
-set(ARCADE_TEST_TRACK "${ARCADE_ROOT}/assets/music/stage1.m4a" CACHE FILEPATH
-    "Pista privada utilizada para comprobar decodificacion y mezcla; nunca se descarga.")
+set(ARCADE_TEST_TRACK "${ARCADE_ROOT}/assets/music/overworld-theme.wav" CACHE FILEPATH
+    "Pista utilizada para comprobar decodificacion y mezcla.")
 add_test(NAME music_decode_and_mix COMMAND music_mix_test "${ARCADE_TEST_TRACK}")
 set_tests_properties(music_decode_and_mix PROPERTIES SKIP_RETURN_CODE 77)
 

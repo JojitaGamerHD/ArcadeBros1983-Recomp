@@ -15,7 +15,7 @@ La preparación se realiza en tu equipo y se guarda para las siguientes
 aperturas. El paquete contiene las herramientas necesarias: el jugador no
 necesita instalar Visual Studio, CMake ni Python.
 
-Este ZIP no incluye ROM ni música. Está preparado para la revisión de ROM
+El juego necesita una ROM local. Está preparado para la revisión de ROM
 identificada por el SHA256 completo:
 a2a0aa437a735cd36ed29a8e7c5b3dfa10590c6203e893f1668c7995bad2b309
 No se proporcionan enlaces de descarga de ROMs.
@@ -36,8 +36,11 @@ la pantalla completa.
 En Gráficos puedes activar el Marco clásico y cambiar su color. El marco
 viene desactivado. Sigue la proporción de la imagen original de 256 × 240
 píxeles y deja espacio para los cuatro lados dentro de la ventana.
-En Gráficos > Filtro visual puedes activar Grid y ajustar su intensidad.
-La cuadrícula aparece en la partida y la demo a partir de 2× de escala.
+En Gráficos > Filtro visual puedes elegir Grid, Scanlines, CRT o Nítido
+para la partida y la demo. Grid, Scanlines y CRT guardan su intensidad
+por separado. La cuadrícula y las líneas aparecen desde 2× de escala.
+CRT añade su máscara de color desde 3× de escala horizontal. Nítido
+ajusta los bordes de los píxeles cuando la escala es fraccionaria.
 Al terminar la secuencia de fin de partida vuelves al menú principal.
 60 FPS es la opción recomendada. Los modos 120/180 son experimentales:
 la lógica y la velocidad de NES permanecen aproximadamente a 60 FPS.
@@ -56,11 +59,13 @@ material privado y no forma parte de ese ZIP.
 
 MÚSICA OPCIONAL
 
-Puedes aportar una pista M4A/MP4 compatible con Media Foundation en:
-Datos/Music/stage1.m4a
-Activa Música de fondo en Audio y ajusta su volumen. La pista empieza después
-de la introducción de cada fase, continúa durante la pérdida de una vida y
-se detiene en Game Over.
+Activa Música de fondo en Audio para escuchar Overworld Theme de Louswan
+(CC0 1.0). Puedes ajustar el volumen de la música por separado.
+Para usar tu propia música, guarda un M4A compatible con Media Foundation
+como Datos\Music\stage1.m4a dentro de la carpeta extraída y reinicia el
+juego. La pista personal tiene prioridad sobre la incluida.
+La música empieza después de la introducción de cada fase, continúa
+durante la pérdida de una vida y se detiene en Game Over.
 
 AYUDA Y FUENTES
 

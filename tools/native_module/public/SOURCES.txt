@@ -24,6 +24,11 @@ localmente el módulo nativo. Avisos de LLVM y componentes en Bin/licenses.
 SDL2 2.30.0
 https://github.com/libsdl-org/SDL/releases/tag/release-2.30.0
 
+Overworld Theme (versión alternativa), por Louswan
+https://opengameart.org/content/overworld-theme-0
+CC0 1.0 Universal. El WAV se conserva sin modificaciones.
+https://creativecommons.org/publicdomain/zero/1.0/
+
 Los demás avisos de bibliotecas, fuentes e imágenes auxiliares están en
 Bin/licenses. Las cabeceras del SDK genérico conservan sus avisos originales.
 
